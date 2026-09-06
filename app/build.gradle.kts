@@ -11,8 +11,8 @@ android {
         applicationId = "com.melodia.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "2.8"
+        versionCode = 12
+        versionName = "2.9"
     }
     buildTypes {
         release {
@@ -42,6 +42,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.media3:media3-exoplayer:1.2.1")
     implementation("androidx.media3:media3-session:1.2.1")
+    implementation("androidx.media:media:1.7.0")
     implementation("dev.chrisbanes.haze:haze:0.3.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.room:room-runtime:2.6.1")

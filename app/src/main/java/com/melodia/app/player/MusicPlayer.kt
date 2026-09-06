@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.util.Log
-import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -67,8 +66,8 @@ class MusicPlayer(private val context: Context) {
     fun initialize() {
         if (bound) return
         try {
+            // Solo bind al abrir: el foreground + notificación se activan al sonar
             val intent = Intent(context, MelodiaPlaybackService::class.java)
-            ContextCompat.startForegroundService(context, intent)
             bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
             scope.launch { while (isActive) { updateState(); delay(500) } }
         } catch (e: Exception) { Log.e("MusicPlayer", "init fail", e) }
