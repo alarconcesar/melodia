@@ -28,7 +28,7 @@ sin Hilt: arranque estable con DI manual.
 
 - Gradle 8.5 · AGP 8.2.2 · Kotlin 1.9.22 · Compose compiler 1.5.8
 - Compose BOM 2024.01.00 · Material 3
-- Media3 ExoPlayer + Session 1.2.1 · Room 2.6.1 (KSP) · Coil 2.5.0
+- Media3 ExoPlayer + Session 1.2.1 · Room 2.6.1 (KSP) · Coil 2.5.0 · Haze 0.3.1 (blur)
 - DI manual (`AppContainer`) — decisión consciente: Hilt + Room + KSP daban
   pantallas negras en arranque (ver `docs/ARCHITECTURE.md`).
 

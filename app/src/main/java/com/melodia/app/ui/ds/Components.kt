@@ -217,19 +217,27 @@ fun DsBackground() {
             .background(Brush.verticalGradient(listOf(cs.surface, cs.surface, cs.background)))
     )
     Canvas(Modifier.fillMaxSize()) {
-        // Glow superior verde (como las refs)
+        val w = size.width
+        val green = Color(0xFF2EE56B)
+        // Glow superior: degradado radial que se funde a transparente (sin borde duro)
         drawCircle(
-            color = Color(0xFF2EE56B),
-            radius = size.width * 0.85f,
-            center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, -size.width * 0.3f),
-            alpha = 0.11f
+            brush = Brush.radialGradient(
+                colors = listOf(green.copy(alpha = 0.14f), green.copy(alpha = 0.05f), Color.Transparent),
+                center = androidx.compose.ui.geometry.Offset(w * 0.5f, -w * 0.3f),
+                radius = w * 0.95f
+            ),
+            radius = w * 0.95f,
+            center = androidx.compose.ui.geometry.Offset(w * 0.5f, -w * 0.3f)
         )
-        // Glow inferior sutil para dar profundidad
+        // Glow inferior sutil
         drawCircle(
-            color = Color(0xFF2EE56B),
-            radius = size.width * 0.9f,
-            center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height + size.width * 0.2f),
-            alpha = 0.05f
+            brush = Brush.radialGradient(
+                colors = listOf(green.copy(alpha = 0.06f), Color.Transparent),
+                center = androidx.compose.ui.geometry.Offset(w * 0.5f, size.height + w * 0.2f),
+                radius = w
+            ),
+            radius = w,
+            center = androidx.compose.ui.geometry.Offset(w * 0.5f, size.height + w * 0.2f)
         )
     }
 }
@@ -254,7 +262,7 @@ fun EqBars(color: Color, modifier: Modifier = Modifier) {
 
 // ── PillNav DS · barra flotante ──────────────────────────────────
 @Composable
-fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit) {
+fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier) {
     val cs = MaterialTheme.colorScheme
     val items = listOf(
         Triple("Inicio", Icons.Default.Home, 0),
@@ -263,9 +271,9 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit) {
         Triple("Favs", Icons.Default.Favorite, 3)
     )
     Surface(
-        shape = CircleShape, color = cs.surface.copy(alpha = 0.8f),
+        shape = CircleShape, color = Color.Transparent,
         tonalElevation = 4.dp, shadowElevation = 12.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
             .border(1.dp, cs.outline.copy(alpha = 0.6f), CircleShape)
     ) {
         Row(
@@ -307,13 +315,14 @@ fun MiniPlayerDs(
     isFav: Boolean,
     onToggleFav: () -> Unit,
     onToggle: () -> Unit,
-    onOpen: () -> Unit
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val cs = MaterialTheme.colorScheme
     Surface(
-        shape = Ds.CardShape, color = cs.surfaceVariant.copy(alpha = 0.88f),
+        shape = Ds.CardShape, color = Color.Transparent,
         tonalElevation = 2.dp, shadowElevation = 10.dp,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)
+        modifier = modifier.fillMaxWidth().clickable(onClick = onOpen)
             .border(1.dp, cs.outline.copy(alpha = 0.55f), Ds.CardShape)
     ) {
         Column {

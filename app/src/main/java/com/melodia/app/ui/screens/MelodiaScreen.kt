@@ -11,6 +11,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import dev.chrisbanes.haze.haze
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
@@ -146,6 +150,9 @@ fun MelodiaScreen(vm: MainViewModel) {
     var showEq by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf<Song?>(null) }
     var renameId by remember { mutableStateOf<Long?>(null) }
+    // Áreas de las barras flotantes para el blur (Haze)
+    var navArea by remember { mutableStateOf<Rect?>(null) }
+    var miniArea by remember { mutableStateOf<Rect?>(null) }
 
     // ── Back Android por capas: player → detalle → filtro → salir ──
     if (showPlayer) {
@@ -158,7 +165,16 @@ fun MelodiaScreen(vm: MainViewModel) {
 
     Box(Modifier.fillMaxSize().background(cs.background)) {
         DsBackground()
-        Column(Modifier.fillMaxSize()) {
+        // Haze: el contenido se dibuja difuminado bajo las barras flotantes
+        val hazeAreas = listOfNotNull(navArea, miniArea.takeIf { current != null && !showPlayer })
+        Column(
+            Modifier.fillMaxSize()
+                .haze(
+                    *hazeAreas.toTypedArray(),
+                    backgroundColor = cs.surface.copy(alpha = 0.55f),
+                    blurRadius = 26.dp
+                )
+        ) {
             // ── Top bar DS ──
             Row(
                 Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 4.dp),
@@ -229,8 +245,11 @@ fun MelodiaScreen(vm: MainViewModel) {
                 }
                 }
             }
-            // ── Pill nav flotante ──
-            Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)) {
+            // ── Pill nav flotante (con blur de fondo) ──
+            Box(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)
+                    .onGloballyPositioned { navArea = it.boundsInRoot() }
+            ) {
                 MelodiaPillNav(tab = tab, onTab = { tab = it })
             }
         }
@@ -241,7 +260,10 @@ fun MelodiaScreen(vm: MainViewModel) {
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             current?.let { s ->
-                Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 96.dp)) {
+                Box(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 96.dp)
+                        .onGloballyPositioned { miniArea = it.boundsInRoot() }
+                ) {
                     MiniPlayerDs(
                         title = s.title, artist = s.artist, playing = state.isPlaying,
                         progress = state.progress, isFav = favIds.contains(s.id),
