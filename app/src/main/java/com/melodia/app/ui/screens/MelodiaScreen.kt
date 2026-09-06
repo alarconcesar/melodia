@@ -11,9 +11,12 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import dev.chrisbanes.haze.haze
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -153,6 +156,7 @@ fun MelodiaScreen(vm: MainViewModel) {
     // Áreas de las barras flotantes para el blur (Haze)
     var navArea by remember { mutableStateOf<Rect?>(null) }
     var miniArea by remember { mutableStateOf<Rect?>(null) }
+    var contentPos by remember { mutableStateOf(Offset.Zero) }
 
     // ── Back Android por capas: player → detalle → filtro → salir ──
     if (showPlayer) {
@@ -165,16 +169,7 @@ fun MelodiaScreen(vm: MainViewModel) {
 
     Box(Modifier.fillMaxSize().background(cs.background)) {
         DsBackground()
-        // Haze: el contenido se dibuja difuminado bajo las barras flotantes
-        val hazeAreas = listOfNotNull(navArea, miniArea.takeIf { current != null && !showPlayer })
-        Column(
-            Modifier.fillMaxSize()
-                .haze(
-                    *hazeAreas.toTypedArray(),
-                    backgroundColor = cs.surface.copy(alpha = 0.55f),
-                    blurRadius = 26.dp
-                )
-        ) {
+        Column(Modifier.fillMaxSize()) {
             // ── Top bar DS ──
             Row(
                 Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 4.dp),
@@ -220,8 +215,19 @@ fun MelodiaScreen(vm: MainViewModel) {
                     modifier = Modifier.padding(start = 20.dp)
                 )
             }
-            // ── Content (transición suave entre tabs) ──
-            Box(Modifier.weight(1f)) {
+            // ── Content: única zona con blur (las barras están fuera) ──
+            // Áreas en coords locales del contenido, como el sample oficial
+            val hazeAreas = listOfNotNull(navArea, miniArea.takeIf { current != null && !showPlayer })
+                .map { RoundRect(it.translate(Offset(-contentPos.x, -contentPos.y))) }
+            Box(
+                Modifier.weight(1f)
+                    .onGloballyPositioned { contentPos = it.positionInRoot() }
+                    .haze(
+                        *hazeAreas.toTypedArray(),
+                        backgroundColor = cs.surface.copy(alpha = 0.55f),
+                        blurRadius = 26.dp
+                    )
+            ) {
                 AnimatedContent(
                     targetState = tab, label = "tabs",
                     transitionSpec = { fadeIn() togetherWith fadeOut() }
@@ -245,13 +251,14 @@ fun MelodiaScreen(vm: MainViewModel) {
                 }
                 }
             }
-            // ── Pill nav flotante (con blur de fondo) ──
-            Box(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)
-                    .onGloballyPositioned { navArea = it.boundsInRoot() }
-            ) {
-                MelodiaPillNav(tab = tab, onTab = { tab = it })
-            }
+        } // fin Column principal
+        // ── Pill nav overlay: la lista pasa por debajo con blur ──
+        Box(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .onGloballyPositioned { navArea = it.boundsInRoot() }
+        ) {
+            MelodiaPillNav(tab = tab, onTab = { tab = it })
         }
         // ── MiniPlayer flotante ──
         AnimatedVisibility(
