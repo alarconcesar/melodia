@@ -271,7 +271,7 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
         Triple("Favs", Icons.Default.Favorite, 3)
     )
     Surface(
-        shape = CircleShape, color = Color.Transparent,
+        shape = CircleShape, color = cs.surface.copy(alpha = 0.78f),
         tonalElevation = 4.dp, shadowElevation = 12.dp,
         modifier = modifier.fillMaxWidth()
             .border(1.dp, cs.outline.copy(alpha = 0.6f), CircleShape)
@@ -320,7 +320,7 @@ fun MiniPlayerDs(
 ) {
     val cs = MaterialTheme.colorScheme
     Surface(
-        shape = Ds.CardShape, color = Color.Transparent,
+        shape = Ds.CardShape, color = cs.surfaceVariant.copy(alpha = 0.85f),
         tonalElevation = 2.dp, shadowElevation = 10.dp,
         modifier = modifier.fillMaxWidth().clickable(onClick = onOpen)
             .border(1.dp, cs.outline.copy(alpha = 0.55f), Ds.CardShape)

@@ -11,12 +11,14 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import dev.chrisbanes.haze.haze
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -216,15 +218,24 @@ fun MelodiaScreen(vm: MainViewModel) {
                 )
             }
             // ── Content: única zona con blur (las barras están fuera) ──
-            // Áreas en coords locales del contenido, como el sample oficial
-            val hazeAreas = listOfNotNull(navArea, miniArea.takeIf { current != null && !showPlayer })
-                .map { RoundRect(it.translate(Offset(-contentPos.x, -contentPos.y))) }
+            // Velo con las mismas formas redondeadas de las barras (sin "cuadro")
+            val density = LocalDensity.current
+            fun rounded(rect: Rect, radiusPx: Float): RoundRect {
+                val moved = rect.translate(Offset(-contentPos.x, -contentPos.y))
+                val c = CornerRadius(radiusPx)
+                return RoundRect(moved, c, c, c, c)
+            }
+            val miniR = with(density) { 20.dp.toPx() }
+            val hazeAreas = listOfNotNull(
+                navArea?.let { rounded(it, it.height / 2f) },
+                miniArea.takeIf { current != null && !showPlayer }?.let { rounded(it, miniR) }
+            )
             Box(
                 Modifier.weight(1f)
                     .onGloballyPositioned { contentPos = it.positionInRoot() }
                     .haze(
                         *hazeAreas.toTypedArray(),
-                        backgroundColor = cs.surface.copy(alpha = 0.55f),
+                        backgroundColor = cs.surface.copy(alpha = 0.32f),
                         blurRadius = 26.dp
                     )
             ) {
