@@ -1,8 +1,14 @@
 package com.melodia.app.player
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.*
@@ -27,32 +33,70 @@ class MusicPlayer(private val context: Context) {
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state
     private var queueIds: List<Long> = emptyList()
-    private var idToUri: Map<Long, String> = emptyMap()
+    private var songMap: Map<Long, com.melodia.app.data.model.Song> = emptyMap()
+    private var listener: Player.Listener? = null
+    private var bound = false
+
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            try {
+                val player = (service as? MelodiaPlaybackService.LocalBinder)?.getPlayer()
+                if (player != null) {
+                    exo = player
+                    attachListener(player)
+                    updateState()
+                }
+            } catch (e: Exception) { Log.e("MusicPlayer", "bind fail", e) }
+        }
+        override fun onServiceDisconnected(name: ComponentName?) {
+            try { listener?.let { exo?.removeListener(it) } } catch (_: Exception) {}
+            exo = null
+        }
+    }
+
+    private fun attachListener(player: ExoPlayer) {
+        try { listener?.let { player.removeListener(it) } } catch (_: Exception) {}
+        listener = object : Player.Listener {
+            override fun onIsPlayingChanged(v: Boolean) { updateState() }
+            override fun onMediaItemTransition(m: MediaItem?, r: Int) { updateState() }
+            override fun onPlaybackStateChanged(s: Int) { updateState(); attachEq() }
+            override fun onAudioSessionIdChanged(id: Int) { try { eq?.attach(id) } catch (_: Exception) {} }
+        }.also { player.addListener(it) }
+    }
 
     fun initialize() {
-        if (exo != null) return
+        if (bound) return
         try {
-            exo = ExoPlayer.Builder(context).setHandleAudioBecomingNoisy(true).build().also { p ->
-                p.addListener(object : Player.Listener {
-                    override fun onIsPlayingChanged(v: Boolean) { updateState() }
-                    override fun onMediaItemTransition(m: MediaItem?, r: Int) { updateState() }
-                    override fun onPlaybackStateChanged(s: Int) { updateState(); attachEq() }
-                    override fun onAudioSessionIdChanged(id: Int) { try { eq?.attach(id) } catch (_: Exception) {} }
-                })
-            }
+            val intent = Intent(context, MelodiaPlaybackService::class.java)
+            ContextCompat.startForegroundService(context, intent)
+            bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
             scope.launch { while (isActive) { updateState(); delay(500) } }
         } catch (e: Exception) { Log.e("MusicPlayer", "init fail", e) }
     }
 
     fun setQueue(songs: List<com.melodia.app.data.model.Song>) {
-        idToUri = songs.associate { it.id to it.dataPath }
+        songMap = songs.associateBy { it.id }
     }
 
     fun play(ids: List<Long>, startIndex: Int) {
         val p = exo ?: return
         try {
             queueIds = ids
-            val items = ids.mapNotNull { idToUri[it] }.map { MediaItem.fromUri(it) }
+            val items = ids.mapNotNull { id ->
+                songMap[id]?.let { s ->
+                    MediaItem.Builder()
+                        .setUri(s.dataPath)
+                        .setMediaId(s.id.toString())
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(s.title)
+                                .setArtist(s.artist.ifBlank { "Desconocido" })
+                                .setAlbumTitle(s.album)
+                                .build()
+                        )
+                        .build()
+                }
+            }
             if (items.isEmpty()) return
             p.setMediaItems(items, startIndex.coerceIn(0, items.size - 1), 0)
             p.prepare()
@@ -89,5 +133,12 @@ class MusicPlayer(private val context: Context) {
         } catch (_: Exception) {}
     }
 
-    fun release() { try { scope.cancel(); exo?.release(); exo = null } catch (_: Exception) {} }
+    fun release() {
+        try {
+            scope.cancel()
+            listener?.let { exo?.removeListener(it) }
+            if (bound) { try { context.unbindService(connection) } catch (_: Exception) {} ; bound = false }
+            exo = null
+        } catch (_: Exception) {}
+    }
 }

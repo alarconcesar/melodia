@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
     private val perm = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) vm.reload()
     }
+    private val notifPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     @Suppress("UNCHECKED_CAST")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +39,12 @@ class MainActivity : ComponentActivity() {
         )[MainViewModel::class.java]
         if (ContextCompat.checkSelfPermission(this, audioPerm) != PackageManager.PERMISSION_GRANTED) {
             perm.launch(audioPerm)
+        }
+        // Android 13+: permiso para mostrar la notificación de reproducción
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         setContent { MelodiaTheme { MelodiaScreen(vm) } }
     }
