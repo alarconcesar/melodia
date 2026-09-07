@@ -1,7 +1,15 @@
 package com.melodia.app.ui.ds
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -99,6 +107,21 @@ fun SongArt(
             }
         }
     }
+}
+
+// ── Click con rebote: se hunde al presionar y vuelve con spring ──
+@Composable
+fun pressClick(onClick: () -> Unit, min: Float = 0.9f): Modifier {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        if (pressed) min else 1f,
+        spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "press"
+    )
+    return Modifier
+        .graphicsLayer { scaleX = scale; scaleY = scale }
+        .clickable(interactionSource = interaction, indication = null, onClick = onClick)
 }
 
 // ── Micro label uppercase ────────────────────────────────────────
@@ -329,7 +352,16 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(icon, null, tint = if (sel) cs.primary else cs.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                        val tabScale by animateFloatAsState(
+                            if (sel) 1.18f else 1f,
+                            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            label = "tab"
+                        )
+                        Icon(
+                            icon, null,
+                            tint = if (sel) cs.primary else cs.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp).graphicsLayer { scaleX = tabScale; scaleY = tabScale }
+                        )
                         Text(
                             label,
                             style = Ds.Sub,
@@ -379,12 +411,14 @@ fun MiniPlayerDs(
                         tint = if (isFav) cs.primary else cs.onSurfaceVariant, modifier = Modifier.size(20.dp)
                     )
                 }
-                Surface(shape = CircleShape, color = cs.primary, modifier = Modifier.size(44.dp).clickable(onClick = onToggle)) {
+                Surface(shape = CircleShape, color = cs.primary, modifier = Modifier.size(44.dp).then(pressClick(onToggle))) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null,
-                            tint = cs.surface, modifier = Modifier.size(22.dp)
-                        )
+                        AnimatedContent(targetState = playing, label = "pp-mini") { p ->
+                            Icon(
+                                if (p) Icons.Default.Pause else Icons.Default.PlayArrow, null,
+                                tint = cs.surface, modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 }
             }

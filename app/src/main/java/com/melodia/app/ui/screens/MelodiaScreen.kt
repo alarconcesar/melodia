@@ -5,9 +5,13 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -95,6 +99,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.melodia.app.MainViewModel
@@ -109,6 +114,7 @@ import com.melodia.app.ui.ds.QuickCard
 import com.melodia.app.ui.ds.SectionHeader
 import com.melodia.app.ui.ds.SongArt
 import com.melodia.app.ui.ds.TrackRow
+import com.melodia.app.ui.ds.pressClick
 import com.melodia.app.ui.theme.Ds
 import com.melodia.app.ui.theme.isDarkMode
 import java.util.Calendar
@@ -686,6 +692,7 @@ fun FavsTab(
 }
 
 // ── NOW PLAYING DS ───────────────────────────────────────────────
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, onAdd: () -> Unit) {
     val cs = MaterialTheme.colorScheme
@@ -704,7 +711,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         Spacer(Modifier.height(24.dp))
         AnimatedContent(
             targetState = s.id, label = "nowplaying",
-            transitionSpec = { (fadeIn() + slideInVertically { it / 4 }) togetherWith (fadeOut() + slideOutVertically { -it / 4 }) },
+            transitionSpec = { (fadeIn() + slideInVertically { it / 4 } + scaleIn(initialScale = 0.94f)) togetherWith (fadeOut() + slideOutVertically { -it / 4 } + scaleOut(targetScale = 0.94f)) },
             modifier = Modifier.align(Alignment.CenterHorizontally)
         ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -715,7 +722,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             )
         }
         Spacer(Modifier.height(28.dp))
-        Text(s.title, style = Ds.Display, color = cs.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(s.title, style = Ds.Display, color = cs.onBackground, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE))
         Text("${s.artist} · ${s.album.ifBlank { "Sencillo" }}", style = Ds.Body, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         }
@@ -738,9 +745,11 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                 Icon(Icons.Default.Shuffle, null, tint = if (state.shuffle) cs.primary else cs.onSurfaceVariant)
             }
             IconButton(onClick = { vm.player.prev() }) { Icon(Icons.Default.SkipPrevious, null, Modifier.size(36.dp), tint = cs.onBackground) }
-            Surface(shape = CircleShape, color = cs.primary, modifier = Modifier.size(Ds.PlayHero).clickable { vm.player.toggle() }) {
+            Surface(shape = CircleShape, color = cs.primary, modifier = Modifier.size(Ds.PlayHero).then(pressClick({ vm.player.toggle() }, min = 0.88f))) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = cs.surface, modifier = Modifier.size(36.dp))
+                    AnimatedContent(targetState = state.isPlaying, label = "pp-hero") { p ->
+                        Icon(if (p) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = cs.surface, modifier = Modifier.size(36.dp))
+                    }
                 }
             }
             IconButton(onClick = { vm.player.next() }) { Icon(Icons.Default.SkipNext, null, Modifier.size(36.dp), tint = cs.onBackground) }
