@@ -196,9 +196,27 @@ fun MelodiaScreen(vm: MainViewModel) {
                     label = { Text("${sleepLeft}m") },
                     leadingIcon = { Icon(Icons.Default.Timer, null, Modifier.size(14.dp)) }
                 )
-                IconButton(onClick = { showEq = true }) { Icon(Icons.Default.Equalizer, null, tint = cs.onBackground) }
-                IconButton(onClick = { showSleep = true }) { Icon(Icons.Default.Timer, null, tint = cs.onBackground) }
-                IconButton(onClick = { isDarkMode = !(isDarkMode ?: false) }) { Icon(Icons.Default.DarkMode, null, tint = cs.onBackground) }
+                var showMenu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null, tint = cs.onBackground) }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Ecualizador") },
+                            leadingIcon = { Icon(Icons.Default.Equalizer, null) },
+                            onClick = { showMenu = false; showEq = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (sleepLeft != null) "Temporizador (${sleepLeft}m)" else "Temporizador") },
+                            leadingIcon = { Icon(Icons.Default.Timer, null) },
+                            onClick = { showMenu = false; showSleep = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (isDarkMode != false) "Modo claro" else "Modo oscuro") },
+                            leadingIcon = { Icon(Icons.Default.DarkMode, null) },
+                            onClick = { showMenu = false; isDarkMode = !(isDarkMode ?: false) }
+                        )
+                    }
+                }
             }
             // ── Search ──
             OutlinedTextField(
