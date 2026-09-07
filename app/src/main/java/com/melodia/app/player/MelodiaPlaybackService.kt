@@ -137,16 +137,16 @@ class MelodiaPlaybackService : MediaSessionService() {
                 .setShowWhen(false)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .addAction(
-                    R.drawable.ic_notif_music, "Anterior",
+                    R.drawable.ic_notif_prev, "Anterior",
                     serviceIntent(ACTION_PREV)
                 )
                 .addAction(
-                    R.drawable.ic_notif_music,
+                    if (playing) R.drawable.ic_notif_pause else R.drawable.ic_notif_play,
                     if (playing) "Pausar" else "Reproducir",
                     serviceIntent(ACTION_TOGGLE)
                 )
                 .addAction(
-                    R.drawable.ic_notif_music, "Siguiente",
+                    R.drawable.ic_notif_next, "Siguiente",
                     serviceIntent(ACTION_NEXT)
                 )
                 .setStyle(
