@@ -41,17 +41,65 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import android.content.ContentUris
+import android.provider.MediaStore
+import coil.compose.AsyncImage
 import com.melodia.app.data.model.Song
 import com.melodia.app.ui.screens.fmt
 import com.melodia.app.ui.theme.Ds
+
+// ── Carátula real del álbum (MediaStore) con fallback a icono ─────
+// El icono va DETRÁS: si la imagen carga lo tapa; si no hay arte, se ve el icono.
+@Composable
+fun SongArt(
+    albumId: Long,
+    size: Dp,
+    shape: Shape,
+    iconSize: Dp = 24.dp,
+    active: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val cs = MaterialTheme.colorScheme
+    val uri = remember(albumId) {
+        if (albumId > 0) ContentUris.withAppendedId(
+            MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, albumId
+        ) else null
+    }
+    Box(
+        modifier = modifier.size(size).clip(shape)
+            .background(if (active) cs.primary.copy(alpha = 0.16f) else cs.surfaceVariant),
+        contentAlignment = Alignment.Center
+    ) {
+        if (active) {
+            EqBars(color = cs.primary)
+        } else {
+            Icon(
+                Icons.Default.MusicNote, null,
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(iconSize)
+            )
+            if (uri != null) {
+                AsyncImage(
+                    model = uri, contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+}
 
 // ── Micro label uppercase ────────────────────────────────────────
 @Composable
@@ -106,21 +154,10 @@ fun TrackRow(
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier.size(Ds.ArtRow).clip(Ds.RowShape)
-                .background(if (active) cs.primary.copy(alpha = 0.16f) else cs.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            if (active) {
-                EqBars(color = cs.primary)
-            } else {
-                Icon(
-                    Icons.Default.MusicNote, null,
-                    tint = cs.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
+        SongArt(
+            albumId = s.albumId, size = Ds.ArtRow, shape = Ds.RowShape,
+            iconSize = 24.dp, active = active
+        )
         Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(
                 s.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -310,6 +347,7 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
 fun MiniPlayerDs(
     title: String,
     artist: String,
+    albumId: Long = -1L,
     playing: Boolean,
     progress: Float,
     isFav: Boolean,
@@ -327,10 +365,10 @@ fun MiniPlayerDs(
     ) {
         Column {
             Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(44.dp).clip(Ds.RowShape).background(cs.primary.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.MusicNote, null, tint = cs.primary, modifier = Modifier.size(22.dp)) }
+                SongArt(
+                    albumId = albumId, size = 44.dp, shape = Ds.RowShape,
+                    iconSize = 22.dp
+                )
                 Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
                     Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
                     Text(artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Sub, color = cs.onSurfaceVariant)

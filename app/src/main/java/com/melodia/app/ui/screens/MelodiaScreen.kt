@@ -107,6 +107,7 @@ import com.melodia.app.ui.ds.MicroLabel
 import com.melodia.app.ui.ds.MiniPlayerDs
 import com.melodia.app.ui.ds.QuickCard
 import com.melodia.app.ui.ds.SectionHeader
+import com.melodia.app.ui.ds.SongArt
 import com.melodia.app.ui.ds.TrackRow
 import com.melodia.app.ui.theme.Ds
 import com.melodia.app.ui.theme.isDarkMode
@@ -301,7 +302,8 @@ fun MelodiaScreen(vm: MainViewModel) {
                         .onGloballyPositioned { miniArea = it.boundsInRoot() }
                 ) {
                     MiniPlayerDs(
-                        title = s.title, artist = s.artist, playing = state.isPlaying,
+                        title = s.title, artist = s.artist, albumId = s.albumId,
+                        playing = state.isPlaying,
                         progress = state.progress, isFav = favIds.contains(s.id),
                         onToggleFav = { vm.toggleFav(s.id) }, onToggle = { vm.player.toggle() },
                         onOpen = { showPlayer = true }
@@ -707,9 +709,10 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Surface(shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(300.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.MusicNote, null, Modifier.size(110.dp), tint = cs.onSurfaceVariant.copy(alpha = 0.4f))
-            }
+            SongArt(
+                albumId = s.albumId, size = 300.dp, shape = Ds.HeroShape,
+                iconSize = 110.dp
+            )
         }
         Spacer(Modifier.height(28.dp))
         Text(s.title, style = Ds.Display, color = cs.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -764,10 +767,10 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
         text = {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(52.dp).clip(RoundedCornerShape(Ds.RRow)).background(cs.primary.copy(alpha = 0.14f)),
-                        contentAlignment = Alignment.Center
-                    ) { Icon(Icons.Default.MusicNote, null, tint = cs.primary, modifier = Modifier.size(26.dp)) }
+                    SongArt(
+                        albumId = song.albumId, size = 52.dp,
+                        shape = RoundedCornerShape(Ds.RRow), iconSize = 26.dp
+                    )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(song.title, style = Ds.Body, color = cs.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
