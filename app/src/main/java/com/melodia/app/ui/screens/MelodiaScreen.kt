@@ -159,6 +159,7 @@ fun MelodiaScreen(vm: MainViewModel) {
     val openSongs by vm.openPlaylistSongs.collectAsState()
     val sleepLeft by vm.sleep.minsLeft.collectAsState()
     var showPlayer by remember { mutableStateOf(false) }
+    var showLyrics by remember { mutableStateOf(false) }
     var showCreate by remember { mutableStateOf(false) }
     var showAddTo by remember { mutableStateOf<Song?>(null) }
     var showSort by remember { mutableStateOf(false) }
@@ -222,8 +223,10 @@ fun MelodiaScreen(vm: MainViewModel) {
         )
     }
 
-    // ── Back Android por capas: player → detalle → filtro → salir ──
-    if (showPlayer) {
+    // ── Back Android por capas: letra → player → detalle → filtro → salir ──
+    if (showLyrics) {
+        BackHandler { showLyrics = false }
+    } else if (showPlayer) {
         BackHandler { showPlayer = false }
     } else if (openPid != null) {
         BackHandler { vm.openPl(null) }
@@ -385,7 +388,22 @@ fun MelodiaScreen(vm: MainViewModel) {
                         interactionSource = remember { MutableInteractionSource() }
                     ) {}
             ) {
-                current?.let { s -> NowPlaying(s, vm, s.id != YT_STREAM_ID && favIds.contains(s.id), onClose = { showPlayer = false }, onAdd = { showAddTo = s }) }
+                current?.let { s -> NowPlaying(s, vm, s.id != YT_STREAM_ID && favIds.contains(s.id), onClose = { showPlayer = false }, onAdd = { showAddTo = s }, onLyrics = { showLyrics = true }) }
+            }
+        }
+        // ── Letra en tiempo real (encima del player) ──
+        AnimatedVisibility(
+            visible = showLyrics, enter = slideInVertically { it }, exit = slideOutVertically { it },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                Modifier.fillMaxSize()
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {}
+            ) {
+                current?.let { s -> LyricsSheet(s, vm, onClose = { showLyrics = false }) }
             }
         }
     }
@@ -750,7 +768,7 @@ fun FavsTab(
 // ── NOW PLAYING DS ───────────────────────────────────────────────
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, onAdd: () -> Unit) {
+fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, onAdd: () -> Unit, onLyrics: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     val state by vm.playerState.collectAsState()
     val dlMap by vm.dlProgress.collectAsState()
@@ -797,6 +815,16 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         Spacer(Modifier.height(28.dp))
         Text(s.title, style = Ds.Display, color = cs.onBackground, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE))
         Text("${s.artist} · ${s.album.ifBlank { "Sencillo" }}", style = Ds.Body, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(10.dp))
+        Surface(
+            shape = RoundedCornerShape(14.dp), color = cs.surfaceVariant,
+            modifier = Modifier.clickable { onLyrics() }
+        ) {
+            Text(
+                "🎤 Ver letra", style = Ds.Body, color = cs.primary,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+            )
+        }
         }
         }
         Spacer(Modifier.height(16.dp))

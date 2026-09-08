@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.melodia.app.data.MusicRepository
 import com.melodia.app.data.PlaylistRepository
 import com.melodia.app.data.local.MelodiaDatabase
+import com.melodia.app.data.lyrics.LyricsRepository
 import com.melodia.app.data.online.YtRepository
 import com.melodia.app.player.EqualizerManager
 import com.melodia.app.player.MusicPlayer
@@ -18,6 +19,7 @@ class AppContainer(context: Context) {
     val db: MelodiaDatabase = Room.databaseBuilder(appContext, MelodiaDatabase::class.java, "melodia.db").fallbackToDestructiveMigration().build()
     val playlistRepo = PlaylistRepository(db)
     val ytRepo = YtRepository(appContext)
+    val lyricsRepo = LyricsRepository(appContext)
     val sleepTimer = SleepTimer { try { musicPlayer.pauseOnly() } catch (_: Exception) {} }
-    fun makeMainViewModel() = MainViewModel(musicPlayer, musicRepository, playlistRepo, sleepTimer, ytRepo)
+    fun makeMainViewModel() = MainViewModel(musicPlayer, musicRepository, playlistRepo, sleepTimer, ytRepo, lyricsRepo)
 }

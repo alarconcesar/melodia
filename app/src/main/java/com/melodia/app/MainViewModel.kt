@@ -6,6 +6,8 @@ import com.melodia.app.data.*
 import com.melodia.app.data.local.PlaylistEntity
 import com.melodia.app.data.local.PlaylistSongEntity
 import com.melodia.app.data.model.Song
+import com.melodia.app.data.lyrics.LyricLine
+import com.melodia.app.data.lyrics.LyricsRepository
 import com.melodia.app.data.online.YtRepository
 import com.melodia.app.data.online.YtTrack
 import com.melodia.app.player.MusicPlayer
@@ -26,7 +28,8 @@ class MainViewModel(
     private val repo: MusicRepository,
     private val lists: PlaylistRepository,
     val sleep: SleepTimer,
-    private val yt: YtRepository
+    private val yt: YtRepository,
+    private val lyricsRepo: LyricsRepository
 ) : ViewModel() {
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs
@@ -99,6 +102,10 @@ class MainViewModel(
         }
         viewModelScope.launch {
             try { _ytRecent.value = yt.getRecent() } catch (_: Exception) {}
+        }
+        // Letras: cargar automáticamente al cambiar de tema
+        viewModelScope.launch {
+            currentSong.collect { s -> if (s != null) loadLyrics(s) }
         }
     }
 
@@ -247,6 +254,49 @@ class MainViewModel(
             _busyYt.value = null
         }
     }
+
+    // ── Letras sincronizadas ──
+    sealed interface LyricsUi {
+        data object Idle : LyricsUi
+        data object Loading : LyricsUi
+        data class Synced(val lines: List<LyricLine>) : LyricsUi
+        data class Plain(val text: String) : LyricsUi
+        data object None : LyricsUi
+    }
+    private val _lyrics = MutableStateFlow<LyricsUi>(LyricsUi.Idle)
+    val lyrics: StateFlow<LyricsUi> = _lyrics
+    private val lyricsMem = mutableMapOf<String, LyricsUi>()
+    private var lyricsJob: kotlinx.coroutines.Job? = null
+
+    fun loadLyrics(s: Song, force: Boolean = false) {
+        val key = if (s.id == YT_STREAM_ID) "yt:${s.dataPath.hashCode()}" else "id:${s.id}"
+        if (!force) lyricsMem[key]?.let { _lyrics.value = it; return }
+        lyricsJob?.cancel()
+        lyricsJob = viewModelScope.launch {
+            _lyrics.value = LyricsUi.Loading
+            try {
+                val dur = (s.durationMs / 1000).coerceAtLeast(0)
+                val got = withContext(Dispatchers.IO) {
+                    lyricsRepo.get(s.artist.ifBlank { "" }, s.title, s.album.ifBlank { "" }, dur, key)
+                }
+                val ui: LyricsUi = when {
+                    got == null -> LyricsUi.None
+                    got.instrumental -> LyricsUi.Plain("🎵 Tema instrumental — sin letra")
+                    got.synced.size >= 3 -> LyricsUi.Synced(got.synced)
+                    got.plain != null -> LyricsUi.Plain(got.plain)
+                    else -> LyricsUi.None
+                }
+                lyricsMem[key] = ui
+                if (lyricsMem.size > 40) lyricsMem.remove(lyricsMem.keys.first())
+                _lyrics.value = ui
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                _lyrics.value = lyricsMem[key] ?: LyricsUi.None
+            }
+        }
+    }
+
+    fun retryLyrics() { currentSong.value?.let { loadLyrics(it, force = true) } }
 
     fun downloadYt(track: YtTrack) {
         if (_dlProgress.value.containsKey(track.id)) return
