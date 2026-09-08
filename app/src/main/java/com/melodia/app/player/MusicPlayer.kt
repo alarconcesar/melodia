@@ -22,7 +22,9 @@ data class PlayerState(
     val shuffle: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
     val currentIndex: Int = -1,
-    val currentId: Long = -1L
+    val currentId: Long = -1L,
+    val pitch: Float = 1f,
+    val speed: Float = 1f
 )
 
 /** ID virtual del tema que suena desde Online (no existe en la biblioteca). */
@@ -135,6 +137,21 @@ class MusicPlayer(private val context: Context) {
 
     fun pauseOnly() { try { exo?.pause() } catch (_: Exception) {} }
 
+    // ── Tono (pitch) y velocidad ──
+    private var pitch = 1f
+    private var speed = 1f
+
+    private fun applyParams() {
+        try {
+            exo?.playbackParameters = androidx.media3.common.PlaybackParameters(speed, pitch)
+            updateState()
+        } catch (e: Exception) { Log.e("MusicPlayer", "params fail", e) }
+    }
+
+    fun setPitch(p: Float) { pitch = p.coerceIn(0.25f, 2f); applyParams() }
+    fun setSpeed(s: Float) { speed = s.coerceIn(0.25f, 2f); applyParams() }
+    fun resetPitchSpeed() { pitch = 1f; speed = 1f; applyParams() }
+
     /** IDs de la cola actual (copia). */
     fun queueIds(): List<Long> = try { queueIds.toList() } catch (_: Exception) { emptyList() }
 
@@ -169,7 +186,8 @@ class MusicPlayer(private val context: Context) {
                 positionMs = pos, durationMs = dur,
                 shuffle = p.shuffleModeEnabled, repeatMode = p.repeatMode,
                 currentIndex = p.currentMediaItemIndex,
-                currentId = queueIds.getOrNull(p.currentMediaItemIndex) ?: -1L
+                currentId = queueIds.getOrNull(p.currentMediaItemIndex) ?: -1L,
+                pitch = pitch, speed = speed
             )
         } catch (_: Exception) {}
     }

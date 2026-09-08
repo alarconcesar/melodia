@@ -177,6 +177,11 @@ class MainViewModel(
         viewModelScope.launch { lists.moveSong(pid, sid, up) }
     }
 
+    // ── Tono y velocidad ──
+    fun setPitch(p: Float) { player.setPitch(p) }
+    fun setSpeed(s: Float) { player.setSpeed(s) }
+    fun resetPitchSpeed() { player.resetPitchSpeed() }
+
     fun toggleFav(id: Long) { viewModelScope.launch { lists.toggleFav(id, _favIds.value.contains(id)) } }
     fun createPlaylist(name: String, onDone: (Long) -> Unit = {}) { viewModelScope.launch { val id = lists.createPlaylist(name); onDone(id) } }
     fun deletePlaylist(id: Long) { viewModelScope.launch { lists.deletePlaylist(id); if (_openPlaylist.value == id) _openPlaylist.value = null } }

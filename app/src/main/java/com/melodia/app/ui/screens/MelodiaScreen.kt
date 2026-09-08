@@ -76,6 +76,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Sort
@@ -904,7 +905,9 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     val curTrack by vm.currentTrack.collectAsState()
     val isStream = s.id == YT_STREAM_ID
     var showQueue by remember { mutableStateOf(false) }
+    var showPitch by remember { mutableStateOf(false) }
     if (showQueue) QueueSheet(vm, onDismiss = { showQueue = false })
+    if (showPitch) PitchSheet(vm, state.pitch, state.speed, onDismiss = { showPitch = false })
     Column(Modifier.fillMaxSize().background(cs.background).padding(20.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(28.dp), tint = cs.onBackground) }
@@ -926,6 +929,12 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             } else {
                 IconButton(onClick = { showQueue = true }) {
                     Icon(Icons.Default.QueueMusic, "Cola", tint = cs.onBackground)
+                }
+                IconButton(onClick = { showPitch = true }) {
+                    Icon(
+                        Icons.Default.Tune, "Tono y velocidad",
+                        tint = if (state.pitch != 1f || state.speed != 1f) cs.primary else cs.onBackground
+                    )
                 }
                 IconButton(onClick = { if (!isStream) vm.toggleFav(s.id) }) {
                     Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onBackground)
@@ -999,6 +1008,56 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             }
         }
     }
+}
+
+// ── Tono (pitch) y velocidad ───────────────────────────────────────
+@Composable
+fun PitchSheet(vm: MainViewModel, pitch: Float, speed: Float, onDismiss: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    var p by remember(pitch) { mutableStateOf(pitch) }
+    var v by remember(speed) { mutableStateOf(speed) }
+    fun semis(x: Float): String {
+        val st = (12 * kotlin.math.log2(x)).toInt()
+        return if (st == 0) "±0" else if (st > 0) "+$st" else "$st"
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Tono y velocidad", color = cs.onBackground) },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Tono", style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f))
+                    Text(
+                        "${(p * 100).toInt()}% · ${semis(p)} st",
+                        style = Ds.Sub, color = cs.primary
+                    )
+                }
+                Slider(
+                    value = p, onValueChange = { p = it; vm.setPitch(it) },
+                    valueRange = 0.5f..1.5f, steps = 19
+                )
+                Text(
+                    "Más grave ← → Más agudo (sin cambiar la velocidad)",
+                    style = Ds.Sub, color = cs.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Velocidad", style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f))
+                    Text("${(v * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
+                }
+                Slider(
+                    value = v, onValueChange = { v = it; vm.setSpeed(it) },
+                    valueRange = 0.5f..1.5f, steps = 19
+                )
+                Spacer(Modifier.height(4.dp))
+                OutlinedButton(
+                    onClick = { p = 1f; v = 1f; vm.resetPitchSpeed() },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Restablecer (100%)") }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Listo") } }
+    )
 }
 
 // ── Cola de reproducción ───────────────────────────────────────────
