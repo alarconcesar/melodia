@@ -4,19 +4,35 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+import java.util.Properties
+
 android {
     namespace = "com.melodia.app"
-    compileSdk = 34
+    compileSdk = 35
     defaultConfig {
         applicationId = "com.melodia.app"
-        minSdk = 26
-        targetSdk = 34
-        versionCode = 25
-        versionName = "2.22"
+        minSdk = 24
+        targetSdk = 35
+        versionCode = 26
+        versionName = "3.0"
+    }
+    signingConfigs {
+        create("release") {
+            val props = Properties()
+            val f = rootProject.file("keystore.properties")
+            if (f.exists()) {
+                f.inputStream().use { props.load(it) }
+                storeFile = file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     buildFeatures { compose = true }

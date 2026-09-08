@@ -18,6 +18,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.melodia.app.MainActivity
 import com.melodia.app.R
+import kotlinx.coroutines.launch
 
 /**
  * Servicio de reproducción con notificación propia estilo Media.
@@ -131,10 +132,12 @@ class MelodiaPlaybackService : MediaSessionService() {
             val title = meta.title?.toString().ifNullOrBlank("Melodia")
             val artist = meta.artist?.toString().ifNullOrBlank("Desconocido")
             val playing = player.isPlaying
+            val large = resolveArt(player, meta, title)
 
             val contentIntent = session?.sessionActivity
             val notif: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notif_music)
+                .setLargeIcon(large)
                 .setContentTitle(title)
                 .setContentText(artist)
                 .setContentIntent(contentIntent)
@@ -210,6 +213,84 @@ class MelodiaPlaybackService : MediaSessionService() {
 
     private fun String?.ifNullOrBlank(fallback: String): String =
         if (this.isNullOrBlank()) fallback else this
+
+    // ── Carátula de la notificación ──
+    private val artScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    )
+    private var artKey: String? = null
+    private var artBmp: android.graphics.Bitmap? = null
+
+    private fun resolveArt(
+        player: Player, meta: androidx.media3.common.MediaMetadata, title: String
+    ): android.graphics.Bitmap? {
+        return try {
+            val mediaId = try { player.currentMediaItem?.mediaId } catch (_: Exception) { null }
+            val key = "$mediaId|$title"
+            if (mediaId == YT_STREAM_ID.toString()) {
+                if (key == artKey) return artBmp
+                artKey = key
+                artBmp = null
+                val url = try { meta.artworkUri?.toString() } catch (_: Exception) { null }
+                if (!url.isNullOrBlank()) {
+                    artScope.launch {
+                        try {
+                            val bmp = downloadBitmap(url)
+                            if (bmp != null && artKey == key) {
+                                artBmp = bmp
+                                updateNotification()
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+                null
+            } else {
+                artKey = key
+                artBmp = null
+                val sid = mediaId?.toLongOrNull() ?: return null
+                if (sid <= 0) return null
+                localAlbumArt(sid)
+            }
+        } catch (_: Exception) { null }
+    }
+
+    private fun localAlbumArt(songId: Long): android.graphics.Bitmap? {
+        return try {
+            val albumId = contentResolver.query(
+                android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                arrayOf(android.provider.MediaStore.Audio.Media.ALBUM_ID),
+                "${android.provider.MediaStore.Audio.Media._ID}=?",
+                arrayOf(songId.toString()), null
+            )?.use { c -> if (c.moveToFirst()) c.getLong(0) else -1L } ?: -1L
+            if (albumId <= 0) return null
+            if (Build.VERSION.SDK_INT >= 29) {
+                contentResolver.loadThumbnail(
+                    android.content.ContentUris.withAppendedId(
+                        android.provider.MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, albumId
+                    ),
+                    android.util.Size(512, 512), null
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                contentResolver.openInputStream(
+                    android.content.ContentUris.withAppendedId(
+                        android.net.Uri.parse("content://media/external/audio/albumart"), albumId
+                    )
+                )?.use { android.graphics.BitmapFactory.decodeStream(it) }
+            }
+        } catch (_: Exception) { null }
+    }
+
+    private fun downloadBitmap(url: String): android.graphics.Bitmap? {
+        return try {
+            val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 10_000
+            conn.connect()
+            if (conn.responseCode !in 200..299) return null
+            conn.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) }
+        } catch (_: Exception) { null }
+    }
 
     /** Metadatos del item actual (compatible con media3 1.2.x). */
     private fun currentMeta(player: Player): androidx.media3.common.MediaMetadata {

@@ -109,7 +109,7 @@ class MusicPlayer(private val context: Context) {
     }
 
     /** Reproduce un stream online (URL directa de audio). */
-    fun playStream(url: String, title: String, artist: String) {
+    fun playStream(url: String, title: String, artist: String, artUrl: String? = null) {
         val p = exo ?: return
         try {
             queueIds = listOf(YT_STREAM_ID)
@@ -121,6 +121,7 @@ class MusicPlayer(private val context: Context) {
                         .setTitle(title)
                         .setArtist(artist.ifBlank { "YouTube" })
                         .setAlbumTitle("Online")
+                        .apply { try { if (!artUrl.isNullOrBlank()) setArtworkUri(android.net.Uri.parse(artUrl)) } catch (_: Exception) {} }
                         .build()
                 )
                 .build()

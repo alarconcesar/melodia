@@ -471,7 +471,9 @@ fun MiniPlayerDs(
                     }
                 }
             }
-            LinearProgressIndicator(progress = progress, modifier = Modifier.fillMaxWidth().height(2.dp))
+            // Progreso fluido: el estado llega cada 500ms, se interpola con tween
+            val smooth by animateFloatAsState(progress.coerceIn(0f, 1f), tween(500), label = "minip")
+            LinearProgressIndicator(progress = smooth, modifier = Modifier.fillMaxWidth().height(2.dp))
         }
     }
 }

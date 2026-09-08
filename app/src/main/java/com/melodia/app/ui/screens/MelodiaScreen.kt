@@ -421,7 +421,7 @@ fun MelodiaScreen(vm: MainViewModel) {
             text = {
                 LazyColumn {
                     if (playlists.isEmpty()) {
-                        item { Text("Aún no hay playlists — créala desde la tab Listas", style = Ds.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        item { Text("Aún no hay playlists — créala desde la sección Listas", style = Ds.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                     items(playlists) { p ->
                         Row(
@@ -722,7 +722,7 @@ fun PlaylistDetail(
                 IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = cs.onBackground) }
                 Text("${songs.size} temas", style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f))
                 if (songs.isNotEmpty()) FilledTonalButton(onClick = { onPlay(0) }) {
-                    Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp)); Text("Play")
+                    Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp)); Text("Reproducir")
                 }
             }
         }
@@ -830,8 +830,13 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         Spacer(Modifier.height(16.dp))
         var dragging by remember { mutableStateOf(false) }
         var dragPos by remember { mutableStateOf(0f) }
+        val basePos = if (dragging) dragPos else state.progress
+        val smoothPos by androidx.compose.animation.core.animateFloatAsState(
+            basePos.coerceIn(0f, 1f),
+            androidx.compose.animation.core.tween(400), label = "heroslider"
+        )
         Slider(
-            value = if (dragging) dragPos else state.progress,
+            value = smoothPos,
             onValueChange = { dragging = true; dragPos = it },
             onValueChangeFinished = { vm.player.seekTo(dragPos); dragging = false }
         )
@@ -897,7 +902,7 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     FilledTonalButton(onClick = onPlay, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Play")
+                        Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Reproducir")
                     }
                     OutlinedButton(onClick = onAdd, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.PlaylistAdd, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("A lista")

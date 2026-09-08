@@ -92,10 +92,14 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
                 ) {
                     itemsIndexed(lines, key = { i, e -> "$i-${e.ms}" }) { i, e ->
                         val cur = i == idx
+                        val lineColor by androidx.compose.animation.animateColorAsState(
+                            if (cur) cs.primary else cs.onSurfaceVariant.copy(alpha = 0.75f),
+                            label = "lyr"
+                        )
                         Text(
                             e.text,
                             style = if (cur) Ds.Body else Ds.Sub,
-                            color = if (cur) cs.primary else cs.onSurfaceVariant.copy(alpha = 0.75f),
+                            color = lineColor,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                                 .clickable {

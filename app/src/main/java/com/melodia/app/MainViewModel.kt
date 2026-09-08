@@ -246,7 +246,7 @@ class MainViewModel(
                     dataPath = audio.url, dateAdded = 0L, artUrl = track.thumbUrl
                 )
                 _currentId.value = YT_STREAM_ID
-                player.playStream(audio.url, track.title, track.artist)
+                player.playStream(audio.url, track.title, track.artist, track.thumbUrl)
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _ytError.value = errMsg(t, "No se pudo reproducir — reintenta")
