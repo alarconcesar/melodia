@@ -21,7 +21,8 @@ class LyricsRepository(context: Context) {
         withContext(Dispatchers.IO) {
             try {
                 readCache(key)?.let { return@withContext it }
-                val found = fetchGet(artist, title, album, durationSec)
+                // /get exige artist_name real: con artista basura se va directo a /search
+                val found = (if (!isJunkArtist(artist)) fetchGet(artist, title, album, durationSec) else null)
                     ?: fetchSearch(artist, title, durationSec)
                 if (found != null) writeCache(key, found)
                 found
@@ -47,15 +48,24 @@ class LyricsRepository(context: Context) {
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
+    private fun isJunkArtist(a: String) =
+        a.isBlank() || a.equals("Desconocido", true) || a.equals("YouTube", true) || a == "<unknown>"
+
+    private fun isJunkAlbum(a: String) =
+        a.isBlank() || a.equals("Online", true) || a.equals("Sencillo", true) || a.equals("Sin álbum", true)
+
     private fun fetchGet(artist: String, title: String, album: String, dur: Long): Lyrics? {
-        val url = "https://lrclib.net/api/get?artist_name=${enc(artist)}&track_name=${enc(title)}" +
-            "&album_name=${enc(album)}&duration=$dur"
-        val o = getJson(url) ?: return null
+        // Los filtros basura ("Desconocido", "Online") hunden el match: se omiten
+        val params = mutableListOf("track_name=${enc(title)}", "duration=$dur")
+        if (!isJunkArtist(artist)) params += "artist_name=${enc(artist)}"
+        if (!isJunkAlbum(album)) params += "album_name=${enc(album)}"
+        val o = getJson("https://lrclib.net/api/get?${params.joinToString("&")}") ?: return null
         return fromJson(o)
     }
 
     private fun fetchSearch(artist: String, title: String, dur: Long): Lyrics? {
-        val url = "https://lrclib.net/api/search?q=${enc("$title $artist")}"
+        val q = if (isJunkArtist(artist)) title else "$title $artist"
+        val url = "https://lrclib.net/api/search?q=${enc(q)}"
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 12_000
             readTimeout = 12_000
@@ -84,7 +94,8 @@ class LyricsRepository(context: Context) {
     private fun tryClean(artist: String, title: String, dur: Long): Lyrics? {
         val clean = cleanTitle(title)
         if (clean == title) return null
-        val url = "https://lrclib.net/api/search?q=${enc("$clean $artist")}"
+        val q = if (isJunkArtist(artist)) clean else "$clean $artist"
+        val url = "https://lrclib.net/api/search?q=${enc(q)}"
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 12_000
             readTimeout = 12_000
