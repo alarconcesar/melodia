@@ -91,6 +91,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,6 +100,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -167,6 +169,57 @@ fun MelodiaScreen(vm: MainViewModel) {
     var navArea by remember { mutableStateOf<Rect?>(null) }
     var miniArea by remember { mutableStateOf<Rect?>(null) }
     var contentPos by remember { mutableStateOf(Offset.Zero) }
+
+    // ── Reporte del último crash (si la app se cerró sola) ──
+    val appCtx = LocalContext.current.applicationContext
+    var lastCrash by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        lastCrash = try {
+            val f = java.io.File(appCtx.filesDir, com.melodia.app.MelodiaApp.CRASH_FILE)
+            if (f.exists()) f.readText() else null
+        } catch (_: Exception) { null }
+    }
+    if (lastCrash != null) {
+        val crashText = lastCrash!!
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("La app se cerró 😕") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                    Text(
+                        "Mándame una captura de esto:",
+                        style = com.melodia.app.ui.theme.Ds.Body,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        crashText.lines().take(25).joinToString("\n"),
+                        style = androidx.compose.ui.text.TextStyle(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = androidx.compose.ui.unit.TextUnit(10f, androidx.compose.ui.unit.TextUnitType.Sp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    try {
+                        val cm = appCtx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", crashText))
+                    } catch (_: Exception) {}
+                    try { java.io.File(appCtx.filesDir, com.melodia.app.MelodiaApp.CRASH_FILE).delete() } catch (_: Exception) {}
+                    lastCrash = null
+                }) { Text("Copiar") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    try { java.io.File(appCtx.filesDir, com.melodia.app.MelodiaApp.CRASH_FILE).delete() } catch (_: Exception) {}
+                    lastCrash = null
+                }) { Text("Cerrar") }
+            }
+        )
+    }
 
     // ── Back Android por capas: player → detalle → filtro → salir ──
     if (showPlayer) {
