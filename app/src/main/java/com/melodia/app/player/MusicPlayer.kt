@@ -25,6 +25,9 @@ data class PlayerState(
     val currentId: Long = -1L
 )
 
+/** ID virtual del tema que suena desde Online (no existe en la biblioteca). */
+const val YT_STREAM_ID = -100L
+
 class MusicPlayer(private val context: Context) {
     var eq: EqualizerManager? = null
     private var exo: ExoPlayer? = null
@@ -103,6 +106,30 @@ class MusicPlayer(private val context: Context) {
             updateState()
             attachEq()
         } catch (e: Exception) { Log.e("MusicPlayer", "play fail", e) }
+    }
+
+    /** Reproduce un stream online (URL directa de audio). */
+    fun playStream(url: String, title: String, artist: String) {
+        val p = exo ?: return
+        try {
+            queueIds = listOf(YT_STREAM_ID)
+            val item = MediaItem.Builder()
+                .setUri(url)
+                .setMediaId(YT_STREAM_ID.toString())
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(title)
+                        .setArtist(artist.ifBlank { "YouTube" })
+                        .setAlbumTitle("Online")
+                        .build()
+                )
+                .build()
+            p.setMediaItem(item)
+            p.prepare()
+            p.play()
+            updateState()
+            attachEq()
+        } catch (e: Exception) { Log.e("MusicPlayer", "playStream fail", e) }
     }
 
     fun pauseOnly() { try { exo?.pause() } catch (_: Exception) {} }

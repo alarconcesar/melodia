@@ -11,8 +11,8 @@ android {
         applicationId = "com.melodia.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 17
-        versionName = "2.14"
+        versionCode = 18
+        versionName = "2.15"
     }
     buildTypes {
         release {
@@ -49,4 +49,5 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
 }

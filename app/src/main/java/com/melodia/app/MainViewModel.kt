@@ -6,12 +6,17 @@ import com.melodia.app.data.*
 import com.melodia.app.data.local.PlaylistEntity
 import com.melodia.app.data.local.PlaylistSongEntity
 import com.melodia.app.data.model.Song
+import com.melodia.app.data.online.YtRepository
+import com.melodia.app.data.online.YtTrack
 import com.melodia.app.player.MusicPlayer
 import com.melodia.app.player.PlayerState
 import com.melodia.app.player.SleepTimer
+import com.melodia.app.player.YT_STREAM_ID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class SortMode { TITLE, ARTIST, RECENT, LONGEST }
 
@@ -19,7 +24,8 @@ class MainViewModel(
     val player: MusicPlayer,
     private val repo: MusicRepository,
     private val lists: PlaylistRepository,
-    val sleep: SleepTimer
+    val sleep: SleepTimer,
+    private val yt: YtRepository
 ) : ViewModel() {
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs
@@ -29,7 +35,11 @@ class MainViewModel(
     val sort: StateFlow<SortMode> = _sort
     val playerState: StateFlow<PlayerState> = player.state
     private val _currentId = MutableStateFlow<Long?>(null)
-    val currentSong: StateFlow<Song?> = combine(_songs, _currentId) { list, id -> list.find { it.id == id } }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    private val _streamSong = MutableStateFlow<Song?>(null)
+    val currentSong: StateFlow<Song?> = combine(_songs, _currentId, _streamSong) { list, id, stream ->
+        @Suppress("UNCHECKED_CAST") val songs = list as List<Song>
+        if (id == YT_STREAM_ID) stream else songs.find { it.id == id }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     // selection filters
     private val _folder = MutableStateFlow<String?>(null)
@@ -83,7 +93,7 @@ class MainViewModel(
         // Sincronizar UI con el item real de ExoPlayer (next/prev/fin de tema)
         viewModelScope.launch {
             player.state.map { it.currentId }.distinctUntilChanged().collect { id ->
-                if (id > 0) _currentId.value = id
+                if (id > 0 || id == YT_STREAM_ID) _currentId.value = id
             }
         }
     }
@@ -128,4 +138,77 @@ class MainViewModel(
     fun renamePlaylist(id: Long, name: String) { viewModelScope.launch { lists.rename(id, name) } }
     fun addToPlaylist(pid: Long, s: Song) { viewModelScope.launch { lists.addToPlaylist(pid, s) } }
     fun removeFromPlaylist(pid: Long, sid: Long) { viewModelScope.launch { lists.removeFromPlaylist(pid, sid) } }
+
+    // ── Online (YouTube: buscar, escuchar, descargar) ──
+    private val _ytQuery = MutableStateFlow("")
+    val ytQuery: StateFlow<String> = _ytQuery
+    private val _ytResults = MutableStateFlow<List<YtTrack>>(emptyList())
+    val ytResults: StateFlow<List<YtTrack>> = _ytResults
+    private val _ytLoading = MutableStateFlow(false)
+    val ytLoading: StateFlow<Boolean> = _ytLoading
+    private val _ytError = MutableStateFlow<String?>(null)
+    val ytError: StateFlow<String?> = _ytError
+    /** videoId -> progreso 0..1 de descarga */
+    private val _dlProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val dlProgress: StateFlow<Map<String, Float>> = _dlProgress
+    /** videoId cuyo audio se está resolviendo para reproducir */
+    private val _busyYt = MutableStateFlow<String?>(null)
+    val busyYt: StateFlow<String?> = _busyYt
+
+    fun setYtQuery(q: String) { _ytQuery.value = q }
+    fun searchYt(q: String = _ytQuery.value) {
+        val query = q.trim()
+        if (query.isBlank()) return
+        viewModelScope.launch {
+            _ytLoading.value = true
+            _ytError.value = null
+            try {
+                _ytResults.value = yt.search(query)
+                if (_ytResults.value.isEmpty()) _ytError.value = "Sin resultados — prueba con otras palabras"
+            } catch (_: Exception) {
+                _ytError.value = "Sin conexión o YouTube no responde — reintenta"
+            }
+            _ytLoading.value = false
+        }
+    }
+
+    fun playYt(track: YtTrack) {
+        if (_busyYt.value != null) return
+        viewModelScope.launch {
+            _busyYt.value = track.id
+            _ytError.value = null
+            try {
+                val audio = withContext(Dispatchers.IO) { yt.bestAudio(track.url) }
+                _streamSong.value = Song(
+                    id = YT_STREAM_ID, title = track.title,
+                    artist = track.artist.ifBlank { "YouTube" },
+                    album = "Online", albumId = -1L, durationMs = track.durationSec * 1000,
+                    dataPath = audio.url, dateAdded = 0L
+                )
+                _currentId.value = YT_STREAM_ID
+                player.playStream(audio.url, track.title, track.artist)
+            } catch (_: Exception) {
+                _ytError.value = "No se pudo reproducir — reintenta"
+            }
+            _busyYt.value = null
+        }
+    }
+
+    fun downloadYt(track: YtTrack) {
+        if (_dlProgress.value.containsKey(track.id)) return
+        viewModelScope.launch {
+            _dlProgress.value += track.id to 0f
+            try {
+                withContext(Dispatchers.IO) {
+                    yt.download(track) { p -> _dlProgress.value += track.id to p }
+                }
+                reload()
+            } catch (_: Exception) {
+                _ytError.value = "No se pudo descargar — reintenta"
+            }
+            // quitar el entry tras un respiro para que se vea el 100%
+            kotlinx.coroutines.delay(600)
+            _dlProgress.value -= track.id
+        }
+    }
 }

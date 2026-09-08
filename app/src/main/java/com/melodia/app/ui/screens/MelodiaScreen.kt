@@ -103,6 +103,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.melodia.app.MainViewModel
+import com.melodia.app.player.YT_STREAM_ID
 import com.melodia.app.SortMode
 import com.melodia.app.data.model.Song
 import com.melodia.app.ui.ds.DsBackground
@@ -282,8 +283,9 @@ fun MelodiaScreen(vm: MainViewModel) {
                             onPlay = { vm.playPlaylistEntities(openSongs, it) },
                             onRemove = { sid -> vm.removeFromPlaylist(openPid!!, sid) })
                     }
-                    else -> FavsTab(favSongs, current?.id, state.isPlaying, favIds,
+                    3 -> FavsTab(favSongs, current?.id, state.isPlaying, favIds,
                         onPlayAt = { vm.playFavAt(it) }, onFav = { vm.toggleFav(it) }, onAdd = { showInfo = it })
+                    else -> OnlineTab(vm)
                 }
                 }
             }
@@ -310,8 +312,8 @@ fun MelodiaScreen(vm: MainViewModel) {
                     MiniPlayerDs(
                         title = s.title, artist = s.artist, albumId = s.albumId,
                         playing = state.isPlaying,
-                        progress = state.progress, isFav = favIds.contains(s.id),
-                        onToggleFav = { vm.toggleFav(s.id) }, onToggle = { vm.player.toggle() },
+                        progress = state.progress, isFav = s.id != YT_STREAM_ID && favIds.contains(s.id),
+                        onToggleFav = { if (s.id != YT_STREAM_ID) vm.toggleFav(s.id) }, onToggle = { vm.player.toggle() },
                         onOpen = { showPlayer = true }
                     )
                 }
@@ -329,7 +331,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                         interactionSource = remember { MutableInteractionSource() }
                     ) {}
             ) {
-                current?.let { s -> NowPlaying(s, vm, favIds.contains(s.id), onClose = { showPlayer = false }, onAdd = { showAddTo = s }) }
+                current?.let { s -> NowPlaying(s, vm, s.id != YT_STREAM_ID && favIds.contains(s.id), onClose = { showPlayer = false }, onAdd = { showAddTo = s }) }
             }
         }
     }

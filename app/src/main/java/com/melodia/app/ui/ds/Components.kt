@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
@@ -350,7 +351,8 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
         Triple("Inicio", Icons.Default.Home, 0),
         Triple("Explorar", Icons.Default.Search, 1),
         Triple("Listas", Icons.Default.PlaylistPlay, 2),
-        Triple("Favs", Icons.Default.Favorite, 3)
+        Triple("Favs", Icons.Default.Favorite, 3),
+        Triple("Online", Icons.Default.Download, 4)
     )
     Surface(
         shape = CircleShape, color = cs.surface.copy(alpha = 0.78f),

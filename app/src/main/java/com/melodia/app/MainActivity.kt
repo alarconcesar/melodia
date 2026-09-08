@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
         if (granted) vm.reload()
     }
     private val notifPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val writePerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     @Suppress("UNCHECKED_CAST")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +34,7 @@ class MainActivity : ComponentActivity() {
             this,
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return MainViewModel(c.musicPlayer, c.musicRepository, c.playlistRepo, c.sleepTimer) as T
+                    return MainViewModel(c.musicPlayer, c.musicRepository, c.playlistRepo, c.sleepTimer, c.ytRepo) as T
                 }
             }
         )[MainViewModel::class.java]
@@ -45,6 +46,12 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        // Android 8 y anteriores: permiso de escritura para guardar descargas
+        if (Build.VERSION.SDK_INT < 29 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            writePerm.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
         setContent { MelodiaTheme { MelodiaScreen(vm) } }
     }
