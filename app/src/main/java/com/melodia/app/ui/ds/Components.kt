@@ -1,11 +1,18 @@
 package com.melodia.app.ui.ds
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
@@ -320,6 +327,21 @@ fun EqBars(color: Color, modifier: Modifier = Modifier) {
     }
 }
 
+// ── Punto indicador del tab: espacio reservado, aparece con pop ──
+@Composable
+private fun SelectionDot(visible: Boolean) {
+    val cs = MaterialTheme.colorScheme
+    Box(Modifier.height(6.dp), contentAlignment = Alignment.Center) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(200)) + scaleIn(tween(200)),
+            exit = fadeOut(tween(150)) + scaleOut(tween(150))
+        ) {
+            Box(Modifier.size(4.dp).clip(CircleShape).background(cs.primary))
+        }
+    }
+}
+
 // ── PillNav DS · barra flotante ──────────────────────────────────
 @Composable
 fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier) {
@@ -344,11 +366,15 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
             items.forEach { (label, icon, idx) ->
                 val sel = tab == idx
                 // Layout fijo: mismo tamaño siempre (sin saltos)
+                val pillBg by animateColorAsState(
+                    if (sel) cs.primary.copy(alpha = 0.16f) else Color.Transparent,
+                    tween(250), label = "pill"
+                )
                 Box(
                     modifier = Modifier.weight(1f).clip(CircleShape)
-                        .background(if (sel) cs.primary.copy(alpha = 0.16f) else Color.Transparent)
+                        .background(pillBg)
                         .clickable { onTab(idx) }
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -367,6 +393,8 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
                             style = Ds.Sub,
                             color = if (sel) cs.primary else cs.onSurfaceVariant
                         )
+                        // Punto indicador: espacio reservado, aparece con pop
+                        SelectionDot(sel)
                     }
                 }
             }
