@@ -49,8 +49,8 @@ object Ds {
     val RowShape = RoundedCornerShape(RRow)
 }
 
-private val DarkScheme = darkColorScheme(
-    primary = Ds.Green,
+private fun darkScheme(accent: Color) = darkColorScheme(
+    primary = accent,
     onPrimary = Color(0xFF06110A),
     background = Color(0xFF0A0D0B),
     onBackground = Color(0xFFF2F5F2),
@@ -61,8 +61,8 @@ private val DarkScheme = darkColorScheme(
     outline = Color(0xFF2A332D)
 )
 
-private val LightScheme = lightColorScheme(
-    primary = Ds.GreenDeep,
+private fun lightScheme(accent: Color) = lightColorScheme(
+    primary = accent,
     onPrimary = Color.White,
     background = Color(0xFFF4F6F4),
     onBackground = Color(0xFF10140F),
@@ -73,13 +73,49 @@ private val LightScheme = lightColorScheme(
     outline = Color(0xFFD8DED8)
 )
 
+// ── Acentos ────────────────────────────────────────────────────────
+data class Accent(val name: String, val dark: Color, val light: Color)
+
+val Accents = listOf(
+    Accent("Verde", Color(0xFF2EE56B), Color(0xFF0E9F52)),
+    Accent("Azul", Color(0xFF53B7FF), Color(0xFF0277BD)),
+    Accent("Morado", Color(0xFFC58AFF), Color(0xFF6A1B9A)),
+    Accent("Naranja", Color(0xFFFFAB4A), Color(0xFFBF360C)),
+    Accent("Rosa", Color(0xFFFF7EB0), Color(0xFFAD1457))
+)
+
+var accentName by mutableStateOf("Verde")
 var isDarkMode by mutableStateOf<Boolean?>(null)
+
+fun currentAccent(): Accent = Accents.find { it.name == accentName } ?: Accents[0]
+
+private const val UI_PREFS = "melodia_ui"
+
+fun loadUiPrefs(ctx: android.content.Context) {
+    try {
+        val p = ctx.getSharedPreferences(UI_PREFS, android.content.Context.MODE_PRIVATE)
+        accentName = p.getString("accent", "Verde") ?: "Verde"
+        isDarkMode = if (p.contains("dark")) p.getBoolean("dark", true) else null
+    } catch (_: Exception) {}
+}
+
+fun saveUiPrefs(ctx: android.content.Context) {
+    try {
+        ctx.getSharedPreferences(UI_PREFS, android.content.Context.MODE_PRIVATE).edit()
+            .putString("accent", accentName)
+            .apply {
+                if (isDarkMode == null) remove("dark") else putBoolean("dark", isDarkMode!!)
+            }
+            .apply()
+    } catch (_: Exception) {}
+}
 
 @Composable
 fun MelodiaTheme(content: @Composable () -> Unit) {
     val dark = isDarkMode ?: isSystemInDarkTheme()
+    val accent = currentAccent()
     MaterialTheme(
-        colorScheme = if (dark) DarkScheme else LightScheme,
+        colorScheme = if (dark) darkScheme(accent.dark) else lightScheme(accent.light),
         typography = Typography(),
         content = content
     )

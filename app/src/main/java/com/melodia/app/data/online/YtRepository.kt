@@ -86,7 +86,8 @@ class YtRepository(private val context: Context) {
                 YtTrack(
                     id = id,
                     title = (try { s.name } catch (_: Exception) { "Sin título" }) ?: "Sin título",
-                    artist = (try { s.uploaderName } catch (_: Exception) { "" }) ?: "",
+                    artist = ((try { s.uploaderName } catch (_: Exception) { "" }) ?: "")
+                        .replace(" - Topic", "").replace("VEVO", "").trim(),
                     durationSec = try { s.duration } catch (_: Exception) { -1L },
                     thumbUrl = try { thumbs.maxByOrNull { it.height * it.width }?.url } catch (_: Exception) { null },
                     url = url
@@ -129,6 +130,36 @@ class YtRepository(private val context: Context) {
     private fun sanitize(s: String): String =
         s.replace(Regex("[\\\\/:*?\"<>|]"), "").trim().take(80).ifBlank { "audio" }
 
+    // ── Historial online (persistido, máx. 20) ──
+    fun getHistory(): List<YtTrack> {
+        return try {
+            val arr = org.json.JSONArray(prefs().getString("history", "[]") ?: "[]")
+            (0 until arr.length()).mapNotNull { i ->
+                try {
+                    val o = arr.getJSONObject(i)
+                    YtTrack(
+                        o.getString("id"), o.getString("title"), o.optString("artist", ""),
+                        o.optLong("dur", -1), o.optString("thumb", "").ifBlank { null }, o.getString("url")
+                    )
+                } catch (_: Exception) { null }
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun pushHistory(t: YtTrack) {
+        try {
+            val list = (listOf(t) + getHistory()).distinctBy { it.id }.take(20)
+            val arr = org.json.JSONArray()
+            list.forEach {
+                arr.put(
+                    org.json.JSONObject()
+                        .put("id", it.id).put("title", it.title).put("artist", it.artist)
+                        .put("dur", it.durationSec).put("thumb", it.thumbUrl ?: "").put("url", it.url)
+                )
+            }
+            prefs().edit().putString("history", arr.toString()).apply()
+        } catch (_: Exception) {}
+    }
     // ── Búsquedas recientes (persistidas, más recientes primero) ──
     private fun prefs() = context.getSharedPreferences("melodia_yt", Context.MODE_PRIVATE)
     fun getRecent(): List<String> = try {

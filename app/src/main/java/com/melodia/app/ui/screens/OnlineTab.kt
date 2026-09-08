@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -71,6 +72,7 @@ fun OnlineTab(vm: MainViewModel) {
     val dl by vm.dlProgress.collectAsState()
     val busy by vm.busyYt.collectAsState()
     val recent by vm.ytRecent.collectAsState()
+    val history by vm.ytHistory.collectAsState()
     val hasMore by vm.ytHasMore.collectAsState()
     val moreLoading by vm.ytMoreLoading.collectAsState()
     val kb = LocalSoftwareKeyboardController.current
@@ -155,11 +157,70 @@ fun OnlineTab(vm: MainViewModel) {
                     style = Ds.Body, color = cs.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
+                if (history.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Escuchado online", style = Ds.Sub, color = cs.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(history, key = { "h-${it.id}" }) { track ->
+                            Surface(
+                                shape = RoundedCornerShape(14.dp), color = cs.surface,
+                                modifier = Modifier.width(190.dp).clickable { vm.playYt(track) }
+                            ) {
+                                Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    if (track.thumbUrl != null) {
+                                        AsyncImage(
+                                            model = track.thumbUrl, contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
+                                        )
+                                    } else {
+                                        Box(
+                                            Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
+                                                .background(cs.surfaceVariant),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.MusicNote, null, tint = cs.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                                        }
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            track.title, style = Ds.Body, color = cs.onBackground,
+                                            maxLines = 2, overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            track.artist.ifBlank { "YouTube" }, style = Ds.Sub,
+                                            color = cs.onSurfaceVariant,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             else -> {
                 error?.let {
                     Text(it, style = Ds.Sub, color = cs.error, modifier = Modifier.padding(bottom = 6.dp))
                 }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "${results.size} resultados", style = Ds.Sub, color = cs.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(12.dp), color = cs.surfaceVariant,
+                        modifier = Modifier.clickable { vm.downloadAllYt() }
+                    ) {
+                        Text(
+                            "⬇ Todo", style = Ds.Body, color = cs.primary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.padding(bottom = 200.dp)

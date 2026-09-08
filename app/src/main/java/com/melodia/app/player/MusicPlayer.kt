@@ -34,7 +34,7 @@ class MusicPlayer(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state
-    private var queueIds: List<Long> = emptyList()
+    private var queueIds: MutableList<Long> = mutableListOf()
     private var songMap: Map<Long, com.melodia.app.data.model.Song> = emptyMap()
     private var listener: Player.Listener? = null
     private var bound = false
@@ -83,7 +83,7 @@ class MusicPlayer(private val context: Context) {
     fun play(ids: List<Long>, startIndex: Int) {
         val p = exo ?: return
         try {
-            queueIds = ids
+            queueIds = ids.toMutableList()
             val items = ids.mapNotNull { id ->
                 songMap[id]?.let { s ->
                     MediaItem.Builder()
@@ -112,7 +112,7 @@ class MusicPlayer(private val context: Context) {
     fun playStream(url: String, title: String, artist: String, artUrl: String? = null) {
         val p = exo ?: return
         try {
-            queueIds = listOf(YT_STREAM_ID)
+            queueIds = mutableListOf(YT_STREAM_ID)
             val item = MediaItem.Builder()
                 .setUri(url)
                 .setMediaId(YT_STREAM_ID.toString())
@@ -134,6 +134,20 @@ class MusicPlayer(private val context: Context) {
     }
 
     fun pauseOnly() { try { exo?.pause() } catch (_: Exception) {} }
+
+    /** IDs de la cola actual (copia). */
+    fun queueIds(): List<Long> = try { queueIds.toList() } catch (_: Exception) { emptyList() }
+
+    /** Quita un item de la cola (local). */
+    fun removeAt(index: Int) {
+        try {
+            val p = exo ?: return
+            if (index < 0 || index >= queueIds.size || index >= p.mediaItemCount) return
+            p.removeMediaItem(index)
+            queueIds.removeAt(index)
+            updateState()
+        } catch (e: Exception) { Log.e("MusicPlayer", "removeAt fail", e) }
+    }
     private fun attachEq() { try { exo?.let { eq?.attach(it.audioSessionId) } } catch (_: Exception) {} }
     fun toggle() { try { exo?.let { if (it.isPlaying) it.pause() else it.play() } } catch (_: Exception) {} }
     fun next() { try { exo?.seekToNextMediaItem() } catch (_: Exception) {} }

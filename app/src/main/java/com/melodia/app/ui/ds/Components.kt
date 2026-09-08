@@ -304,7 +304,7 @@ fun DsBackground() {
     )
     Canvas(Modifier.fillMaxSize()) {
         val w = size.width
-        val green = Color(0xFF2EE56B)
+        val green = cs.primary
         // Glow superior: degradado radial que se funde a transparente (sin borde duro)
         drawCircle(
             brush = Brush.radialGradient(

@@ -102,6 +102,7 @@ class MainViewModel(
         }
         viewModelScope.launch {
             try { _ytRecent.value = yt.getRecent() } catch (_: Exception) {}
+            try { _ytHistory.value = yt.getHistory() } catch (_: Exception) {}
         }
         // Letras: cargar automáticamente al cambiar de tema
         viewModelScope.launch {
@@ -120,11 +121,33 @@ class MainViewModel(
     fun clearFilters() { _folder.value = null; _album.value = null; _artist.value = null }
     fun openPl(pid: Long?) { _openPlaylist.value = pid }
 
+    // ── Cola de reproducción visible ──
+    private val _queue = MutableStateFlow<List<Song>>(emptyList())
+    val queueSongs: StateFlow<List<Song>> = _queue
+
     private fun emitPlay(list: List<Song>, idx: Int) {
         if (list.isEmpty()) return
+        _queue.value = list
         _currentId.value = list[idx.coerceIn(0, list.size - 1)].id
         player.play(list.map { it.id }, idx.coerceIn(0, list.size - 1))
     }
+    fun playQueueAt(idx: Int) {
+        val q = _queue.value
+        if (q.isEmpty() || idx !in q.indices) return
+        if (q.any { it.id == YT_STREAM_ID }) return // stream: cola de 1, nada que saltar
+        _currentId.value = q[idx].id
+        player.play(q.map { it.id }, idx)
+    }
+
+    fun removeQueueAt(idx: Int) {
+        val q = _queue.value
+        if (q.isEmpty() || idx !in q.indices) return
+        if (q.any { it.id == YT_STREAM_ID }) return
+        if (q.size <= 1) return
+        player.removeAt(idx)
+        _queue.value = q.filterIndexed { i, _ -> i != idx }
+    }
+
     fun playSong(id: Long) {
         val list = filtered.value.ifEmpty { songs.value }
         val idx = list.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return
@@ -174,6 +197,8 @@ class MainViewModel(
     val ytMoreLoading: StateFlow<Boolean> = _ytMoreLoading
     private val _ytRecent = MutableStateFlow<List<String>>(emptyList())
     val ytRecent: StateFlow<List<String>> = _ytRecent
+    private val _ytHistory = MutableStateFlow<List<YtTrack>>(emptyList())
+    val ytHistory: StateFlow<List<YtTrack>> = _ytHistory
 
     private fun errMsg(t: Throwable, fallback: String): String {
         val detail = "${t.javaClass.simpleName}${if (!t.message.isNullOrBlank()) ": ${t.message}" else ""}"
@@ -239,14 +264,20 @@ class MainViewModel(
             try {
                 val audio = withContext(Dispatchers.IO) { yt.bestAudio(track.url) }
                 _currentTrack.value = track
-                _streamSong.value = Song(
+                val stream = Song(
                     id = YT_STREAM_ID, title = track.title,
                     artist = track.artist.ifBlank { "YouTube" },
                     album = "Online", albumId = -1L, durationMs = track.durationSec * 1000,
                     dataPath = audio.url, dateAdded = 0L, artUrl = track.thumbUrl
                 )
+                _streamSong.value = stream
+                _queue.value = listOf(stream)
                 _currentId.value = YT_STREAM_ID
                 player.playStream(audio.url, track.title, track.artist, track.thumbUrl)
+                try {
+                    yt.pushHistory(track)
+                    _ytHistory.value = yt.getHistory()
+                } catch (_: Exception) {}
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _ytError.value = errMsg(t, "No se pudo reproducir — reintenta")
@@ -292,6 +323,21 @@ class MainViewModel(
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _lyrics.value = lyricsMem[key] ?: LyricsUi.None
+            }
+        }
+    }
+
+    /** Descarga todos los resultados actuales (con pausa entre cada uno). */
+    fun downloadAllYt() {
+        viewModelScope.launch {
+            val list = _ytResults.value.filter { !_dlProgress.value.containsKey(it.id) }
+            for (t in list) {
+                if (_dlProgress.value.size >= 3) {
+                    // máx. 3 en paralelo: espera a que se libere uno
+                    while (_dlProgress.value.size >= 3) kotlinx.coroutines.delay(1000)
+                }
+                downloadYt(t)
+                kotlinx.coroutines.delay(400)
             }
         }
     }

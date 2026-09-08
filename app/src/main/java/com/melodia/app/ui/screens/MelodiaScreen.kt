@@ -13,6 +13,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.geometry.CornerRadius
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,6 +50,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
@@ -61,6 +64,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
@@ -69,6 +73,7 @@ import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -120,6 +125,9 @@ import com.melodia.app.ui.ds.SongArt
 import com.melodia.app.ui.ds.TrackRow
 import com.melodia.app.ui.ds.pressClick
 import com.melodia.app.ui.theme.Ds
+import com.melodia.app.ui.theme.Accents
+import com.melodia.app.ui.theme.accentName
+import com.melodia.app.ui.theme.saveUiPrefs
 import com.melodia.app.ui.theme.isDarkMode
 import java.util.Calendar
 
@@ -160,6 +168,7 @@ fun MelodiaScreen(vm: MainViewModel) {
     val sleepLeft by vm.sleep.minsLeft.collectAsState()
     var showPlayer by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
+    var showAccent by remember { mutableStateOf(false) }
     var showCreate by remember { mutableStateOf(false) }
     var showAddTo by remember { mutableStateOf<Song?>(null) }
     var showSort by remember { mutableStateOf(false) }
@@ -278,7 +287,16 @@ fun MelodiaScreen(vm: MainViewModel) {
                         DropdownMenuItem(
                             text = { Text(if (isDarkMode != false) "Modo claro" else "Modo oscuro") },
                             leadingIcon = { Icon(Icons.Default.DarkMode, null) },
-                            onClick = { showMenu = false; isDarkMode = !(isDarkMode ?: false) }
+                            onClick = {
+                                showMenu = false
+                                isDarkMode = if (isDarkMode == null) false else !(isDarkMode!!)
+                                saveUiPrefs(appCtx)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Color de acento") },
+                            leadingIcon = { Icon(Icons.Default.Palette, null) },
+                            onClick = { showMenu = false; showAccent = true }
                         )
                     }
                 }
@@ -409,6 +427,7 @@ fun MelodiaScreen(vm: MainViewModel) {
     }
 
     if (showCreate) TextDialog("Nueva playlist", "", onDismiss = { showCreate = false }) { vm.createPlaylist(it) { showCreate = false } }
+    if (showAccent) AccentDialog(onDismiss = { showAccent = false })
     renameId?.let { pid ->
         TextDialog("Renombrar", playlists.find { it.id == pid }?.name ?: "", onDismiss = { renameId = null }) {
             vm.renamePlaylist(pid, it); renameId = null
@@ -774,6 +793,8 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     val dlMap by vm.dlProgress.collectAsState()
     val curTrack by vm.currentTrack.collectAsState()
     val isStream = s.id == YT_STREAM_ID
+    var showQueue by remember { mutableStateOf(false) }
+    if (showQueue) QueueSheet(vm, onDismiss = { showQueue = false })
     Column(Modifier.fillMaxSize().background(cs.background).padding(20.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(28.dp), tint = cs.onBackground) }
@@ -793,6 +814,9 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                     }
                 }
             } else {
+                IconButton(onClick = { showQueue = true }) {
+                    Icon(Icons.Default.QueueMusic, "Cola", tint = cs.onBackground)
+                }
                 IconButton(onClick = { if (!isStream) vm.toggleFav(s.id) }) {
                     Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onBackground)
                 }
@@ -867,11 +891,72 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     }
 }
 
+// ── Cola de reproducción ───────────────────────────────────────────
+@Composable
+fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val queue by vm.queueSongs.collectAsState()
+    val current by vm.currentSong.collectAsState()
+    val playing by vm.playerState.collectAsState()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Cola · ${queue.size}", color = cs.onBackground) },
+        text = {
+            if (queue.isEmpty()) {
+                Text("Vacía", style = Ds.Body, color = cs.onSurfaceVariant)
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                    itemsIndexed(queue, key = { i, e -> "$i-${e.id}" }) { idx, e ->
+                        val cur = e.id == current?.id && e.id != YT_STREAM_ID || (e.id == YT_STREAM_ID && current?.id == YT_STREAM_ID)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    if (e.id != YT_STREAM_ID) {
+                                        vm.playQueueAt(idx)
+                                        onDismiss()
+                                    }
+                                }
+                                .padding(vertical = 7.dp, horizontal = 4.dp)
+                        ) {
+                            Text(
+                                "${idx + 1}", style = Ds.Sub,
+                                color = if (cur && playing.isPlaying) cs.primary else cs.onSurfaceVariant,
+                                modifier = Modifier.width(26.dp)
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    e.title, style = Ds.Body,
+                                    color = if (cur) cs.primary else cs.onBackground,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    e.artist.ifBlank { "Desconocido" }, style = Ds.Sub,
+                                    color = cs.onSurfaceVariant,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (e.id != YT_STREAM_ID && queue.size > 1) {
+                                IconButton(onClick = { vm.removeQueueAt(idx) }, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.Close, "Quitar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } }
+    )
+}
+
 // ── Diálogos ─────────────────────────────────────────────────────
 // ── Ficha del tema (long-press): info útil + acciones ────────────
 @Composable
 fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> Unit, onAdd: () -> Unit, onClose: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val ctx = LocalContext.current
     val folder = try { java.io.File(song.dataPath).parent?.substringAfterLast("/") ?: "—" } catch (_: Exception) { "—" }
     val added = try {
         java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(song.dateAdded * 1000))
@@ -910,6 +995,26 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
                     IconButton(onClick = onFav) {
                         Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onSurfaceVariant)
                     }
+                    if (song.id != YT_STREAM_ID) {
+                        IconButton(onClick = {
+                            try {
+                                val f = java.io.File(song.dataPath)
+                                if (f.exists()) {
+                                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                                        ctx, "${ctx.packageName}.provider", f
+                                    )
+                                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "audio/*"
+                                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    ctx.startActivity(android.content.Intent.createChooser(send, "Compartir"))
+                                }
+                            } catch (_: Exception) {}
+                        }) {
+                            Icon(Icons.Default.Share, "Compartir", tint = cs.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         },
@@ -924,6 +1029,45 @@ fun InfoRow(label: String, value: String) {
         Text(label, style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.width(80.dp))
         Text(value, style = Ds.Body, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
     }
+}
+
+// ── Diálogo de color de acento ─────────────────────────────────────
+@Composable
+fun AccentDialog(onDismiss: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val ctx = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Color de acento", color = cs.onBackground) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Accents.forEach { a ->
+                    val sel = accentName == a.name
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                accentName = a.name
+                                saveUiPrefs(ctx)
+                                onDismiss()
+                            }
+                            .padding(vertical = 10.dp, horizontal = 4.dp)
+                    ) {
+                        Box(
+                            Modifier.size(24.dp).clip(CircleShape)
+                                .background(a.dark)
+                                .border(1.dp, cs.outline, CircleShape)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(a.name, style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f))
+                        if (sel) Icon(Icons.Default.Check, null, tint = cs.primary, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } }
+    )
 }
 
 @Composable

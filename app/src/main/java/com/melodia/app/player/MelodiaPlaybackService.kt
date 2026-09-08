@@ -171,6 +171,15 @@ class MelodiaPlaybackService : MediaSessionService() {
                 startForeground(NOTIF_ID, notif)
             }
             isForeground = true
+            // Widget de inicio siempre sincronizado (arte reducido para el binder)
+            try {
+                val wArt = large?.let {
+                    if (it.width > 192 || it.height > 192) {
+                        android.graphics.Bitmap.createScaledBitmap(it, 192, 192, true)
+                    } else it
+                }
+                com.melodia.app.widget.MelodiaWidget.refresh(this, title, artist, playing, wArt)
+            } catch (_: Exception) {}
         } catch (e: Exception) {
             Log.e("MelodiaSvc", "notif fail", e)
         }

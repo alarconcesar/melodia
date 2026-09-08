@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.melodia.app.ui.screens.MelodiaScreen
 import com.melodia.app.ui.theme.MelodiaTheme
+import com.melodia.app.ui.theme.loadUiPrefs
 
 class MainActivity : ComponentActivity() {
     private lateinit var vm: MainViewModel
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
     @Suppress("UNCHECKED_CAST")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        loadUiPrefs(this)
         val app = application as MelodiaApp
         val c = app.appContainer
         vm = ViewModelProvider(
