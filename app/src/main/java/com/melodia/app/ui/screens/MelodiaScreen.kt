@@ -15,6 +15,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -165,6 +166,7 @@ fun MelodiaScreen(vm: MainViewModel) {
     val artistSel by vm.artistF.collectAsState()
     val openPid by vm.openPlaylist.collectAsState()
     val openSongs by vm.openPlaylistSongs.collectAsState()
+    val allLinks by vm.allPlaylistSongs.collectAsState()
     val sleepLeft by vm.sleep.minsLeft.collectAsState()
     var showPlayer by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
@@ -351,11 +353,21 @@ fun MelodiaScreen(vm: MainViewModel) {
                     1 -> ExploreTab(vm, folders, albums, artists, folderSel, albumSel, artistSel, songs,
                         current?.id, state.isPlaying, favIds, onAdd = { showInfo = it })
                     2 -> {
-                        if (openPid == null) PlaylistsTab(playlists,
+                        if (openPid == null) PlaylistsTab(playlists, allLinks, all,
                             onOpen = { vm.openPl(it) }, onCreate = { showCreate = true },
-                            onDelete = { vm.deletePlaylist(it) }, onRename = { renameId = it })
-                        else PlaylistDetail(openSongs, onBack = { vm.openPl(null) },
+                            onDelete = { vm.deletePlaylist(it) }, onRename = { renameId = it },
+                            onPlay = { pid ->
+                                val mine = allLinks.filter { it.playlistId == pid }
+                                val byId = all.associateBy { it.id }
+                                val list = mine.mapNotNull { byId[it.songId] }
+                                if (list.isNotEmpty()) vm.playListAt(list, 0)
+                            })
+                        else PlaylistDetail(
+                            playlists.find { it.id == openPid }?.name ?: "Playlist",
+                            openSongs, onBack = { vm.openPl(null) },
                             onPlay = { vm.playPlaylistEntities(openSongs, it) },
+                            onShuffle = { vm.shufflePlaylistEntities(openSongs) },
+                            onMove = { sid, up -> vm.moveInPlaylist(openPid!!, sid, up) },
                             onRemove = { sid -> vm.removeFromPlaylist(openPid!!, sid) })
                     }
                     3 -> FavsTab(favSongs, current?.id, state.isPlaying, favIds,
@@ -444,7 +456,16 @@ fun MelodiaScreen(vm: MainViewModel) {
                     }
                     items(playlists) { p ->
                         Row(
-                            Modifier.fillMaxWidth().clickable { vm.addToPlaylist(p.id, s); showAddTo = null }
+                            Modifier.fillMaxWidth().clickable {
+                                vm.addToPlaylist(p.id, s) { ok ->
+                                    android.widget.Toast.makeText(
+                                        appCtx,
+                                        if (ok) "Agregada a ${p.name}" else "Ya está en ${p.name}",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                showAddTo = null
+                            }
                                 .padding(vertical = 10.dp)
                         ) {
                             Icon(Icons.Default.QueueMusic, null, Modifier.size(20.dp))
@@ -684,9 +705,13 @@ fun ExploreTab(
 @Composable
 fun PlaylistsTab(
     playlists: List<com.melodia.app.data.local.PlaylistEntity>,
-    onOpen: (Long) -> Unit, onCreate: () -> Unit, onDelete: (Long) -> Unit, onRename: (Long) -> Unit
+    links: List<com.melodia.app.data.local.PlaylistSongEntity>,
+    songs: List<Song>,
+    onOpen: (Long) -> Unit, onCreate: () -> Unit, onDelete: (Long) -> Unit, onRename: (Long) -> Unit,
+    onPlay: (Long) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
+    val byId = remember(songs) { songs.associateBy { it.id } }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp, 6.dp, 20.dp, 200.dp)) {
         item {
             Surface(shape = Ds.CardShape, color = cs.surface, modifier = Modifier.fillMaxWidth().clickable(onClick = onCreate)) {
@@ -708,14 +733,23 @@ fun PlaylistsTab(
         }
         items(playlists, key = { it.id }) { p ->
             var menu by remember { mutableStateOf(false) }
+            val mine = remember(links, p.id) { links.filter { it.playlistId == p.id } }
+            val arts = remember(mine, byId) {
+                mine.mapNotNull { byId[it.songId]?.albumId }.filter { it > 0 }.distinct().take(4)
+            }
             Row(Modifier.fillMaxWidth().clickable { onOpen(p.id) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(52.dp).clip(RoundedCornerShape(Ds.RRow)).background(cs.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.QueueMusic, null, Modifier.size(24.dp), tint = cs.onSurfaceVariant) }
+                PlaylistCover(arts)
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text(p.name, style = Ds.Body, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("Playlist", style = Ds.Sub, color = cs.onSurfaceVariant)
+                    Text(
+                        if (mine.isEmpty()) "Vacía" else "${mine.size} ${if (mine.size == 1) "tema" else "temas"} · ${fmtTotal(mine.sumOf { it.durationMs })}",
+                        style = Ds.Sub, color = cs.onSurfaceVariant
+                    )
+                }
+                if (mine.isNotEmpty()) {
+                    IconButton(onClick = { onPlay(p.id) }) {
+                        Icon(Icons.Default.PlayArrow, null, tint = cs.primary)
+                    }
                 }
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, null, tint = cs.onSurfaceVariant) }
@@ -729,30 +763,106 @@ fun PlaylistsTab(
     }
 }
 
+/** Portada: collage 2×2 con carátulas, una sola si hay una, icono si no hay. */
+@Composable
+fun PlaylistCover(albumIds: List<Long>) {
+    val cs = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(Ds.RRow)
+    Box(
+        Modifier.size(52.dp).clip(shape).background(cs.surfaceVariant),
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            albumIds.isEmpty() ->
+                Icon(Icons.Default.QueueMusic, null, Modifier.size(24.dp), tint = cs.onSurfaceVariant)
+            albumIds.size == 1 ->
+                SongArt(albumIds[0], size = 52.dp, shape = shape, iconSize = 24.dp)
+            else -> {
+                val cells = (albumIds + List(4) { -1L }).take(4)
+                Column {
+                    Row { MiniCover(cells[0]); MiniCover(cells[1]) }
+                    Row { MiniCover(cells[2]); MiniCover(cells[3]) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniCover(albumId: Long) {
+    val cs = MaterialTheme.colorScheme
+    if (albumId > 0) {
+        SongArt(albumId, size = 26.dp, shape = RectangleShape, iconSize = 12.dp)
+    } else {
+        Box(Modifier.size(26.dp).background(cs.surfaceVariant), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.MusicNote, null, Modifier.size(12.dp), tint = cs.onSurfaceVariant)
+        }
+    }
+}
+
+private fun fmtTotal(ms: Long): String {
+    val m = (ms / 60000).toInt()
+    return if (m >= 60) "${m / 60} h ${m % 60} min" else "$m min"
+}
+
 @Composable
 fun PlaylistDetail(
+    name: String,
     songs: List<com.melodia.app.data.local.PlaylistSongEntity>,
-    onBack: () -> Unit, onPlay: (Int) -> Unit, onRemove: (Long) -> Unit
+    onBack: () -> Unit, onPlay: (Int) -> Unit, onShuffle: () -> Unit,
+    onMove: (Long, Boolean) -> Unit, onRemove: (Long) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp, 6.dp, 20.dp, 200.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = cs.onBackground) }
-                Text("${songs.size} temas", style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f))
-                if (songs.isNotEmpty()) FilledTonalButton(onClick = { onPlay(0) }) {
-                    Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp)); Text("Reproducir")
+                Column(Modifier.weight(1f)) {
+                    Text(name, style = Ds.Title, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        if (songs.isEmpty()) "Vacía" else "${songs.size} ${if (songs.size == 1) "tema" else "temas"} · ${fmtTotal(songs.sumOf { it.durationMs })}",
+                        style = Ds.Sub, color = cs.onSurfaceVariant
+                    )
                 }
+                if (songs.isNotEmpty()) {
+                    IconButton(onClick = onShuffle) { Icon(Icons.Default.Shuffle, "Aleatorio", tint = cs.onBackground) }
+                    FilledTonalButton(onClick = { onPlay(0) }) {
+                        Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp)); Text("Reproducir")
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+        if (songs.isEmpty()) item {
+            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text("Sin temas — mantén presionada una canción para agregarla", style = Ds.Body, color = cs.onSurfaceVariant)
             }
         }
         itemsIndexed(songs, key = { _, e -> "${e.playlistId}-${e.songId}" }) { idx, e ->
+            var menu by remember { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth().clickable { onPlay(idx) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("${idx + 1}", style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.width(28.dp))
                 Column(Modifier.weight(1f)) {
                     Text(e.title.ifBlank { "Tema" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
                     Text("${e.artist} · ${fmt(e.durationMs)}", style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                IconButton(onClick = { onRemove(e.songId) }) { Icon(Icons.Default.Delete, null, Modifier.size(18.dp), tint = cs.onSurfaceVariant) }
+                Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, null, Modifier.size(18.dp), tint = cs.onSurfaceVariant) }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Subir") }, enabled = idx > 0,
+                            onClick = { menu = false; onMove(e.songId, true) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Bajar") }, enabled = idx < songs.size - 1,
+                            onClick = { menu = false; onMove(e.songId, false) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Quitar") },
+                            onClick = { menu = false; onRemove(e.songId) }
+                        )
+                    }
+                }
             }
         }
     }

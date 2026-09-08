@@ -79,6 +79,9 @@ class MainViewModel(
     val openPlaylistSongs: StateFlow<List<PlaylistSongEntity>> = _openPlaylist.flatMapLatest { pid ->
         if (pid == null) flowOf(emptyList()) else lists.playlistSongs(pid)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** Todos los vínculos playlist→canción (para portadas y conteos sin abrir cada una). */
+    val allPlaylistSongs: StateFlow<List<PlaylistSongEntity>> =
+        lists.allPlaylistSongs().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _favIds = MutableStateFlow<Set<Long>>(emptySet())
     val favIds: StateFlow<Set<Long>> = _favIds
@@ -165,12 +168,25 @@ class MainViewModel(
         val list = e.mapNotNull { byId[it.songId] }
         if (list.isNotEmpty()) emitPlay(list, idx.coerceIn(0, list.size - 1))
     }
+    fun shufflePlaylistEntities(e: List<PlaylistSongEntity>) {
+        val byId = songs.value.associateBy { it.id }
+        val list = e.mapNotNull { byId[it.songId] }.shuffled()
+        if (list.isNotEmpty()) emitPlay(list, 0)
+    }
+    fun moveInPlaylist(pid: Long, sid: Long, up: Boolean) {
+        viewModelScope.launch { lists.moveSong(pid, sid, up) }
+    }
 
     fun toggleFav(id: Long) { viewModelScope.launch { lists.toggleFav(id, _favIds.value.contains(id)) } }
     fun createPlaylist(name: String, onDone: (Long) -> Unit = {}) { viewModelScope.launch { val id = lists.createPlaylist(name); onDone(id) } }
     fun deletePlaylist(id: Long) { viewModelScope.launch { lists.deletePlaylist(id); if (_openPlaylist.value == id) _openPlaylist.value = null } }
     fun renamePlaylist(id: Long, name: String) { viewModelScope.launch { lists.rename(id, name) } }
-    fun addToPlaylist(pid: Long, s: Song) { viewModelScope.launch { lists.addToPlaylist(pid, s) } }
+    fun addToPlaylist(pid: Long, s: Song, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val ok = lists.addToPlaylist(pid, s)
+            onResult(ok)
+        }
+    }
     fun removeFromPlaylist(pid: Long, sid: Long) { viewModelScope.launch { lists.removeFromPlaylist(pid, sid) } }
 
     // ── Online (YouTube: buscar, escuchar, descargar) ──
