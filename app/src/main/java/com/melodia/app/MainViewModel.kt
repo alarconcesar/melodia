@@ -97,6 +97,9 @@ class MainViewModel(
                 if (id > 0 || id == YT_STREAM_ID) _currentId.value = id
             }
         }
+        viewModelScope.launch {
+            try { _ytRecent.value = yt.getRecent() } catch (_: Exception) {}
+        }
     }
 
     fun reload() { _reload.value++ }
@@ -155,6 +158,15 @@ class MainViewModel(
     /** videoId cuyo audio se está resolviendo para reproducir */
     private val _busyYt = MutableStateFlow<String?>(null)
     val busyYt: StateFlow<String?> = _busyYt
+    /** tema online sonando ahora (para descargar desde el reproductor) */
+    private val _currentTrack = MutableStateFlow<YtTrack?>(null)
+    val currentTrack: StateFlow<YtTrack?> = _currentTrack
+    private val _ytHasMore = MutableStateFlow(false)
+    val ytHasMore: StateFlow<Boolean> = _ytHasMore
+    private val _ytMoreLoading = MutableStateFlow(false)
+    val ytMoreLoading: StateFlow<Boolean> = _ytMoreLoading
+    private val _ytRecent = MutableStateFlow<List<String>>(emptyList())
+    val ytRecent: StateFlow<List<String>> = _ytRecent
 
     private fun errMsg(t: Throwable, fallback: String): String {
         val detail = "${t.javaClass.simpleName}${if (!t.message.isNullOrBlank()) ": ${t.message}" else ""}"
@@ -170,12 +182,38 @@ class MainViewModel(
             _ytError.value = null
             try {
                 _ytResults.value = yt.search(query)
+                _ytHasMore.value = yt.hasMore()
                 if (_ytResults.value.isEmpty()) _ytError.value = "Sin resultados — prueba con otras palabras"
+                else {
+                    try {
+                        yt.pushRecent(query)
+                        _ytRecent.value = yt.getRecent()
+                    } catch (_: Exception) {}
+                }
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _ytError.value = errMsg(t, "Sin conexión o YouTube no responde — reintenta")
             }
             _ytLoading.value = false
+        }
+    }
+
+    fun loadMoreYt() {
+        if (_ytMoreLoading.value || !_ytHasMore.value) return
+        viewModelScope.launch {
+            _ytMoreLoading.value = true
+            try {
+                val extra = withContext(Dispatchers.IO) { yt.more() }
+                if (extra.isNotEmpty()) {
+                    val known = _ytResults.value.map { it.id }.toSet()
+                    _ytResults.value = _ytResults.value + extra.filter { !known.contains(it.id) }
+                }
+                _ytHasMore.value = yt.hasMore()
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                _ytHasMore.value = false
+            }
+            _ytMoreLoading.value = false
         }
     }
 
@@ -186,11 +224,12 @@ class MainViewModel(
             _ytError.value = null
             try {
                 val audio = withContext(Dispatchers.IO) { yt.bestAudio(track.url) }
+                _currentTrack.value = track
                 _streamSong.value = Song(
                     id = YT_STREAM_ID, title = track.title,
                     artist = track.artist.ifBlank { "YouTube" },
                     album = "Online", albumId = -1L, durationMs = track.durationSec * 1000,
-                    dataPath = audio.url, dateAdded = 0L
+                    dataPath = audio.url, dateAdded = 0L, artUrl = track.thumbUrl
                 )
                 _currentId.value = YT_STREAM_ID
                 player.playStream(audio.url, track.title, track.artist)

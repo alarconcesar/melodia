@@ -10,6 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.InfoItem.InfoType
 import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.Page
+import org.schabi.newpipe.extractor.search.SearchExtractor
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
@@ -44,11 +46,34 @@ class YtRepository(private val context: Context) {
 
     private fun yt() = NewPipe.getService(0)
 
+    // ── Paginación: se guarda el extractor y la página siguiente ──
+    private var pager: SearchExtractor? = null
+    private var next: Page? = null
+
     suspend fun search(query: String): List<YtTrack> = withContext(Dispatchers.IO) {
         ensure()
         val ex = yt().getSearchExtractor(query)
         ex.fetchPage()
-        ex.initialPage.items.mapNotNull { item ->
+        val page = ex.initialPage
+        pager = ex
+        next = try { page.nextPage } catch (_: Exception) { null }
+        mapItems(page.items)
+    }
+
+    /** Devuelve true si hay más páginas por cargar. */
+    fun hasMore(): Boolean = pager != null && next != null
+
+    suspend fun more(): List<YtTrack> = withContext(Dispatchers.IO) {
+        val ex = pager ?: return@withContext emptyList()
+        val np = next ?: return@withContext emptyList()
+        ensure()
+        val page = ex.getPage(np)
+        next = try { page.nextPage } catch (_: Exception) { null }
+        mapItems(page.items)
+    }
+
+    private fun mapItems(items: List<org.schabi.newpipe.extractor.InfoItem>): List<YtTrack> {
+        return items.mapNotNull { item ->
             try {
                 if (item.infoType != InfoType.STREAM) return@mapNotNull null
                 val s = item as StreamInfoItem
@@ -85,6 +110,21 @@ class YtRepository(private val context: Context) {
 
     private fun sanitize(s: String): String =
         s.replace(Regex("[\\\\/:*?\"<>|]"), "").trim().take(80).ifBlank { "audio" }
+
+    // ── Búsquedas recientes (persistidas, más recientes primero) ──
+    private fun prefs() = context.getSharedPreferences("melodia_yt", Context.MODE_PRIVATE)
+    fun getRecent(): List<String> = try {
+        prefs().getString("recent", "")!!.split("\n").filter { it.isNotBlank() }.take(6)
+    } catch (_: Exception) { emptyList() }
+
+    fun pushRecent(q: String) {
+        try {
+            val clean = q.trim()
+            if (clean.isBlank()) return
+            val list = (listOf(clean) + getRecent()).distinct().take(6)
+            prefs().edit().putString("recent", list.joinToString("\n")).apply()
+        } catch (_: Exception) {}
+    }
 
     /** Descarga el audio a Música/Melodia y devuelve su Uri de MediaStore. */
     suspend fun download(track: YtTrack, onProgress: (Float) -> Unit): Uri = withContext(Dispatchers.IO) {

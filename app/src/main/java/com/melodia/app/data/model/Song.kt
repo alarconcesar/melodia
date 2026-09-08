@@ -8,5 +8,7 @@ data class Song(
     val albumId: Long,
     val durationMs: Long,
     val dataPath: String,
-    val dateAdded: Long
+    val dateAdded: Long,
+    /** URL de carátula online (solo streams de YouTube); null = arte de MediaStore */
+    val artUrl: String? = null
 )

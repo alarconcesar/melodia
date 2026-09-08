@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,7 +60,7 @@ private fun fmtDur(sec: Long): String {
     else "$m:${s.toString().padStart(2, '0')}"
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun OnlineTab(vm: MainViewModel) {
     val cs = MaterialTheme.colorScheme
@@ -68,6 +70,9 @@ fun OnlineTab(vm: MainViewModel) {
     val error by vm.ytError.collectAsState()
     val dl by vm.dlProgress.collectAsState()
     val busy by vm.busyYt.collectAsState()
+    val recent by vm.ytRecent.collectAsState()
+    val hasMore by vm.ytHasMore.collectAsState()
+    val moreLoading by vm.ytMoreLoading.collectAsState()
     val kb = LocalSoftwareKeyboardController.current
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -106,15 +111,51 @@ fun OnlineTab(vm: MainViewModel) {
             loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                 MelodiaSpinner()
             }
-            error != null && results.isEmpty() -> Text(
-                error ?: "", style = Ds.Body, color = cs.error,
-                modifier = Modifier.padding(vertical = 16.dp)
-            )
-            results.isEmpty() -> Text(
-                "Escribe algo y pulsa buscar 🔎",
-                style = Ds.Body, color = cs.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 16.dp)
-            )
+            error != null && results.isEmpty() -> Column(Modifier.padding(vertical = 16.dp)) {
+                Text(error ?: "", style = Ds.Body, color = cs.error)
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp), color = cs.primary,
+                    modifier = Modifier.clickable { vm.searchYt() }
+                ) {
+                    Text(
+                        "Reintentar", style = Ds.Body, color = cs.surface,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                    )
+                }
+            }
+            results.isEmpty() -> {
+                if (recent.isNotEmpty()) {
+                    Text("Recientes", style = Ds.Sub, color = cs.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        recent.forEach { term ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = cs.surfaceVariant,
+                                modifier = Modifier.clickable {
+                                    vm.setYtQuery(term); vm.searchYt(term)
+                                }
+                            ) {
+                                Text(
+                                    term, style = Ds.Body, color = cs.onBackground,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                Text(
+                    "Escribe algo y pulsa buscar 🔎",
+                    style = Ds.Body, color = cs.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
             else -> {
                 error?.let {
                     Text(it, style = Ds.Sub, color = cs.error, modifier = Modifier.padding(bottom = 6.dp))
@@ -131,6 +172,29 @@ fun OnlineTab(vm: MainViewModel) {
                             onPlay = { vm.playYt(track) },
                             onDownload = { vm.downloadYt(track) }
                         )
+                    }
+                    if (hasMore || moreLoading) {
+                        item {
+                            Box(
+                                Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (moreLoading) {
+                                    MelodiaSpinner(size = 28.dp, width = 3.dp)
+                                } else {
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = cs.surfaceVariant,
+                                        modifier = Modifier.clickable { vm.loadMoreYt() }
+                                    ) {
+                                        Text(
+                                            "Ver más ↓", style = Ds.Body, color = cs.primary,
+                                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

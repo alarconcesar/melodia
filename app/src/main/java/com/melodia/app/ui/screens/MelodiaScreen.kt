@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -363,7 +364,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                         .onGloballyPositioned { miniArea = it.boundsInRoot() }
                 ) {
                     MiniPlayerDs(
-                        title = s.title, artist = s.artist, albumId = s.albumId,
+                        title = s.title, artist = s.artist, albumId = s.albumId, artUrl = s.artUrl,
                         playing = state.isPlaying,
                         progress = state.progress, isFav = s.id != YT_STREAM_ID && favIds.contains(s.id),
                         onToggleFav = { if (s.id != YT_STREAM_ID) vm.toggleFav(s.id) }, onToggle = { vm.player.toggle() },
@@ -752,16 +753,33 @@ fun FavsTab(
 fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, onAdd: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     val state by vm.playerState.collectAsState()
+    val dlMap by vm.dlProgress.collectAsState()
+    val curTrack by vm.currentTrack.collectAsState()
+    val isStream = s.id == YT_STREAM_ID
     Column(Modifier.fillMaxSize().background(cs.background).padding(20.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(28.dp), tint = cs.onBackground) }
             Spacer(Modifier.weight(1f))
             MicroLabel("Ahora suena")
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { vm.toggleFav(s.id) }) {
-                Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onBackground)
+            if (isStream && curTrack != null) {
+                val prog = dlMap[curTrack!!.id]
+                if (prog != null) {
+                    Text(
+                        "${(prog * 100).toInt()}%", style = Ds.Sub, color = cs.primary,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                } else {
+                    IconButton(onClick = { vm.downloadYt(curTrack!!) }) {
+                        Icon(Icons.Default.Download, "Descargar", tint = cs.onBackground)
+                    }
+                }
+            } else {
+                IconButton(onClick = { if (!isStream) vm.toggleFav(s.id) }) {
+                    Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onBackground)
+                }
+                IconButton(onClick = onAdd) { Icon(Icons.Default.PlaylistAdd, null, tint = cs.onBackground) }
             }
-            IconButton(onClick = onAdd) { Icon(Icons.Default.PlaylistAdd, null, tint = cs.onBackground) }
         }
         Spacer(Modifier.height(24.dp))
         AnimatedContent(
@@ -773,7 +791,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         Surface(shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(300.dp)) {
             SongArt(
                 albumId = s.albumId, size = 300.dp, shape = Ds.HeroShape,
-                iconSize = 110.dp
+                iconSize = 110.dp, artUrl = s.artUrl
             )
         }
         Spacer(Modifier.height(28.dp))
@@ -833,7 +851,7 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SongArt(
                         albumId = song.albumId, size = 52.dp,
-                        shape = RoundedCornerShape(Ds.RRow), iconSize = 26.dp
+                        shape = RoundedCornerShape(Ds.RRow), artUrl = song.artUrl, iconSize = 26.dp
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {

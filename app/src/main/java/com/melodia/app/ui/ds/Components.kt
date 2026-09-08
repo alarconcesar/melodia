@@ -86,10 +86,11 @@ fun SongArt(
     shape: Shape,
     iconSize: Dp = 24.dp,
     active: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    artUrl: String? = null
 ) {
     val cs = MaterialTheme.colorScheme
-    val uri = remember(albumId) {
+    val uri = remember(albumId, artUrl) {
         if (albumId > 0) ContentUris.withAppendedId(
             MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, albumId
         ) else null
@@ -107,9 +108,10 @@ fun SongArt(
                 tint = cs.onSurfaceVariant,
                 modifier = Modifier.size(iconSize)
             )
-            if (uri != null) {
+            val model = artUrl ?: uri
+            if (model != null) {
                 AsyncImage(
-                    model = uri, contentDescription = null,
+                    model = model, contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -203,7 +205,7 @@ fun TrackRow(
     ) {
         SongArt(
             albumId = s.albumId, size = Ds.ArtRow, shape = Ds.RowShape,
-            iconSize = 24.dp, active = active
+            iconSize = 24.dp, active = active, artUrl = s.artUrl
         )
         Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(
@@ -426,6 +428,7 @@ fun MiniPlayerDs(
     title: String,
     artist: String,
     albumId: Long = -1L,
+    artUrl: String? = null,
     playing: Boolean,
     progress: Float,
     isFav: Boolean,
@@ -445,7 +448,7 @@ fun MiniPlayerDs(
             Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 SongArt(
                     albumId = albumId, size = 44.dp, shape = Ds.RowShape,
-                    iconSize = 22.dp
+                    iconSize = 22.dp, artUrl = artUrl
                 )
                 Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
                     Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
