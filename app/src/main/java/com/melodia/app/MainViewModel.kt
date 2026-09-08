@@ -189,6 +189,13 @@ class MainViewModel(
                         yt.pushRecent(query)
                         _ytRecent.value = yt.getRecent()
                     } catch (_: Exception) {}
+                    // Prefetch del primer resultado: el play más común arranca al instante
+                    val top = _ytResults.value.firstOrNull()
+                    if (top != null) {
+                        viewModelScope.launch {
+                            try { withContext(Dispatchers.IO) { yt.prefetchAudio(top.url) } } catch (_: Exception) {}
+                        }
+                    }
                 }
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t

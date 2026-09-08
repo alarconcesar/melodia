@@ -57,6 +57,12 @@ class MelodiaPlaybackService : MediaSessionService() {
         )
         val player = ExoPlayer.Builder(this)
             .setHandleAudioBecomingNoisy(true)
+            // Arranque rápido: suena con ~1s en buffer (ideal para streams)
+            .setLoadControl(
+                androidx.media3.exoplayer.DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(15_000, 30_000, 1_000, 1_500)
+                    .build()
+            )
             .build()
         player.addListener(notifListener)
         session = MediaSession.Builder(this, player)

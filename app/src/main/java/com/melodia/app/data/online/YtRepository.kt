@@ -49,6 +49,7 @@ class YtRepository(private val context: Context) {
     // ── Paginación: se guarda el extractor y la página siguiente ──
     private var pager: SearchExtractor? = null
     private var next: Page? = null
+    private val audioCache = mutableMapOf<String, Pair<Long, YtAudio>>()
 
     suspend fun search(query: String): List<YtTrack> = withContext(Dispatchers.IO) {
         ensure()
@@ -96,6 +97,13 @@ class YtRepository(private val context: Context) {
 
     suspend fun bestAudio(videoUrl: String): YtAudio = withContext(Dispatchers.IO) {
         ensure()
+        // Caché: las URLs de audio valen horas — re-escuchar es instantáneo
+        synchronized(audioCache) {
+            val hit = audioCache[videoUrl]
+            if (hit != null && System.currentTimeMillis() - hit.first < 5 * 60 * 60 * 1000L) {
+                return@withContext hit.second
+            }
+        }
         val ex = yt().getStreamExtractor(videoUrl)
         ex.fetchPage()
         val audios: List<AudioStream> = ex.audioStreams
@@ -105,7 +113,17 @@ class YtRepository(private val context: Context) {
             ?: ranked.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("opus", true) }
             ?: ranked.first()
         val isMp4 = (try { pick.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true)
-        YtAudio(pick.content, if (isMp4) "m4a" else "webm", if (isMp4) "audio/mp4" else "audio/webm")
+        YtAudio(pick.content, if (isMp4) "m4a" else "webm", if (isMp4) "audio/mp4" else "audio/webm").also {
+            synchronized(audioCache) {
+                audioCache[videoUrl] = System.currentTimeMillis() to it
+                while (audioCache.size > 30) audioCache.remove(audioCache.keys.first())
+            }
+        }
+    }
+
+    /** Resuelve el audio en segundo plano para que el play sea instantáneo. */
+    suspend fun prefetchAudio(videoUrl: String) {
+        try { bestAudio(videoUrl) } catch (_: Exception) {}
     }
 
     private fun sanitize(s: String): String =
