@@ -12,6 +12,7 @@ import com.melodia.app.player.MusicPlayer
 import com.melodia.app.player.PlayerState
 import com.melodia.app.player.SleepTimer
 import com.melodia.app.player.YT_STREAM_ID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -155,6 +156,11 @@ class MainViewModel(
     private val _busyYt = MutableStateFlow<String?>(null)
     val busyYt: StateFlow<String?> = _busyYt
 
+    private fun errMsg(t: Throwable, fallback: String): String {
+        val detail = "${t.javaClass.simpleName}${if (!t.message.isNullOrBlank()) ": ${t.message}" else ""}"
+        return "$fallback\n($detail)"
+    }
+
     fun setYtQuery(q: String) { _ytQuery.value = q }
     fun searchYt(q: String = _ytQuery.value) {
         val query = q.trim()
@@ -165,8 +171,9 @@ class MainViewModel(
             try {
                 _ytResults.value = yt.search(query)
                 if (_ytResults.value.isEmpty()) _ytError.value = "Sin resultados — prueba con otras palabras"
-            } catch (_: Exception) {
-                _ytError.value = "Sin conexión o YouTube no responde — reintenta"
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                _ytError.value = errMsg(t, "Sin conexión o YouTube no responde — reintenta")
             }
             _ytLoading.value = false
         }
@@ -187,8 +194,9 @@ class MainViewModel(
                 )
                 _currentId.value = YT_STREAM_ID
                 player.playStream(audio.url, track.title, track.artist)
-            } catch (_: Exception) {
-                _ytError.value = "No se pudo reproducir — reintenta"
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                _ytError.value = errMsg(t, "No se pudo reproducir — reintenta")
             }
             _busyYt.value = null
         }
@@ -203,8 +211,9 @@ class MainViewModel(
                     yt.download(track) { p -> _dlProgress.value += track.id to p }
                 }
                 reload()
-            } catch (_: Exception) {
-                _ytError.value = "No se pudo descargar — reintenta"
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                _ytError.value = errMsg(t, "No se pudo descargar — reintenta")
             }
             // quitar el entry tras un respiro para que se vea el 100%
             kotlinx.coroutines.delay(600)
