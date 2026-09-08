@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -48,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.melodia.app.MainViewModel
 import com.melodia.app.data.online.YtTrack
+import com.melodia.app.ui.ds.MelodiaSpinner
 import com.melodia.app.ui.theme.Ds
 
 private fun fmtDur(sec: Long): String {
@@ -104,7 +104,7 @@ fun OnlineTab(vm: MainViewModel) {
         Spacer(Modifier.height(12.dp))
         when {
             loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = cs.primary)
+                MelodiaSpinner()
             }
             error != null && results.isEmpty() -> Text(
                 error ?: "", style = Ds.Body, color = cs.error,
@@ -180,10 +180,7 @@ private fun YtRow(
                     )
                 }
                 if (busy) {
-                    CircularProgressIndicator(
-                        color = cs.primary, strokeWidth = 2.dp,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    MelodiaSpinner(size = 24.dp, width = 2.dp)
                 } else {
                     IconButton(onClick = onPlay) {
                         Icon(Icons.Default.PlayArrow, "Escuchar", tint = cs.primary, modifier = Modifier.size(28.dp))

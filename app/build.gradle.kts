@@ -11,8 +11,8 @@ android {
         applicationId = "com.melodia.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 20
-        versionName = "2.17"
+        versionCode = 21
+        versionName = "2.18"
     }
     buildTypes {
         release {

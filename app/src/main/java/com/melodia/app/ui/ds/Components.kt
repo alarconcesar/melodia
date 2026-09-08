@@ -16,6 +16,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -130,6 +131,21 @@ fun pressClick(onClick: () -> Unit, min: Float = 0.9f): Modifier {
     return Modifier
         .graphicsLayer { scaleX = scale; scaleY = scale }
         .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+}
+
+// ── Spinner propio: M3 CircularProgressIndicator crashea en este BOM ──
+// (M3 1.1.2 llama a KeyframesSpecConfig.at() que animation-core 1.6.0 no trae)
+@Composable
+fun MelodiaSpinner(size: androidx.compose.ui.unit.Dp = 32.dp, width: androidx.compose.ui.unit.Dp = 3.dp) {
+    val cs = MaterialTheme.colorScheme
+    val inf = rememberInfiniteTransition(label = "spin")
+    val angle by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(900)), label = "a")
+    androidx.compose.foundation.Canvas(Modifier.size(size)) {
+        drawArc(
+            color = cs.primary, startAngle = angle, sweepAngle = 270f, useCenter = false,
+            style = Stroke(width.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        )
+    }
 }
 
 // ── Micro label uppercase ────────────────────────────────────────
