@@ -27,9 +27,11 @@ class MainViewModel(
     val player: MusicPlayer,
     private val repo: MusicRepository,
     private val lists: PlaylistRepository,
+    private val stats: StatsRepository,
     val sleep: SleepTimer,
     private val yt: YtRepository,
-    private val lyricsRepo: LyricsRepository
+    private val lyricsRepo: LyricsRepository,
+    private val artRepo: com.melodia.app.data.art.ArtworkRepository
 ) : ViewModel() {
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs
@@ -94,6 +96,7 @@ class MainViewModel(
             _reload.flatMapLatest { repo.loadAllSongs() }.collect { list ->
                 player.setQueue(list)
                 _songs.value = list
+                enrichArtwork(list)
             }
         }
         viewModelScope.launch { lists.favorites().collect { f -> _favIds.value = f.map { it.songId }.toSet() } }
@@ -101,6 +104,11 @@ class MainViewModel(
         viewModelScope.launch {
             player.state.map { it.currentId }.distinctUntilChanged().collect { id ->
                 if (id > 0 || id == YT_STREAM_ID) _currentId.value = id
+                // Estadísticas: cada tema local que empieza suma una reproducción
+                if (id > 0) {
+                    val dur = songs.value.find { it.id == id }?.durationMs ?: 0L
+                    viewModelScope.launch { stats.recordPlay(id, dur) }
+                }
             }
         }
         viewModelScope.launch {
@@ -114,6 +122,28 @@ class MainViewModel(
     }
 
     fun reload() { _reload.value++ }
+
+    // ── Biblioteca: filtros y metadatos ──
+    val minSecs: StateFlow<Int> = repo.minSecs
+    val scanFolder: StateFlow<String?> = repo.scanFolder
+
+    fun setMinSecs(s: Int) {
+        repo.setMinSecs(s)
+        reload()
+    }
+
+    fun setScanFolder(path: String?) {
+        repo.setScanFolder(path)
+        reload()
+    }
+
+    fun updateMetadata(s: Song, title: String, artist: String, album: String, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { repo.updateMetadata(s.id, title, artist, album) }
+            if (ok) reload()
+            onDone(ok)
+        }
+    }
 
     fun setQuery(q: String) { _query.value = q }
     fun setSort(s: SortMode) { _sort.value = s }
@@ -156,6 +186,12 @@ class MainViewModel(
         val idx = list.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return
         emitPlay(list, idx)
     }
+    /** Reproduce por id desde toda la biblioteca (historial, estadísticas). */
+    fun playById(id: Long) {
+        val list = songs.value
+        val idx = list.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return
+        emitPlay(list, idx)
+    }
     fun playShuffle() {
         val list = filtered.value.ifEmpty { songs.value }
         if (list.isEmpty()) return
@@ -182,6 +218,28 @@ class MainViewModel(
     fun setSpeed(s: Float) { player.setSpeed(s) }
     fun resetPitchSpeed() { player.resetPitchSpeed() }
 
+    // ── A continuación / al final ──
+    fun queueNext(id: Long, onDone: (Boolean) -> Unit = {}) {
+        val s = songs.value.find { it.id == id } ?: run { onDone(false); return }
+        if (!player.playNext(id)) { onDone(false); return }
+        val q = _queue.value.toMutableList()
+        val at = (player.state.value.currentIndex + 1).coerceIn(0, q.size)
+        q.add(at, s)
+        _queue.value = q
+        onDone(true)
+    }
+
+    fun queueEnd(id: Long, onDone: (Boolean) -> Unit = {}) {
+        val s = songs.value.find { it.id == id } ?: run { onDone(false); return }
+        if (!player.addToEnd(id)) { onDone(false); return }
+        _queue.value = _queue.value + s
+        onDone(true)
+    }
+
+    // ── Fundido entre canciones ──
+    fun toggleCrossfade() { player.setCrossfade(!player.state.value.crossfade) }
+    fun setCrossfadeSecs(s: Int) { player.setCrossfadeSecs(s) }
+
     fun toggleFav(id: Long) { viewModelScope.launch { lists.toggleFav(id, _favIds.value.contains(id)) } }
     fun createPlaylist(name: String, onDone: (Long) -> Unit = {}) { viewModelScope.launch { val id = lists.createPlaylist(name); onDone(id) } }
     fun deletePlaylist(id: Long) { viewModelScope.launch { lists.deletePlaylist(id); if (_openPlaylist.value == id) _openPlaylist.value = null } }
@@ -193,6 +251,143 @@ class MainViewModel(
         }
     }
     fun removeFromPlaylist(pid: Long, sid: Long) { viewModelScope.launch { lists.removeFromPlaylist(pid, sid) } }
+
+    // ── Estadísticas e historial ──
+    val statRows: StateFlow<List<com.melodia.app.data.local.StatEntity>> =
+        stats.observe().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Temas escuchados recientemente (para "Historial" en Inicio). */
+    val recentPlayed: StateFlow<List<Song>> =
+        combine(_songs, statRows) { list, st ->
+            val last = st.associate { it.songId to it.lastPlayedAt }
+            @Suppress("UNCHECKED_CAST")
+            (list as List<Song>).filter { last.containsKey(it.id) }
+                .sortedByDescending { last[it.id] ?: 0L }.take(10)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    data class StatsSummary(
+        val plays: Int = 0, val minutes: Long = 0L,
+        val topSongs: List<Pair<Song, Int>> = emptyList(),
+        val topArtists: List<Pair<String, Int>> = emptyList()
+    )
+
+    val statsSummary: StateFlow<StatsSummary> =
+        combine(_songs, statRows) { list, st ->
+            @Suppress("UNCHECKED_CAST") val songs = list as List<Song>
+            val byId = songs.associateBy { it.id }
+            val plays = st.sumOf { it.plays }
+            val minutes = st.sumOf { it.listenMs } / 60000
+            val topSongs = st.sortedByDescending { it.plays }
+                .mapNotNull { e -> byId[e.songId]?.let { it to e.plays } }.take(5)
+            val artPlays = mutableMapOf<String, Int>()
+            st.forEach { e ->
+                val a = byId[e.songId]?.artist?.ifBlank { "Desconocido" } ?: return@forEach
+                artPlays[a] = (artPlays[a] ?: 0) + e.plays
+            }
+            val topArtists = artPlays.entries.sortedByDescending { it.value }.take(5).map { it.key to it.value }
+            StatsSummary(plays, minutes, topSongs, topArtists)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, StatsSummary())
+
+    fun clearStats() { viewModelScope.launch { stats.clear() } }
+
+    // ── Respaldo y restauración (JSON en Descargas/Melodia) ──
+    fun backup(ctx: android.content.Context, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val json = withContext(Dispatchers.IO) { lists.exportJson() }
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, "melodia-respaldo.json")
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, "Download/Melodia")
+                }
+                val uri = ctx.contentResolver.insert(
+                    android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
+                )
+                if (uri == null) { onDone("No se pudo crear el archivo"); return@launch }
+                withContext(Dispatchers.IO) {
+                    ctx.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
+                }
+                onDone("Respaldo guardado en Descargas/Melodia")
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                onDone("No se pudo crear el respaldo")
+            }
+        }
+    }
+
+    fun restore(ctx: android.content.Context, uri: android.net.Uri, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) {
+                    ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: ""
+                }
+                val root = org.json.JSONObject(text)
+                val lib = songs.value
+                val byPath = lib.associateBy { it.dataPath }
+                var pls = 0; var added = 0; var favs = 0
+                val arr = root.optJSONArray("playlists") ?: org.json.JSONArray()
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val name = o.optString("name", "Lista").ifBlank { "Lista" }
+                    val pid = lists.createPlaylist("$name (respaldo)")
+                    pls++
+                    val sarr = o.optJSONArray("songs") ?: org.json.JSONArray()
+                    for (j in 0 until sarr.length()) {
+                        val e = sarr.getJSONObject(j)
+                        val match = byPath[e.optString("path")] ?: lib.find {
+                            it.title.equals(e.optString("title"), true) &&
+                                it.artist.equals(e.optString("artist"), true)
+                        } ?: continue
+                        if (lists.addToPlaylist(pid, match)) added++
+                    }
+                }
+                val farr = root.optJSONArray("favs") ?: org.json.JSONArray()
+                for (i in 0 until farr.length()) {
+                    val id = farr.optLong(i, -1)
+                    if (lib.any { it.id == id } && !_favIds.value.contains(id)) {
+                        lists.toggleFav(id, false); favs++
+                    }
+                }
+                onDone("Restaurado: $pls listas, $added temas, $favs favoritos")
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                onDone("Archivo inválido — no se pudo restaurar")
+            }
+        }
+    }
+
+    // ── Carátulas online para temas sin arte ──
+    private var artJob: kotlinx.coroutines.Job? = null
+
+    private fun enrichArtwork(list: List<Song>) {
+        artJob?.cancel()
+        artJob = viewModelScope.launch {
+            try {
+                // 1) aplica caché al instante (sin red)
+                val cached = list.mapNotNull { s ->
+                    if (s.albumId > 0 || !s.artUrl.isNullOrBlank()) return@mapNotNull null
+                    artRepo.cached(s.artist, s.title)?.let { s.id to it }
+                }.toMap()
+                if (cached.isNotEmpty()) {
+                    _songs.value = _songs.value.map { s -> cached[s.id]?.let { s.copy(artUrl = it) } ?: s }
+                }
+                // 2) busca en red lo que falte (máx. 50 por carga, con pausa)
+                var n = 0
+                for (s in list) {
+                    if (n >= 50) break
+                    val cur = _songs.value.find { it.id == s.id } ?: continue
+                    if (cur.albumId > 0 || !cur.artUrl.isNullOrBlank()) continue
+                    if (cur.artist.isBlank() || cur.artist == "Desconocido") continue
+                    val url = try { artRepo.fetch(cur.artist, cur.title) } catch (_: Exception) { null }
+                    if (!url.isNullOrBlank()) {
+                        _songs.value = _songs.value.map { x -> if (x.id == s.id) x.copy(artUrl = url) else x }
+                    }
+                    n++
+                    kotlinx.coroutines.delay(250)
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     // ── Online (YouTube: buscar, escuchar, descargar) ──
     private val _ytQuery = MutableStateFlow("")

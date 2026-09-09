@@ -73,5 +73,56 @@ class EqualizerManager(context: Context) {
             }
         } catch (_: Exception) {}
     }
+
+    // ── Mis presets con nombre (5 bandas + graves) ──
+    private val _customPresets = MutableStateFlow(loadCustom())
+    val customPresets: StateFlow<Map<String, List<Int>>> = _customPresets
+
+    private fun loadCustom(): Map<String, List<Int>> {
+        return try {
+            val raw = prefs.getString("custom_eq", "") ?: ""
+            if (raw.isBlank()) return emptyMap()
+            raw.split(";").mapNotNull { entry ->
+                val kv = entry.split("|")
+                if (kv.size != 2) return@mapNotNull null
+                val vals = kv[1].split(",").mapNotNull { it.toIntOrNull() }
+                if (vals.size != 6) return@mapNotNull null
+                kv[0] to vals
+            }.toMap()
+        } catch (_: Exception) { emptyMap() }
+    }
+
+    private fun saveCustom() {
+        try {
+            val raw = _customPresets.value.entries.joinToString(";") { (k, v) -> "$k|${v.joinToString(",")}" }
+            prefs.edit().putString("custom_eq", raw).apply()
+        } catch (_: Exception) {}
+    }
+
+    fun saveCustomPreset(name: String) {
+        val n = name.trim().take(24)
+        if (n.isEmpty()) return
+        val vals = _bands.value.take(5) + _bass.value
+        _customPresets.value = _customPresets.value + (n to vals)
+        saveCustom()
+        _preset.value = n; prefs.edit().putString("preset", n).apply()
+    }
+
+    fun deleteCustomPreset(name: String) {
+        _customPresets.value = _customPresets.value - name
+        saveCustom()
+    }
+
+    fun applyCustomPreset(name: String) {
+        val vals = _customPresets.value[name] ?: return
+        val bands = vals.take(5)
+        _bands.value = bands
+        bands.forEachIndexed { i, lvl ->
+            prefs.edit().putInt("band$i", lvl).apply()
+            try { eq?.setBandLevel(i.toShort(), lvl.coerceIn(-1500, 1500).toShort()) } catch (_: Exception) {}
+        }
+        setBass(vals.getOrElse(5) { 0 })
+        _preset.value = name; prefs.edit().putString("preset", name).apply()
+    }
     private fun releaseFx() { try { eq?.release() } catch (_: Exception) {}; try { bass?.release() } catch (_: Exception) {}; try { reverb?.release() } catch (_: Exception) {}; eq = null; bass = null; reverb = null }
 }

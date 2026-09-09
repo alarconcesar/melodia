@@ -30,4 +30,26 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
     fun allPlaylistSongs(): Flow<List<PlaylistSongEntity>> = db.playlistSongDao().observeAllSongs()
     suspend fun removeFromPlaylist(pid: Long, sid: Long) = db.playlistSongDao().remove(pid, sid)
     suspend fun toggleFav(id: Long, isFav: Boolean) { if (isFav) db.favoriteDao().remove(id) else db.favoriteDao().add(FavoriteEntity(id)) }
+
+    /** Exporta playlists + favoritos a JSON. */
+    suspend fun exportJson(): String {
+        val pls = db.playlistDao().getAll()
+        val arr = org.json.JSONArray()
+        pls.forEach { p ->
+            val songs = db.playlistSongDao().getSongs(p.id)
+            val sarr = org.json.JSONArray()
+            songs.forEach { e ->
+                sarr.put(
+                    org.json.JSONObject()
+                        .put("path", e.dataPath).put("title", e.title)
+                        .put("artist", e.artist).put("album", e.album)
+                        .put("dur", e.durationMs)
+                )
+            }
+            arr.put(org.json.JSONObject().put("name", p.name).put("songs", sarr))
+        }
+        val favs = org.json.JSONArray()
+        db.favoriteDao().getAllIds().forEach { favs.put(it) }
+        return org.json.JSONObject().put("playlists", arr).put("favs", favs).toString()
+    }
 }

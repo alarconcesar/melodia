@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -52,16 +53,21 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.LowPriority
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -73,6 +79,7 @@ import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
@@ -176,6 +183,10 @@ fun MelodiaScreen(vm: MainViewModel) {
     var showAddTo by remember { mutableStateOf<Song?>(null) }
     var showSort by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
+    var showXfade by remember { mutableStateOf(false) }
+    var showStats by remember { mutableStateOf(false) }
+    var showLib by remember { mutableStateOf(false) }
+    var showBackup by remember { mutableStateOf(false) }
     var showEq by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf<Song?>(null) }
     var renameId by remember { mutableStateOf<Long?>(null) }
@@ -297,9 +308,29 @@ fun MelodiaScreen(vm: MainViewModel) {
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text(if (state.crossfade) "Fundido: activado" else "Fundido entre canciones") },
+                            leadingIcon = { Icon(Icons.Default.VolumeUp, null) },
+                            onClick = { showMenu = false; showXfade = true }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Color de acento") },
                             leadingIcon = { Icon(Icons.Default.Palette, null) },
                             onClick = { showMenu = false; showAccent = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Mis estadísticas") },
+                            leadingIcon = { Icon(Icons.Default.Assessment, null) },
+                            onClick = { showMenu = false; showStats = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Biblioteca") },
+                            leadingIcon = { Icon(Icons.Default.Folder, null) },
+                            onClick = { showMenu = false; showLib = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Respaldo") },
+                            leadingIcon = { Icon(Icons.Default.Save, null) },
+                            onClick = { showMenu = false; showBackup = true }
                         )
                     }
                 }
@@ -485,7 +516,7 @@ fun MelodiaScreen(vm: MainViewModel) {
             onPlay = { vm.playSong(s.id); showInfo = null },
             onFav = { vm.toggleFav(s.id) },
             onAdd = { showAddTo = s; showInfo = null },
-            onClose = { showInfo = null }
+            onClose = { showInfo = null }, vm = vm
         )
     }
     if (showSort) {
@@ -530,6 +561,18 @@ fun MelodiaScreen(vm: MainViewModel) {
             },
             confirmButton = { TextButton(onClick = { showSleep = false }) { Text("Cerrar") } }
         )
+    }
+    if (showXfade) {
+        CrossfadeSheet(vm, onDismiss = { showXfade = false })
+    }
+    if (showStats) {
+        StatsSheet(vm, onDismiss = { showStats = false })
+    }
+    if (showLib) {
+        LibrarySheet(vm, onDismiss = { showLib = false })
+    }
+    if (showBackup) {
+        BackupSheet(vm, onDismiss = { showBackup = false })
     }
     if (showEq) {
         val eq = vm.player.eq
@@ -602,6 +645,82 @@ fun HomeTab(
                         val artists by vm.artists.collectAsState()
                         QuickCard("Artistas", "${artists.size}", Icons.Default.Person) { onTab(1) }
                     }
+                }
+            }
+        }
+        item {
+            val q by vm.query.collectAsState()
+            if (q.isNotBlank()) {
+                val artists by vm.artists.collectAsState()
+                val albums by vm.albums.collectAsState()
+                val pls by vm.playlists.collectAsState()
+                val mArtists = artists.filter { it.name.contains(q, true) }.take(4)
+                val mAlbums = albums.filter { it.name.contains(q, true) }.take(4)
+                val mPls = pls.filter { it.name.contains(q, true) }.take(4)
+                if (mArtists.isNotEmpty() || mAlbums.isNotEmpty() || mPls.isNotEmpty()) {
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                        Text("Coincidencias", style = Ds.Title, color = cs.onBackground)
+                        Spacer(Modifier.height(8.dp))
+                        mArtists.forEach { a ->
+                            SearchMatchRow(
+                                icon = Icons.Default.Person, title = a.name,
+                                sub = "${a.count} ${if (a.count == 1) "tema" else "temas"} · Artista",
+                                onTap = { vm.setQuery(""); vm.setArtist(a.name); onTab(1) }
+                            )
+                        }
+                        mAlbums.forEach { a ->
+                            SearchMatchRow(
+                                icon = Icons.Default.Album, title = a.name,
+                                sub = "${a.artist} · Álbum",
+                                onTap = { vm.setQuery(""); vm.setAlbum(a.name); onTab(1) }
+                            )
+                        }
+                        mPls.forEach { p ->
+                            SearchMatchRow(
+                                icon = Icons.Default.QueueMusic, title = p.name,
+                                sub = "Playlist",
+                                onTap = { vm.setQuery(""); vm.openPl(p.id); onTab(2) }
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
+        item {
+            val recent by vm.recentPlayed.collectAsState()
+            if (recent.isNotEmpty()) {
+                Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                    Text("Escuchado recientemente", style = Ds.Title, color = cs.onBackground)
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(recent, key = { it.id }) { s ->
+                            Surface(
+                                shape = RoundedCornerShape(14.dp), color = cs.surface,
+                                modifier = Modifier.width(150.dp).clickable { vm.playById(s.id) }
+                            ) {
+                                Column(Modifier.padding(8.dp)) {
+                                    SongArt(
+                                        albumId = s.albumId, size = 134.dp,
+                                        shape = RoundedCornerShape(10.dp),
+                                        artUrl = s.artUrl, iconSize = 28.dp,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(
+                                        s.title, style = Ds.Body, color = cs.onBackground,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        s.artist.ifBlank { "Desconocido" }, style = Ds.Sub,
+                                        color = cs.onSurfaceVariant,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
                 }
             }
         }
@@ -1060,6 +1179,287 @@ fun PitchSheet(vm: MainViewModel, pitch: Float, speed: Float, onDismiss: () -> U
     )
 }
 
+// ── Biblioteca: carpeta + duración mínima ──────────────────────────
+@Composable
+fun LibrarySheet(vm: MainViewModel, onDismiss: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val minSecs by vm.minSecs.collectAsState()
+    val scanFolder by vm.scanFolder.collectAsState()
+    val folders by vm.folders.collectAsState()
+    var mins by remember(minSecs) { mutableStateOf(minSecs) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Biblioteca", color = cs.onBackground) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Text("Ignorar audios de menos de", style = Ds.Body, color = cs.onBackground)
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf(0, 15, 30, 60).forEach { s ->
+                        val sel = mins == s
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (sel) cs.primary else cs.surfaceVariant,
+                            modifier = Modifier.weight(1f).clickable { mins = s; vm.setMinSecs(s) }
+                        ) {
+                            Box(Modifier.padding(vertical = 9.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    if (s == 0) "Todo" else "${s}s",
+                                    style = Ds.Body,
+                                    color = if (sel) cs.surface else cs.onBackground
+                                )
+                            }
+                        }
+                    }
+                }
+                Text(
+                    "Oculta tonos, notas de voz y efectos cortos",
+                    style = Ds.Sub, color = cs.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                Divider(Modifier.padding(vertical = 10.dp))
+                Text("Carpeta", style = Ds.Body, color = cs.onBackground)
+                Spacer(Modifier.height(4.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp), color = cs.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth().clickable { vm.setScanFolder(null) }
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            "Todo el dispositivo", style = Ds.Body,
+                            color = if (scanFolder == null) cs.primary else cs.onBackground,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (scanFolder == null) Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = cs.primary)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                folders.forEach { f ->
+                    Surface(
+                        shape = RoundedCornerShape(12.dp), color = cs.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth().clickable { vm.setScanFolder(f.path) }
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                            Column(Modifier.weight(1f)) {
+                                Text(f.name, style = Ds.Body, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("${f.count} temas", style = Ds.Sub, color = cs.onSurfaceVariant)
+                            }
+                            if (scanFolder == f.path) Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = cs.primary)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Listo") } }
+    )
+}
+
+// ── Respaldo y restauración ────────────────────────────────────────
+@Composable
+fun BackupSheet(vm: MainViewModel, onDismiss: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val ctx = LocalContext.current
+    var msg by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            busy = true
+            vm.restore(ctx, uri) { msg = it; busy = false }
+        }
+    }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Respaldo", color = cs.onBackground) },
+        text = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Guarda tus playlists y favoritos en un archivo, y restáuralos cuando quieras",
+                    style = Ds.Body, color = cs.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = {
+                        busy = true
+                        vm.backup(ctx) { msg = it; busy = false }
+                    },
+                    enabled = !busy, modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Save, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (busy) "Trabajando…" else "Crear respaldo")
+                }
+                OutlinedButton(
+                    onClick = { picker.launch("application/json") },
+                    enabled = !busy, modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.FolderOpen, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Restaurar desde archivo")
+                }
+                msg?.let {
+                    Text(it, style = Ds.Sub, color = cs.primary)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cerrar") } }
+    )
+}
+
+// ── Mis estadísticas ───────────────────────────────────────────────
+@Composable
+fun StatsSheet(vm: MainViewModel, onDismiss: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val sum by vm.statsSummary.collectAsState()
+    var confirmClear by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mis estadísticas", color = cs.onBackground) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                if (sum.plays == 0) {
+                    Text(
+                        "Aún no hay datos — reproduce algo y vuelve aquí",
+                        style = Ds.Body, color = cs.onSurfaceVariant
+                    )
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        StatCard("${sum.plays}", "reproducciones", Modifier.weight(1f))
+                        StatCard("${sum.minutes}", "minutos", Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    if (sum.topSongs.isNotEmpty()) {
+                        Text("Más escuchadas", style = Ds.Title, color = cs.onBackground)
+                        Spacer(Modifier.height(4.dp))
+                        sum.topSongs.forEachIndexed { i, (s, plays) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { vm.playById(s.id); onDismiss() }
+                                    .padding(vertical = 6.dp, horizontal = 4.dp)
+                            ) {
+                                Text("${i + 1}", style = Ds.Sub, color = cs.primary, modifier = Modifier.width(24.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(s.title, style = Ds.Body, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(s.artist.ifBlank { "Desconocido" }, style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                Text("$plays", style = Ds.Sub, color = cs.onSurfaceVariant)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    if (sum.topArtists.isNotEmpty()) {
+                        Text("Artistas top", style = Ds.Title, color = cs.onBackground)
+                        Spacer(Modifier.height(4.dp))
+                        sum.topArtists.forEach { (a, plays) ->
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 4.dp)) {
+                                Text(a, style = Ds.Body, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                Text("$plays", style = Ds.Sub, color = cs.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row {
+                if (sum.plays > 0) {
+                    TextButton(onClick = { confirmClear = true }) { Text("Borrar", color = cs.error) }
+                }
+                TextButton(onClick = onDismiss) { Text("Cerrar") }
+            }
+        }
+    )
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Borrar estadísticas", color = cs.onBackground) },
+            text = { Text("Se eliminarán tus reproducciones e historial.", style = Ds.Body, color = cs.onSurfaceVariant) },
+            confirmButton = {
+                TextButton(onClick = { vm.clearStats(); confirmClear = false }) { Text("Borrar", color = cs.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancelar") } }
+        )
+    }
+}
+
+@Composable
+private fun SearchMatchRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String, sub: String, onTap: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onTap)
+            .padding(vertical = 8.dp, horizontal = 4.dp)
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).background(cs.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) { Icon(icon, null, Modifier.size(20.dp), tint = cs.onSurfaceVariant) }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = Ds.Body, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sub, style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun StatCard(value: String, label: String, modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(14.dp), color = cs.surface, modifier = modifier) {
+        Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(value, style = Ds.Display, color = cs.primary)
+            Text(label, style = Ds.Sub, color = cs.onSurfaceVariant)
+        }
+    }
+}
+
+// ── Fundido entre canciones ────────────────────────────────────────
+@Composable
+fun CrossfadeSheet(vm: MainViewModel, onDismiss: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val st by vm.playerState.collectAsState()
+    var secs by remember(st.crossfade) { mutableStateOf(vm.player.crossfadeSecs) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Fundido entre canciones", color = cs.onBackground) },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        if (st.crossfade) "Activado" else "Desactivado",
+                        style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f)
+                    )
+                    Switch(checked = st.crossfade, onCheckedChange = { vm.toggleCrossfade() })
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Duración", style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f))
+                    Text("$secs s", style = Ds.Sub, color = cs.primary)
+                }
+                Slider(
+                    value = secs.toFloat(),
+                    onValueChange = { secs = it.toInt(); vm.setCrossfadeSecs(it.toInt()) },
+                    valueRange = 1f..12f, steps = 10, enabled = st.crossfade
+                )
+                Text(
+                    "El volumen baja al final de cada tema y sube con el siguiente",
+                    style = Ds.Sub, color = cs.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Listo") } }
+    )
+}
+
 // ── Cola de reproducción ───────────────────────────────────────────
 @Composable
 fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
@@ -1121,11 +1521,65 @@ fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
 }
 
 // ── Diálogos ─────────────────────────────────────────────────────
-// ── Ficha del tema (long-press): info útil + acciones ────────────
+// ── Editar metadatos ───────────────────────────────────────────────
 @Composable
-fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> Unit, onAdd: () -> Unit, onClose: () -> Unit) {
+fun EditMetadataSheet(song: Song, vm: MainViewModel, onDismiss: () -> Unit, onSaved: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     val ctx = LocalContext.current
+    var title by remember(song.id) { mutableStateOf(song.title) }
+    var artist by remember(song.id) { mutableStateOf(song.artist) }
+    var album by remember(song.id) { mutableStateOf(song.album) }
+    var saving by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Editar datos", color = cs.onBackground) },
+        text = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = title, onValueChange = { title = it }, label = { Text("Título") },
+                    singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = artist, onValueChange = { artist = it }, label = { Text("Artista") },
+                    singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = album, onValueChange = { album = it }, label = { Text("Álbum") },
+                    singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (title.isBlank() || saving) return@TextButton
+                    saving = true
+                    vm.updateMetadata(song, title, artist, album) { ok ->
+                        saving = false
+                        android.widget.Toast.makeText(
+                            ctx,
+                            if (ok) "Datos actualizados" else "No se pudo guardar",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                        if (ok) onSaved()
+                    }
+                },
+                enabled = title.isNotBlank() && !saving
+            ) { Text(if (saving) "Guardando…" else "Guardar") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancelar") } }
+    )
+}
+
+// ── Ficha del tema (long-press): info útil + acciones ────────────
+@Composable
+fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> Unit, onAdd: () -> Unit, onClose: () -> Unit, vm: MainViewModel) {
+    val cs = MaterialTheme.colorScheme
+    val ctx = LocalContext.current
+    var showEdit by remember { mutableStateOf(false) }
+    if (showEdit) {
+        EditMetadataSheet(song, vm, onDismiss = { showEdit = false }, onSaved = { showEdit = false; onClose() })
+    }
     val folder = try { java.io.File(song.dataPath).parent?.substringAfterLast("/") ?: "—" } catch (_: Exception) { "—" }
     val added = try {
         java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(song.dateAdded * 1000))
@@ -1165,6 +1619,9 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
                         Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onSurfaceVariant)
                     }
                     if (song.id != YT_STREAM_ID) {
+                        IconButton(onClick = { showEdit = true }) {
+                            Icon(Icons.Default.Edit, "Editar datos", tint = cs.onSurfaceVariant)
+                        }
                         IconButton(onClick = {
                             try {
                                 val f = java.io.File(song.dataPath)
@@ -1182,6 +1639,41 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
                             } catch (_: Exception) {}
                         }) {
                             Icon(Icons.Default.Share, "Compartir", tint = cs.onSurfaceVariant)
+                        }
+                    }
+                }
+                if (song.id != YT_STREAM_ID) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = {
+                                vm.queueNext(song.id) { ok ->
+                                    android.widget.Toast.makeText(
+                                        ctx,
+                                        if (ok) "Sonará a continuación" else "No se pudo agregar",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                onClose()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.QueueMusic, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Siguiente")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                vm.queueEnd(song.id) { ok ->
+                                    android.widget.Toast.makeText(
+                                        ctx,
+                                        if (ok) "Agregado al final" else "No se pudo agregar",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                onClose()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.LowPriority, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Al final")
                         }
                     }
                 }
@@ -1260,7 +1752,9 @@ fun EqSheet(eq: com.melodia.app.player.EqualizerManager, onClose: () -> Unit) {
     val bands by eq.bands.collectAsState()
     val bass by eq.bassLevel.collectAsState()
     val preset by eq.preset.collectAsState()
+    val custom by eq.customPresets.collectAsState()
     var presetMenu by remember { mutableStateOf(false) }
+    var showSave by remember { mutableStateOf(false) }
     val freqs = listOf("60Hz", "230Hz", "910Hz", "3.6kHz", "14kHz")
     AlertDialog(
         onDismissRequest = onClose,
@@ -1301,9 +1795,42 @@ fun EqSheet(eq: com.melodia.app.player.EqualizerManager, onClose: () -> Unit) {
                     }
                     Slider(value = bass.toFloat(), onValueChange = { eq.setBass(it.toInt()) }, valueRange = 0f..1000f, enabled = enabled)
                 }
+                Divider(Modifier.padding(vertical = 8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text("Mis presets", style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showSave = true }, enabled = enabled) { Text("Guardar actual") }
+                }
+                if (custom.isEmpty()) {
+                    Text("Ajusta las bandas y guárdalas con un nombre", style = Ds.Sub, color = cs.onSurfaceVariant)
+                } else {
+                    custom.keys.sorted().forEach { name ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable(enabled = enabled) { eq.applyCustomPreset(name) }
+                                .padding(vertical = 8.dp, horizontal = 4.dp)
+                        ) {
+                            Text(
+                                name, style = Ds.Body,
+                                color = if (preset == name) cs.primary else cs.onBackground,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = { eq.deleteCustomPreset(name) }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Delete, "Eliminar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
                 Text("Se aplica en tiempo real y se guarda", style = Ds.Sub, color = cs.onSurfaceVariant)
             }
         },
         confirmButton = { TextButton(onClick = onClose) { Text("Listo") } }
     )
+    if (showSave) {
+        TextDialog("Guardar preset", "", onDismiss = { showSave = false }) {
+            eq.saveCustomPreset(it); showSave = false
+        }
+    }
 }
