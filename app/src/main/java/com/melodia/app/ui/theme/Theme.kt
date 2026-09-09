@@ -39,8 +39,9 @@ object Ds {
     val PlayHero = 72.dp
 
     // Tipo (todos los Text del sistema usan estos estilos + color explícito)
-    val Display = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold, lineHeight = 32.sp)
-    val Title = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+    // Titulares tight (-0.5/-0.25): se sienten más premium que el tracking neutro
+    val Display = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold, lineHeight = 32.sp, letterSpacing = (-0.5).sp)
+    val Title = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.25).sp)
     val Body = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)
     val Sub = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Normal)
     val Micro = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium)
@@ -49,28 +50,59 @@ object Ds {
     val RowShape = RoundedCornerShape(RRow)
 }
 
+/** Mezcla dos colores (0 = todo a, 1 = todo b). Para containers tonales del acento. */
+private fun blend(a: Color, b: Color, t: Float): Color {
+    val k = t.coerceIn(0f, 1f)
+    return Color(
+        red = a.red + (b.red - a.red) * k,
+        green = a.green + (b.green - a.green) * k,
+        blue = a.blue + (b.blue - a.blue) * k,
+        alpha = 1f
+    )
+}
+
 private fun darkScheme(accent: Color) = darkColorScheme(
     primary = accent,
     onPrimary = Color(0xFF06110A),
+    secondary = blend(accent, Color.White, 0.15f),
+    onSecondary = Color(0xFF06110A),
+    secondaryContainer = blend(accent, Color(0xFF131715), 0.80f),
+    onSecondaryContainer = blend(accent, Color.White, 0.30f),
+    tertiary = accent,
+    onTertiary = Color(0xFF06110A),
     background = Color(0xFF0A0D0B),
     onBackground = Color(0xFFF2F5F2),
     surface = Color(0xFF131715),
     onSurface = Color(0xFFF2F5F2),
     surfaceVariant = Color(0xFF1B211E),
     onSurfaceVariant = Color(0xFF9AA5A0),
-    outline = Color(0xFF2A332D)
+    outline = Color(0xFF2A332D),
+    outlineVariant = Color(0xFF1E2621),
+    scrim = Color.Black,
+    error = Color(0xFFF2B8B5),
+    onError = Color(0xFF601410),
+    errorContainer = Color(0xFF8C1D18),
+    onErrorContainer = Color(0xFFF9DEDC)
 )
 
 private fun lightScheme(accent: Color) = lightColorScheme(
     primary = accent,
     onPrimary = Color.White,
+    secondary = blend(accent, Color(0xFF10140F), 0.15f),
+    onSecondary = Color.White,
+    secondaryContainer = blend(accent, Color.White, 0.82f),
+    onSecondaryContainer = blend(accent, Color(0xFF10140F), 0.45f),
+    tertiary = accent,
+    onTertiary = Color.White,
     background = Color(0xFFF4F6F4),
     onBackground = Color(0xFF10140F),
     surface = Color.White,
     onSurface = Color(0xFF10140F),
     surfaceVariant = Color(0xFFE8ECE8),
     onSurfaceVariant = Color(0xFF5F6B62),
-    outline = Color(0xFFD8DED8)
+    outline = Color(0xFFD8DED8),
+    outlineVariant = Color(0xFFC6CFC6),
+    scrim = Color.Black
 )
 
 // ── Acentos ────────────────────────────────────────────────────────

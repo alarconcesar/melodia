@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -29,6 +30,8 @@ class MainActivity : ComponentActivity() {
     @Suppress("UNCHECKED_CAST")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Pantalla completa real: el fondo y el blur llegan hasta los bordes
+        try { enableEdgeToEdge() } catch (_: Exception) {}
         loadUiPrefs(this)
         val app = application as MelodiaApp
         val c = app.appContainer

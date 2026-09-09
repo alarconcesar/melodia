@@ -175,7 +175,7 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
             if (onAction != null) {
                 Text(
                     text = action, style = Ds.Sub,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable(onClick = onAction).padding(4.dp)
                 )
             } else {
@@ -201,7 +201,7 @@ fun TrackRow(
     Row(
         modifier = Modifier.fillMaxWidth()
             .combinedClickable(onClick = onTap, onLongClick = onLongPress)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         SongArt(
@@ -211,7 +211,8 @@ fun TrackRow(
         Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(
                 s.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = Ds.Body, color = cs.onBackground
+                style = if (active) Ds.Body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium) else Ds.Body,
+                color = if (active) cs.primary else cs.onBackground
             )
             Text(
                 "${s.artist} · ${fmt(s.durationMs)}", maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -411,7 +412,7 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
                         )
                         Text(
                             label,
-                            style = Ds.Sub,
+                            style = if (sel) Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium) else Ds.Sub,
                             color = if (sel) cs.primary else cs.onSurfaceVariant
                         )
                         // Contador vivo con altura fija (sin saltos de layout)
@@ -482,7 +483,10 @@ fun MiniPlayerDs(
             }
             // Progreso fluido: el estado llega cada 500ms, se interpola con tween
             val smooth by animateFloatAsState(progress.coerceIn(0f, 1f), tween(500), label = "minip")
-            LinearProgressIndicator(progress = smooth, modifier = Modifier.fillMaxWidth().height(2.dp))
+            LinearProgressIndicator(
+                progress = smooth, modifier = Modifier.fillMaxWidth().height(2.dp),
+                color = cs.primary, trackColor = cs.onSurfaceVariant.copy(alpha = 0.22f)
+            )
         }
     }
 }

@@ -38,6 +38,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -120,6 +122,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -218,11 +221,11 @@ fun MelodiaScreen(vm: MainViewModel) {
         val crashText = lastCrash!!
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("La app se cerró 😕") },
+            title = { Text("La app se cerró") },
             text = {
                 Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                     Text(
-                        "Mándame una captura de esto:",
+                        "Copia el detalle y mándame una captura:",
                         style = com.melodia.app.ui.theme.Ds.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -272,7 +275,7 @@ fun MelodiaScreen(vm: MainViewModel) {
         Column(Modifier.fillMaxSize()) {
             // ── Top bar DS ──
             Row(
-                Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 4.dp),
+                Modifier.fillMaxWidth().statusBarsPadding().padding(20.dp, 12.dp, 20.dp, 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(shape = CircleShape, color = cs.surface, modifier = Modifier.clickable { }) {
@@ -424,6 +427,7 @@ fun MelodiaScreen(vm: MainViewModel) {
         // ── Pill nav overlay: la lista pasa por debajo con blur ──
         Box(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .navigationBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 10.dp)
                 .onGloballyPositioned { navArea = it.boundsInRoot() }
         ) {
@@ -1320,7 +1324,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     LaunchedEffect(tapMsg) { if (tapMsg != null) { kotlinx.coroutines.delay(900); tapMsg = null } }
     if (showQueue) QueueSheet(vm, onDismiss = { showQueue = false })
     if (showPitch) PitchSheet(vm, state.pitch, state.speed, onDismiss = { showPitch = false })
-    Column(Modifier.fillMaxSize().background(cs.background).padding(20.dp)) {
+    Column(Modifier.fillMaxSize().background(cs.background).statusBarsPadding().navigationBarsPadding().padding(20.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(28.dp), tint = cs.onBackground) }
             Spacer(Modifier.weight(1f))
@@ -1368,7 +1372,11 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(300.dp), contentAlignment = Alignment.Center) {
-            Surface(shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(300.dp)) {
+            // Sombra ambiental del acento: la carátula flota sobre el fondo
+            Surface(
+                shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(300.dp)
+                    .shadow(28.dp, Ds.HeroShape, spotColor = cs.primary.copy(alpha = 0.28f))
+            ) {
                 SongArt(
                     albumId = s.albumId, size = 300.dp, shape = Ds.HeroShape,
                     iconSize = 110.dp, artUrl = s.artUrl
