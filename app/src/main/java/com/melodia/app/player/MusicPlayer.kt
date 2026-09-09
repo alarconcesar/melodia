@@ -284,6 +284,8 @@ class MusicPlayer(private val context: Context) {
         try { exo?.let { it.repeatMode = when (it.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF }; updateState() } } catch (_: Exception) {}
     }
     fun seekTo(f: Float) { try { exo?.let { val d = it.duration.coerceAtLeast(0); it.seekTo((d * f).toLong()) } } catch (_: Exception) {} }
+    /** Salto relativo en ms (doble toque ±10 s, modo auto). */
+    fun seekBy(ms: Long) { try { exo?.let { it.seekTo((it.currentPosition + ms).coerceAtLeast(0)) } } catch (_: Exception) {} }
 
     private fun updateState() {
         try {

@@ -70,6 +70,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import android.content.ContentUris
 import android.provider.MediaStore
 import coil.compose.AsyncImage
@@ -363,7 +364,7 @@ private fun SelectionDot(visible: Boolean) {
 
 // ── PillNav DS · barra flotante ──────────────────────────────────
 @Composable
-fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier, badges: List<String> = emptyList()) {
     val cs = MaterialTheme.colorScheme
     val items = listOf(
         Triple("Inicio", Icons.Default.Home, 0),
@@ -412,6 +413,14 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
                             label,
                             style = Ds.Sub,
                             color = if (sel) cs.primary else cs.onSurfaceVariant
+                        )
+                        // Contador vivo con altura fija (sin saltos de layout)
+                        Text(
+                            badges.getOrNull(idx) ?: " ",
+                            style = Ds.Sub.copy(fontSize = 9.sp),
+                            color = cs.onSurfaceVariant.copy(alpha = 0.8f),
+                            maxLines = 1,
+                            modifier = Modifier.height(12.dp)
                         )
                         // Punto indicador: espacio reservado, aparece con pop
                         SelectionDot(sel)

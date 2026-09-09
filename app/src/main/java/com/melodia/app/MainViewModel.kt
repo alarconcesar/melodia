@@ -244,6 +244,8 @@ class MainViewModel(
     fun createPlaylist(name: String, onDone: (Long) -> Unit = {}) { viewModelScope.launch { val id = lists.createPlaylist(name); onDone(id) } }
     fun deletePlaylist(id: Long) { viewModelScope.launch { lists.deletePlaylist(id); if (_openPlaylist.value == id) _openPlaylist.value = null } }
     fun renamePlaylist(id: Long, name: String) { viewModelScope.launch { lists.rename(id, name) } }
+    fun togglePinPlaylist(id: Long) { viewModelScope.launch { lists.togglePin(id) } }
+    fun setPlaylistCover(id: Long, albumId: Long?) { viewModelScope.launch { lists.setCover(id, albumId) } }
     fun addToPlaylist(pid: Long, s: Song, onResult: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             val ok = lists.addToPlaylist(pid, s)
@@ -415,6 +417,20 @@ class MainViewModel(
     val ytRecent: StateFlow<List<String>> = _ytRecent
     private val _ytHistory = MutableStateFlow<List<YtTrack>>(emptyList())
     val ytHistory: StateFlow<List<YtTrack>> = _ytHistory
+    /** Calidad de descarga preferida: true = alta, false = estándar (liviana). */
+    private val _ytHighQuality = MutableStateFlow(true)
+    val ytHighQuality: StateFlow<Boolean> = _ytHighQuality
+    /** Ahorro de datos: el streaming online usa bitrate modesto (solo audio, sin video). */
+    private val _dataSaver = MutableStateFlow(false)
+    val dataSaver: StateFlow<Boolean> = _dataSaver
+    /** Historial de descargas completadas. */
+    private val _dlHistory = MutableStateFlow<List<YtRepository.DlRecord>>(emptyList())
+    val dlHistory: StateFlow<List<YtRepository.DlRecord>> = _dlHistory
+
+    fun setYtQuality(high: Boolean) { _ytHighQuality.value = high }
+    fun setDataSaver(on: Boolean) { _dataSaver.value = on }
+    fun refreshDlHistory() { try { _dlHistory.value = yt.getDlHistory() } catch (_: Exception) {} }
+    fun clearDlHistory() { viewModelScope.launch { withContext(Dispatchers.IO) { yt.clearDlHistory() }; _dlHistory.value = emptyList() } }
 
     private fun errMsg(t: Throwable, fallback: String): String {
         val detail = "${t.javaClass.simpleName}${if (!t.message.isNullOrBlank()) ": ${t.message}" else ""}"
@@ -444,7 +460,7 @@ class MainViewModel(
                     val top = _ytResults.value.firstOrNull()
                     if (top != null) {
                         launch {
-                            try { withContext(Dispatchers.IO) { yt.prefetchAudio(top.url) } } catch (_: Exception) {}
+                            try { withContext(Dispatchers.IO) { yt.prefetchAudio(top.url, !_dataSaver.value) } } catch (_: Exception) {}
                         }
                     }
                 }
@@ -481,7 +497,8 @@ class MainViewModel(
             _busyYt.value = track.id
             _ytError.value = null
             try {
-                val audio = withContext(Dispatchers.IO) { yt.bestAudio(track.url) }
+                // Solo-audio real: nunca se toca el video; con ahorro usa bitrate modesto
+                val audio = withContext(Dispatchers.IO) { yt.bestAudio(track.url, !_dataSaver.value) }
                 _currentTrack.value = track
                 val stream = Song(
                     id = YT_STREAM_ID, title = track.title,
@@ -563,14 +580,18 @@ class MainViewModel(
 
     fun retryLyrics() { currentSong.value?.let { loadLyrics(it, force = true) } }
 
-    fun downloadYt(track: YtTrack) {
+    fun downloadYt(track: YtTrack, high: Boolean = _ytHighQuality.value) {
         if (_dlProgress.value.containsKey(track.id)) return
         viewModelScope.launch {
             _dlProgress.value += track.id to 0f
             try {
                 withContext(Dispatchers.IO) {
-                    yt.download(track) { p -> _dlProgress.value += track.id to p }
+                    yt.download(track, { p -> _dlProgress.value += track.id to p }, high)
                 }
+                try {
+                    yt.pushDlHistory(track, high)
+                    _dlHistory.value = yt.getDlHistory()
+                } catch (_: Exception) {}
                 reload()
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t

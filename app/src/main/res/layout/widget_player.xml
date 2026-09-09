@@ -42,6 +42,17 @@
             android:text="Tu música"
             android:textColor="#9AA5A0"
             android:textSize="12sp" />
+
+        <ProgressBar
+            android:id="@+id/w_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="6dp"
+            android:max="1000"
+            android:progress="0"
+            android:progressTint="#2EE56B"
+            android:progressBackgroundTint="#2A3530" />
     </LinearLayout>
 
     <ImageButton
@@ -67,4 +78,12 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="Siguiente"
         android:src="@drawable/ic_notif_next" />
+
+    <ImageButton
+        android:id="@+id/w_sleep"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Dormir en 30 minutos"
+        android:src="@drawable/ic_sleep" />
 </LinearLayout>

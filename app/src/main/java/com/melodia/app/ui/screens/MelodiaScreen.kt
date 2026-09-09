@@ -56,8 +56,12 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
@@ -106,6 +110,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -118,7 +123,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.melodia.app.MainViewModel
 import com.melodia.app.player.YT_STREAM_ID
 import com.melodia.app.SortMode
@@ -167,6 +175,8 @@ fun MelodiaScreen(vm: MainViewModel) {
     val artists by vm.artists.collectAsState()
     val playlists by vm.playlists.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
+    val dlHist by vm.dlHistory.collectAsState()
+    LaunchedEffect(Unit) { vm.refreshDlHistory() }
     val favIds by vm.favIds.collectAsState()
     val sort by vm.sort.collectAsState()
     val folderSel by vm.folder.collectAsState()
@@ -388,6 +398,8 @@ fun MelodiaScreen(vm: MainViewModel) {
                         if (openPid == null) PlaylistsTab(playlists, allLinks, all,
                             onOpen = { vm.openPl(it) }, onCreate = { showCreate = true },
                             onDelete = { vm.deletePlaylist(it) }, onRename = { renameId = it },
+                            onPin = { vm.togglePinPlaylist(it) },
+                            onCover = { id, album -> vm.setPlaylistCover(id, album) },
                             onPlay = { pid ->
                                 val mine = allLinks.filter { it.playlistId == pid }
                                 val byId = all.associateBy { it.id }
@@ -415,7 +427,16 @@ fun MelodiaScreen(vm: MainViewModel) {
                 .padding(horizontal = 20.dp, vertical = 10.dp)
                 .onGloballyPositioned { navArea = it.boundsInRoot() }
         ) {
-            MelodiaPillNav(tab = tab, onTab = { tab = it })
+            MelodiaPillNav(
+                tab = tab, onTab = { tab = it },
+                badges = listOf(
+                    if (all.isNotEmpty()) "${all.size}" else " ",
+                    " ",
+                    if (playlists.isNotEmpty()) "${playlists.size}" else " ",
+                    if (favSongs.isNotEmpty()) "${favSongs.size}" else " ",
+                    if (dlHist.isNotEmpty()) "${dlHist.size}" else " "
+                )
+            )
         }
         // ── MiniPlayer flotante ──
         AnimatedVisibility(
@@ -828,7 +849,7 @@ fun PlaylistsTab(
     links: List<com.melodia.app.data.local.PlaylistSongEntity>,
     songs: List<Song>,
     onOpen: (Long) -> Unit, onCreate: () -> Unit, onDelete: (Long) -> Unit, onRename: (Long) -> Unit,
-    onPlay: (Long) -> Unit
+    onPlay: (Long) -> Unit, onPin: (Long) -> Unit, onCover: (Long, Long?) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
     val byId = remember(songs) { songs.associateBy { it.id } }
@@ -853,14 +874,29 @@ fun PlaylistsTab(
         }
         items(playlists, key = { it.id }) { p ->
             var menu by remember { mutableStateOf(false) }
+            var coverPick by remember { mutableStateOf(false) }
+            if (coverPick) {
+                CoverPickerSheet(
+                    mine = links.filter { it.playlistId == p.id },
+                    songs = songs, current = p.coverAlbumId,
+                    onPick = { onCover(p.id, it); coverPick = false },
+                    onDismiss = { coverPick = false }
+                )
+            }
             val mine = remember(links, p.id) { links.filter { it.playlistId == p.id } }
             val arts = remember(mine, byId) {
                 mine.mapNotNull { byId[it.songId]?.albumId }.filter { it > 0 }.distinct().take(4)
             }
             Row(Modifier.fillMaxWidth().clickable { onOpen(p.id) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                PlaylistCover(arts)
+                PlaylistCover(arts, p.coverAlbumId)
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    Text(p.name, style = Ds.Body, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (p.pinned) {
+                            Icon(Icons.Default.PushPin, null, Modifier.size(14.dp), tint = cs.primary)
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        Text(p.name, style = Ds.Body, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                     Text(
                         if (mine.isEmpty()) "Vacía" else "${mine.size} ${if (mine.size == 1) "tema" else "temas"} · ${fmtTotal(mine.sumOf { it.durationMs })}",
                         style = Ds.Sub, color = cs.onSurfaceVariant
@@ -874,6 +910,8 @@ fun PlaylistsTab(
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, null, tint = cs.onSurfaceVariant) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text(if (p.pinned) "Desfijar" else "Fijar arriba") }, onClick = { menu = false; onPin(p.id) })
+                        DropdownMenuItem(text = { Text("Elegir portada") }, onClick = { menu = false; coverPick = true })
                         DropdownMenuItem(text = { Text("Renombrar") }, onClick = { menu = false; onRename(p.id) })
                         DropdownMenuItem(text = { Text("Eliminar") }, onClick = { menu = false; onDelete(p.id) })
                     }
@@ -883,9 +921,9 @@ fun PlaylistsTab(
     }
 }
 
-/** Portada: collage 2×2 con carátulas, una sola si hay una, icono si no hay. */
+/** Portada: elegida por ti, collage 2×2 automático, una sola si hay una, icono si no hay. */
 @Composable
-fun PlaylistCover(albumIds: List<Long>) {
+fun PlaylistCover(albumIds: List<Long>, chosen: Long? = null) {
     val cs = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(Ds.RRow)
     Box(
@@ -893,6 +931,8 @@ fun PlaylistCover(albumIds: List<Long>) {
         contentAlignment = Alignment.Center
     ) {
         when {
+            chosen != null && chosen > 0 ->
+                SongArt(chosen, size = 52.dp, shape = shape, iconSize = 24.dp)
             albumIds.isEmpty() ->
                 Icon(Icons.Default.QueueMusic, null, Modifier.size(24.dp), tint = cs.onSurfaceVariant)
             albumIds.size == 1 ->
@@ -906,6 +946,68 @@ fun PlaylistCover(albumIds: List<Long>) {
             }
         }
     }
+}
+
+/** Elige la portada entre las carátulas de la lista, o vuelve al collage automático. */
+@Composable
+fun CoverPickerSheet(
+    mine: List<com.melodia.app.data.local.PlaylistSongEntity>,
+    songs: List<Song>, current: Long?,
+    onPick: (Long?) -> Unit, onDismiss: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val byId = remember(songs) { songs.associateBy { it.id } }
+    val arts = remember(mine, byId) {
+        mine.mapNotNull { byId[it.songId] }
+            .filter { it.albumId > 0 }
+            .distinctBy { it.albumId }
+            .take(12)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Portada", color = cs.onBackground) },
+        text = {
+            if (arts.isEmpty()) {
+                Text("Esta lista aún no tiene temas con carátula", style = Ds.Body, color = cs.onSurfaceVariant)
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    item {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                Modifier.size(56.dp).clip(RoundedCornerShape(12.dp))
+                                    .background(cs.surfaceVariant)
+                                    .clickable { onPick(null) }
+                                    .border(
+                                        if (current == null) 2.dp else 0.dp,
+                                        if (current == null) cs.primary else Color.Transparent,
+                                        RoundedCornerShape(12.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) { Icon(Icons.Default.AutoAwesome, null, tint = cs.onSurfaceVariant) }
+                            Text("Auto", style = Ds.Sub, color = cs.onSurfaceVariant)
+                        }
+                    }
+                    items(arts, key = { it.id }) { s ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                Modifier.clickable { onPick(s.albumId) }
+                                    .border(
+                                        if (current == s.albumId) 2.dp else 0.dp,
+                                        if (current == s.albumId) cs.primary else Color.Transparent,
+                                        RoundedCornerShape(12.dp)
+                                    )
+                            ) { SongArt(s.albumId, size = 56.dp, shape = RoundedCornerShape(12.dp), iconSize = 20.dp) }
+                            Text(
+                                s.title, style = Ds.Sub, color = cs.onSurfaceVariant,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(56.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } }
+    )
 }
 
 @Composable
@@ -1025,6 +1127,26 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     val isStream = s.id == YT_STREAM_ID
     var showQueue by remember { mutableStateOf(false) }
     var showPitch by remember { mutableStateOf(false) }
+    var autoMode by remember { mutableStateOf(false) }
+    var tapMsg by remember { mutableStateOf<String?>(null) }
+    val ctx = LocalContext.current
+    // Modo auto: anuncia el tema con voz al cambiar (TTS del sistema, sin permisos)
+    val tts = remember {
+        var t: android.speech.tts.TextToSpeech? = null
+        t = android.speech.tts.TextToSpeech(ctx) { st ->
+            if (st == android.speech.tts.TextToSpeech.SUCCESS) {
+                try { t?.setLanguage(java.util.Locale.getDefault()) } catch (_: Exception) {}
+            }
+        }
+        t!!
+    }
+    DisposableEffect(Unit) { onDispose { try { tts.shutdown() } catch (_: Exception) {} } }
+    LaunchedEffect(s.id, autoMode) {
+        if (autoMode) {
+            try { tts.speak("${s.title}, de ${s.artist.ifBlank { "artista desconocido" }}", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "melodia-auto") } catch (_: Exception) {}
+        }
+    }
+    LaunchedEffect(tapMsg) { if (tapMsg != null) { kotlinx.coroutines.delay(900); tapMsg = null } }
     if (showQueue) QueueSheet(vm, onDismiss = { showQueue = false })
     if (showPitch) PitchSheet(vm, state.pitch, state.speed, onDismiss = { showPitch = false })
     Column(Modifier.fillMaxSize().background(cs.background).padding(20.dp)) {
@@ -1046,6 +1168,12 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                     }
                 }
             } else {
+                IconButton(onClick = { autoMode = !autoMode }) {
+                    Icon(
+                        Icons.Default.DirectionsCar, "Modo auto",
+                        tint = if (autoMode) cs.primary else cs.onBackground
+                    )
+                }
                 IconButton(onClick = { showQueue = true }) {
                     Icon(Icons.Default.QueueMusic, "Cola", tint = cs.onBackground)
                 }
@@ -1068,14 +1196,30 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             modifier = Modifier.align(Alignment.CenterHorizontally)
         ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(300.dp)) {
-            SongArt(
-                albumId = s.albumId, size = 300.dp, shape = Ds.HeroShape,
-                iconSize = 110.dp, artUrl = s.artUrl
+        Box(Modifier.size(300.dp), contentAlignment = Alignment.Center) {
+            Surface(shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(300.dp)) {
+                SongArt(
+                    albumId = s.albumId, size = 300.dp, shape = Ds.HeroShape,
+                    iconSize = 110.dp, artUrl = s.artUrl
+                )
+            }
+            // Doble toque: izquierda −10 s, derecha +10 s
+            Box(
+                Modifier.matchParentSize().pointerInput(s.id) {
+                    detectTapGestures(onDoubleTap = { off ->
+                        if (off.x < size.width / 2) { vm.player.seekBy(-10_000); tapMsg = "−10 segundos" }
+                        else { vm.player.seekBy(10_000); tapMsg = "+10 segundos" }
+                    })
+                }
             )
+            tapMsg?.let {
+                Surface(shape = RoundedCornerShape(12.dp), color = Color.Black.copy(alpha = 0.7f)) {
+                    Text(it, color = Color.White, style = Ds.Body, modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp))
+                }
+            }
         }
         Spacer(Modifier.height(28.dp))
-        Text(s.title, style = Ds.Display, color = cs.onBackground, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE))
+        Text(s.title, style = if (autoMode) Ds.Display.copy(fontSize = 26.sp) else Ds.Display, color = cs.onBackground, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE))
         Text("${s.artist} · ${s.album.ifBlank { "Sencillo" }}", style = Ds.Body, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(10.dp))
         Surface(
@@ -1083,7 +1227,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             modifier = Modifier.clickable { onLyrics() }
         ) {
             Text(
-                "🎤 Ver letra", style = Ds.Body, color = cs.primary,
+                "Ver letra", style = Ds.Body, color = cs.primary,
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
             )
         }
@@ -1112,15 +1256,15 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             IconButton(onClick = { vm.player.toggleShuffle() }) {
                 Icon(Icons.Default.Shuffle, null, tint = if (state.shuffle) cs.primary else cs.onSurfaceVariant)
             }
-            IconButton(onClick = { vm.player.prev() }) { Icon(Icons.Default.SkipPrevious, null, Modifier.size(36.dp), tint = cs.onBackground) }
-            Surface(shape = CircleShape, color = cs.primary, modifier = Modifier.size(Ds.PlayHero).then(pressClick({ vm.player.toggle() }, min = 0.88f))) {
+            IconButton(onClick = { vm.player.prev() }) { Icon(Icons.Default.SkipPrevious, null, Modifier.size(if (autoMode) 46.dp else 36.dp), tint = cs.onBackground) }
+            Surface(shape = CircleShape, color = cs.primary, modifier = Modifier.size(if (autoMode) 88.dp else Ds.PlayHero).then(pressClick({ vm.player.toggle() }, min = 0.88f))) {
                 Box(contentAlignment = Alignment.Center) {
                     AnimatedContent(targetState = state.isPlaying, label = "pp-hero") { p ->
                         Icon(if (p) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = cs.surface, modifier = Modifier.size(36.dp))
                     }
                 }
             }
-            IconButton(onClick = { vm.player.next() }) { Icon(Icons.Default.SkipNext, null, Modifier.size(36.dp), tint = cs.onBackground) }
+            IconButton(onClick = { vm.player.next() }) { Icon(Icons.Default.SkipNext, null, Modifier.size(if (autoMode) 46.dp else 36.dp), tint = cs.onBackground) }
             IconButton(onClick = { vm.player.cycleRepeat() }) {
                 val icon = when (state.repeatMode) { 2 -> Icons.Default.RepeatOne; 1 -> Icons.Default.Repeat; else -> Icons.Default.Repeat }
                 Icon(icon, null, tint = if (state.repeatMode != 0) cs.primary else cs.onSurfaceVariant)
@@ -1460,6 +1604,31 @@ fun CrossfadeSheet(vm: MainViewModel, onDismiss: () -> Unit) {
     )
 }
 
+// ── Chip seleccionable (estable, sin APIs experimentales) ──────────
+@Composable
+fun ToggleChip(
+    selected: Boolean, text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) cs.primary.copy(alpha = 0.16f) else cs.surfaceVariant,
+        border = if (selected) androidx.compose.foundation.BorderStroke(1.dp, cs.primary) else null,
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Icon(icon, null, Modifier.size(16.dp), tint = if (selected) cs.primary else cs.onSurfaceVariant)
+            Spacer(Modifier.width(6.dp))
+            Text(text, style = Ds.Body, color = if (selected) cs.primary else cs.onBackground)
+        }
+    }
+}
+
 // ── Cola de reproducción ───────────────────────────────────────────
 @Composable
 fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
@@ -1471,6 +1640,27 @@ fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text("Cola · ${queue.size}", color = cs.onBackground) },
         text = {
+            // Controles de repetición y aleatorio sin salir de la cola
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+            ) {
+                ToggleChip(
+                    selected = playing.shuffle, text = "Aleatorio",
+                    icon = Icons.Default.Shuffle, onClick = { vm.player.toggleShuffle() }
+                )
+                Spacer(Modifier.width(8.dp))
+                ToggleChip(
+                    selected = playing.repeatMode != 0,
+                    text = when (playing.repeatMode) {
+                        2 -> "Repetir uno"
+                        1 -> "Repetir todo"
+                        else -> "No repetir"
+                    },
+                    icon = if (playing.repeatMode == 2) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                    onClick = { vm.player.cycleRepeat() }
+                )
+            }
             if (queue.isEmpty()) {
                 Text("Vacía", style = Ds.Body, color = cs.onSurfaceVariant)
             } else {

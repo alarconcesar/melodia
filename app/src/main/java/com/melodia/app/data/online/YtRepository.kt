@@ -96,11 +96,13 @@ class YtRepository(private val context: Context) {
         }
     }
 
-    suspend fun bestAudio(videoUrl: String): YtAudio = withContext(Dispatchers.IO) {
+    /** high=true: mejor bitrate (alta). false: bitrate modesto (estándar / ahorro de datos). */
+    suspend fun bestAudio(videoUrl: String, high: Boolean = true): YtAudio = withContext(Dispatchers.IO) {
         ensure()
         // Caché: las URLs de audio valen horas — re-escuchar es instantáneo
+        val cacheKey = "$videoUrl|${if (high) "h" else "s"}"
         synchronized(audioCache) {
-            val hit = audioCache[videoUrl]
+            val hit = audioCache[cacheKey]
             if (hit != null && System.currentTimeMillis() - hit.first < 5 * 60 * 60 * 1000L) {
                 return@withContext hit.second
             }
@@ -110,21 +112,24 @@ class YtRepository(private val context: Context) {
         val audios: List<AudioStream> = ex.audioStreams
         require(audios.isNotEmpty()) { "Sin audio disponible" }
         val ranked = audios.sortedByDescending { try { it.averageBitrate } catch (_: Exception) { 0 } }
-        val pick = ranked.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true) }
-            ?: ranked.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("opus", true) }
-            ?: ranked.first()
+        val pool = if (high) ranked else ranked.filter {
+            try { it.averageBitrate <= 96000 } catch (_: Exception) { true }
+        }.ifEmpty { ranked.takeLast(2) }
+        val pick = pool.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true) }
+            ?: pool.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("opus", true) }
+            ?: pool.first()
         val isMp4 = (try { pick.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true)
         YtAudio(pick.content, if (isMp4) "m4a" else "webm", if (isMp4) "audio/mp4" else "audio/webm").also {
             synchronized(audioCache) {
-                audioCache[videoUrl] = System.currentTimeMillis() to it
+                audioCache[cacheKey] = System.currentTimeMillis() to it
                 while (audioCache.size > 30) audioCache.remove(audioCache.keys.first())
             }
         }
     }
 
     /** Resuelve el audio en segundo plano para que el play sea instantáneo. */
-    suspend fun prefetchAudio(videoUrl: String) {
-        try { bestAudio(videoUrl) } catch (_: Exception) {}
+    suspend fun prefetchAudio(videoUrl: String, high: Boolean = true) {
+        try { bestAudio(videoUrl, high) } catch (_: Exception) {}
     }
 
     private fun sanitize(s: String): String =
@@ -160,6 +165,32 @@ class YtRepository(private val context: Context) {
             prefs().edit().putString("history", arr.toString()).apply()
         } catch (_: Exception) {}
     }
+    /** Historial de descargas (persistido, máx. 50): título, artista, calidad y fecha. */
+    data class DlRecord(val title: String, val artist: String, val high: Boolean, val at: Long)
+
+    fun getDlHistory(): List<DlRecord> {
+        return try {
+            val arr = org.json.JSONArray(prefs().getString("dlhist", "[]") ?: "[]")
+            (0 until arr.length()).mapNotNull { i ->
+                try {
+                    val o = arr.getJSONObject(i)
+                    DlRecord(o.getString("t"), o.optString("a", ""), o.optBoolean("h", true), o.optLong("at", 0))
+                } catch (_: Exception) { null }
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun pushDlHistory(track: YtTrack, high: Boolean) {
+        try {
+            val list = (listOf(DlRecord(track.title, track.artist, high, System.currentTimeMillis())) + getDlHistory()).take(50)
+            val arr = org.json.JSONArray()
+            list.forEach { arr.put(org.json.JSONObject().put("t", it.title).put("a", it.artist).put("h", it.high).put("at", it.at)) }
+            prefs().edit().putString("dlhist", arr.toString()).apply()
+        } catch (_: Exception) {}
+    }
+
+    fun clearDlHistory() { try { prefs().edit().remove("dlhist").apply() } catch (_: Exception) {} }
+
     // ── Búsquedas recientes (persistidas, más recientes primero) ──
     private fun prefs() = context.getSharedPreferences("melodia_yt", Context.MODE_PRIVATE)
     fun getRecent(): List<String> = try {
@@ -176,8 +207,8 @@ class YtRepository(private val context: Context) {
     }
 
     /** Descarga el audio a Música/Melodia y devuelve su Uri de MediaStore. */
-    suspend fun download(track: YtTrack, onProgress: (Float) -> Unit): Uri = withContext(Dispatchers.IO) {
-        val audio = bestAudio(track.url)
+    suspend fun download(track: YtTrack, onProgress: (Float) -> Unit, high: Boolean = true): Uri = withContext(Dispatchers.IO) {
+        val audio = bestAudio(track.url, high)
         val fileName = sanitize("${track.title} - ${track.artist.ifBlank { "YouTube" }}") + "." + audio.ext
         val resolver = context.contentResolver
         if (Build.VERSION.SDK_INT < 29) {

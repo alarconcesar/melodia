@@ -18,7 +18,7 @@ class AppContainer(context: Context) {
     val musicRepository = MusicRepository(appContext)
     val eqManager = EqualizerManager(appContext)
     val musicPlayer = MusicPlayer(appContext).also { it.eq = eqManager; it.initialize() }
-    val db: MelodiaDatabase = Room.databaseBuilder(appContext, MelodiaDatabase::class.java, "melodia.db").fallbackToDestructiveMigration().build()
+    val db: MelodiaDatabase = Room.databaseBuilder(appContext, MelodiaDatabase::class.java, "melodia.db").addMigrations(MelodiaDatabase.MIGRATION_2_3).fallbackToDestructiveMigration().build()
     val playlistRepo = PlaylistRepository(db)
     val statsRepo = StatsRepository(db)
     val ytRepo = YtRepository(appContext)

@@ -24,13 +24,17 @@ class MelodiaWidget : AppWidgetProvider() {
         @Volatile private var artist = "Tu música"
         @Volatile private var playing = false
         @Volatile private var art: Bitmap? = null
+        @Volatile private var pos: Long = 0L
+        @Volatile private var dur: Long = 0L
 
-        fun refresh(ctx: Context, t: String? = null, a: String? = null, p: Boolean? = null, bitmap: Bitmap? = undefined()) {
+        fun refresh(ctx: Context, t: String? = null, a: String? = null, p: Boolean? = null, bitmap: Bitmap? = undefined(), posMs: Long? = null, durMs: Long? = null) {
             try {
                 if (t != null) title = t
                 if (a != null) artist = a
                 if (p != null) playing = p
                 if (bitmap !== UNSET) art = bitmap
+                if (posMs != null) pos = posMs
+                if (durMs != null) dur = durMs
                 val mgr = AppWidgetManager.getInstance(ctx)
                 val ids = mgr.getAppWidgetIds(ComponentName(ctx, MelodiaWidget::class.java))
                 if (ids.isEmpty()) return
@@ -50,6 +54,10 @@ class MelodiaWidget : AppWidgetProvider() {
                 rv.setOnClickPendingIntent(R.id.w_prev, svc(ctx, MelodiaPlaybackService.ACTION_PREV, 1))
                 rv.setOnClickPendingIntent(R.id.w_play, svc(ctx, MelodiaPlaybackService.ACTION_TOGGLE, 2))
                 rv.setOnClickPendingIntent(R.id.w_next, svc(ctx, MelodiaPlaybackService.ACTION_NEXT, 3))
+                rv.setOnClickPendingIntent(R.id.w_sleep, svc(ctx, MelodiaPlaybackService.ACTION_SLEEP, 5))
+                try {
+                    rv.setProgressBar(R.id.w_progress, 1000, if (dur > 0) ((pos.toFloat() / dur) * 1000).toInt().coerceIn(0, 1000) else 0, false)
+                } catch (_: Exception) {}
                 val open = PendingIntent.getActivity(
                     ctx, 4,
                     Intent(ctx, MainActivity::class.java).apply {

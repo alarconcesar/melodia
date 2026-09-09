@@ -95,6 +95,14 @@ class MelodiaPlaybackService : MediaSessionService() {
                     stopForegroundCompat(true)
                     stopSelf()
                 }
+                ACTION_SLEEP -> {
+                    // Sleep de 30 min desde el widget, con el mismo fundido gradual
+                    try {
+                        val app = application as com.melodia.app.MelodiaApp
+                        val sleep = app.appContainer.sleepTimer
+                        if (sleep.minsLeft.value != null) sleep.cancel() else sleep.start(30)
+                    } catch (_: Exception) {}
+                }
             }
         } catch (e: Exception) { Log.e("MelodiaSvc", "action fail", e) }
         return START_STICKY
@@ -178,7 +186,9 @@ class MelodiaPlaybackService : MediaSessionService() {
                         android.graphics.Bitmap.createScaledBitmap(it, 192, 192, true)
                     } else it
                 }
-                com.melodia.app.widget.MelodiaWidget.refresh(this, title, artist, playing, wArt)
+                val dur = try { player.duration.takeIf { it > 0 } ?: 0L } catch (_: Exception) { 0L }
+                val pos = try { player.currentPosition.coerceAtLeast(0) } catch (_: Exception) { 0L }
+                com.melodia.app.widget.MelodiaWidget.refresh(this, title, artist, playing, wArt, pos, dur)
             } catch (_: Exception) {}
         } catch (e: Exception) {
             Log.e("MelodiaSvc", "notif fail", e)
@@ -321,5 +331,6 @@ class MelodiaPlaybackService : MediaSessionService() {
         const val ACTION_NEXT = "com.melodia.app.NEXT"
         const val ACTION_PREV = "com.melodia.app.PREV"
         const val ACTION_STOP = "com.melodia.app.STOP"
+        const val ACTION_SLEEP = "com.melodia.app.SLEEP30"
     }
 }
