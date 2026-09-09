@@ -8,6 +8,7 @@ import com.melodia.app.data.local.PlaylistSongEntity
 import com.melodia.app.data.model.Song
 import com.melodia.app.data.lyrics.LyricLine
 import com.melodia.app.data.lyrics.LyricsRepository
+import com.melodia.app.data.online.DownloadManager
 import com.melodia.app.data.online.YtRepository
 import com.melodia.app.data.online.YtTrack
 import com.melodia.app.player.MusicPlayer
@@ -30,6 +31,7 @@ class MainViewModel(
     private val stats: StatsRepository,
     val sleep: SleepTimer,
     private val yt: YtRepository,
+    private val dl: DownloadManager,
     private val lyricsRepo: LyricsRepository,
     private val artRepo: com.melodia.app.data.art.ArtworkRepository
 ) : ViewModel() {
@@ -119,6 +121,54 @@ class MainViewModel(
         viewModelScope.launch {
             currentSong.collect { s -> if (s != null) loadLyrics(s) }
         }
+        // Motor de descargas: progreso + guardado con etiquetas incrustadas
+        viewModelScope.launch { dl.progress.collect { _dlProgress.value = it } }
+        dl.onFinished = { track, high, audio, part ->
+            // Letra y carátula para incrustar en el archivo
+            val lyricText = try {
+                val l = withContext(Dispatchers.IO) {
+                    lyricsRepo.get(track.artist, track.title, "", track.durationSec, "dl:${track.id}")
+                }
+                l?.let { plainOrSynced(it) }
+            } catch (_: Exception) { null }
+            val art = try {
+                track.thumbUrl?.let { withContext(Dispatchers.IO) { yt.fetchBytes(it) } }
+            } catch (_: Exception) { null }
+            withContext(Dispatchers.IO) { yt.storeDownload(track, high, audio, part, lyricText, art, null) }
+            try {
+                yt.pushDlHistory(track, high)
+                _dlHistory.value = yt.getDlHistory()
+            } catch (_: Exception) {}
+            reload()
+            // Precalienta la caché de letra con la clave del tema ya guardado
+            viewModelScope.launch { delayWarmLyric(track) }
+        }
+    }
+
+    /** Busca el tema recién descargado y deja su letra lista sin internet. */
+    private suspend fun delayWarmLyric(track: YtTrack) {
+        try {
+            kotlinx.coroutines.delay(2500)
+            val s = songs.value.firstOrNull {
+                it.title.equals(track.title, true) &&
+                    (track.artist.isBlank() || it.artist.equals(track.artist, true))
+            } ?: return
+            val l = withContext(Dispatchers.IO) {
+                lyricsRepo.get(s.artist, s.title, s.album, s.durationMs / 1000, "id:${s.id}")
+            }
+            if (l != null) loadLyrics(s, force = false)
+        } catch (_: Exception) {}
+    }
+
+    /** Texto incrustable: sincronizado si hay, si no el plano. */
+    private fun plainOrSynced(l: com.melodia.app.data.lyrics.Lyrics): String? {
+        if (l.synced.isNotEmpty()) {
+            return l.synced.joinToString("\n") { ln ->
+                val s = (ln.ms / 1000).toInt()
+                "[${"%02d".format(s / 60)}:${"%02d".format(s % 60)}]${ln.text}"
+            }.take(60000).ifBlank { null } ?: l.plain
+        }
+        return l.plain
     }
 
     fun reload() { _reload.value++ }
@@ -199,6 +249,27 @@ class MainViewModel(
     }
     fun playListAt(list: List<Song>, idx: Int) = emitPlay(list, idx)
     fun playFavAt(idx: Int) = emitPlay(favSongs.value, idx)
+    // ── Artista / álbum: reproducir y aleatorio propios ──
+    private fun artistSongs(name: String) =
+        songs.value.filter { (it.artist.ifBlank { "Desconocido" }) == name }
+    private fun albumSongs(name: String) =
+        songs.value.filter { (it.album.ifBlank { "Sin álbum" }) == name }
+    fun playArtist(name: String) {
+        val l = artistSongs(name)
+        if (l.isNotEmpty()) emitPlay(l, 0)
+    }
+    fun shuffleArtist(name: String) {
+        val l = artistSongs(name).shuffled()
+        if (l.isNotEmpty()) emitPlay(l, 0)
+    }
+    fun playAlbum(name: String) {
+        val l = albumSongs(name)
+        if (l.isNotEmpty()) emitPlay(l, 0)
+    }
+    fun shuffleAlbum(name: String) {
+        val l = albumSongs(name).shuffled()
+        if (l.isNotEmpty()) emitPlay(l, 0)
+    }
     fun playPlaylistEntities(e: List<PlaylistSongEntity>, idx: Int) {
         val byId = songs.value.associateBy { it.id }
         val list = e.mapNotNull { byId[it.songId] }
@@ -563,43 +634,53 @@ class MainViewModel(
         }
     }
 
-    /** Descarga todos los resultados actuales (con pausa entre cada uno). */
+    /** Descarga todos los resultados actuales (el motor los encola de 3 en 3). */
     fun downloadAllYt() {
-        viewModelScope.launch {
-            val list = _ytResults.value.filter { !_dlProgress.value.containsKey(it.id) }
-            for (t in list) {
-                if (_dlProgress.value.size >= 3) {
-                    // máx. 3 en paralelo: espera a que se libere uno
-                    while (_dlProgress.value.size >= 3) kotlinx.coroutines.delay(1000)
-                }
-                downloadYt(t)
-                kotlinx.coroutines.delay(400)
-            }
-        }
+        val list = _ytResults.value.filter { t -> dlJobs.value.none { it.track.id == t.id } }
+        if (list.isEmpty()) return
+        dl.enqueueAll(list, _ytHighQuality.value)
     }
 
     fun retryLyrics() { currentSong.value?.let { loadLyrics(it, force = true) } }
 
+    // ── Descargas: cola con pausa, reintento e importación de playlists ──
+    val dlJobs: StateFlow<List<com.melodia.app.data.online.DlJob>> = dl.jobs
+
     fun downloadYt(track: YtTrack, high: Boolean = _ytHighQuality.value) {
-        if (_dlProgress.value.containsKey(track.id)) return
+        dl.enqueue(track, high)
+    }
+
+    fun pauseDl(id: String) = dl.pause(id)
+    fun resumeDl(id: String) = dl.resume(id)
+    fun cancelDl(id: String) = dl.cancel(id)
+
+    private val _ytImport = MutableStateFlow<String?>(null)
+    val ytImport: StateFlow<String?> = _ytImport
+
+    /** Pega un link de playlist de YouTube y encola todos sus temas. */
+    fun importYtPlaylist(url: String) {
+        val clean = url.trim()
+        if (!clean.contains("list=", true)) {
+            _ytImport.value = "Pega un link de playlist (lleva “list=” en la URL)"
+            return
+        }
+        if (_ytImport.value == "…") return
         viewModelScope.launch {
-            _dlProgress.value += track.id to 0f
+            _ytImport.value = "…"
             try {
-                withContext(Dispatchers.IO) {
-                    yt.download(track, { p -> _dlProgress.value += track.id to p }, high)
+                val (title, tracks) = withContext(Dispatchers.IO) { yt.playlistTracks(clean) }
+                if (tracks.isEmpty()) {
+                    _ytImport.value = "La playlist no trae temas visibles"
+                    return@launch
                 }
-                try {
-                    yt.pushDlHistory(track, high)
-                    _dlHistory.value = yt.getDlHistory()
-                } catch (_: Exception) {}
-                reload()
+                dl.enqueueAll(tracks, _ytHighQuality.value)
+                _ytImport.value = "OK|${tracks.size}|$title"
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
-                _ytError.value = errMsg(t, "No se pudo descargar — reintenta")
+                _ytImport.value = errMsg(t, "No se pudo leer la playlist")
             }
-            // quitar el entry tras un respiro para que se vea el 100%
-            kotlinx.coroutines.delay(600)
-            _dlProgress.value -= track.id
         }
     }
+
+    fun clearYtImport() { _ytImport.value = null }
 }

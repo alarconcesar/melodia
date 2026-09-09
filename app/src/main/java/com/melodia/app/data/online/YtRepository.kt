@@ -263,4 +263,95 @@ class YtRepository(private val context: Context) {
             throw e
         }
     }
+
+    /** Trae los temas de una playlist de YouTube (título + hasta 100 temas, varias páginas). */
+    suspend fun playlistTracks(url: String): Pair<String, List<YtTrack>> = withContext(Dispatchers.IO) {
+        ensure()
+        val ex = yt().getPlaylistExtractor(url)
+        ex.fetchPage()
+        val title = (try { ex.name } catch (_: Exception) { "Playlist" }) ?: "Playlist"
+        val out = mutableListOf<YtTrack>()
+        var page = ex.initialPage
+        var rounds = 0
+        while (true) {
+            out += mapItems(page.items)
+            if (out.size >= 100 || !page.hasNextPage() || rounds++ >= 4) break
+            page = ex.getPage(page.nextPage)
+        }
+        title to out.take(100)
+    }
+
+    /** Descarga bytes crudos (miniatura para incrustar como carátula). */
+    suspend fun fetchBytes(url: String): ByteArray? = withContext(Dispatchers.IO) {
+        try {
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.setRequestProperty(
+                "User-Agent",
+                "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
+            )
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 20_000
+            conn.connect()
+            if (conn.responseCode !in 200..299) return@withContext null
+            conn.inputStream.use { it.readBytes() }.takeIf { it.size in 1..4_000_000 }
+        } catch (_: Exception) { null }
+    }
+
+    /**
+     * Guarda un archivo ya descargado en Música/Melodia y, si es M4A,
+     * le incrusta título, artista, letra y carátula en el propio archivo.
+     * Si el etiquetado falla, la descarga se conserva igual.
+     */
+    suspend fun storeDownload(
+        track: YtTrack, high: Boolean, audio: YtAudio, part: File,
+        lyrics: String? = null, artBytes: ByteArray? = null, artMime: String? = null
+    ): Uri = withContext(Dispatchers.IO) {
+        val fileName = sanitize("${track.title} - ${track.artist.ifBlank { "YouTube" }}") + "." + audio.ext
+        val resolver = context.contentResolver
+        if (Build.VERSION.SDK_INT < 29) {
+            try {
+                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Melodia").mkdirs()
+            } catch (_: Exception) {}
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.Audio.Media.TITLE, track.title)
+            put(MediaStore.Audio.Media.ARTIST, track.artist.ifBlank { "YouTube" })
+            put(MediaStore.Audio.Media.MIME_TYPE, audio.mime)
+            if (Build.VERSION.SDK_INT >= 29) {
+                put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/Melodia")
+                put(MediaStore.Audio.Media.IS_PENDING, 1)
+            }
+        }
+        val uri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+            ?: error("No se pudo crear el archivo")
+        try {
+            resolver.openOutputStream(uri)?.use { out ->
+                part.inputStream().use { inp -> inp.copyTo(out) }
+            } ?: error("Sin salida")
+            // Etiquetado M4A dentro del archivo (título, artista, letra, carátula)
+            if (audio.ext == "m4a") {
+                try {
+                    val raw = resolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?.takeIf { it.size in 16..60_000_000 }
+                        ?: error("sin lectura")
+                    val tagged = Mp4Tagger.tag(
+                        raw, track.title, track.artist.ifBlank { "YouTube" },
+                        null, lyrics, artBytes, artMime
+                    )
+                    resolver.openOutputStream(uri)?.use { it.write(tagged) }
+                        ?: error("sin escritura")
+                } catch (_: Exception) { /* se conserva sin etiquetar */ }
+            }
+            if (Build.VERSION.SDK_INT >= 29) {
+                values.clear()
+                values.put(MediaStore.Audio.Media.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+            }
+            uri
+        } catch (e: Exception) {
+            try { resolver.delete(uri, null, null) } catch (_: Exception) {}
+            throw e
+        }
+    }
 }

@@ -50,6 +50,7 @@ class MusicPlayer(private val context: Context) {
                     exo = player
                     attachListener(player)
                     updateState()
+                    pending?.let { pending = null; try { it() } catch (_: Exception) {} }
                 }
             } catch (e: Exception) { Log.e("MusicPlayer", "bind fail", e) }
         }
@@ -88,8 +89,16 @@ class MusicPlayer(private val context: Context) {
         songMap = songs.associateBy { it.id }
     }
 
+    /** Bindea el servicio al primer uso (el arranque de la app no lo toca). */
+    private fun ensureBound() { if (!bound) initialize() }
+
+    /** Acción pendiente mientras el servicio conecta (solo afecta al primer play). */
+    private var pending: (() -> Unit)? = null
+
     fun play(ids: List<Long>, startIndex: Int) {
-        val p = exo ?: return
+        ensureBound()
+        val p = exo
+        if (p == null) { pending = { play(ids, startIndex) }; return }
         try {
             queueIds = ids.toMutableList()
             val items = ids.mapNotNull { id -> songMap[id]?.let { buildItem(it) } }
@@ -142,7 +151,9 @@ class MusicPlayer(private val context: Context) {
 
     /** Reproduce un stream online (URL directa de audio). */
     fun playStream(url: String, title: String, artist: String, artUrl: String? = null) {
-        val p = exo ?: return
+        ensureBound()
+        val p = exo
+        if (p == null) { pending = { playStream(url, title, artist, artUrl) }; return }
         try {
             queueIds = mutableListOf(YT_STREAM_ID)
             val item = MediaItem.Builder()
@@ -196,9 +207,9 @@ class MusicPlayer(private val context: Context) {
         } catch (e: Exception) { Log.e("MusicPlayer", "removeAt fail", e) }
     }
     private fun attachEq() { try { exo?.let { eq?.attach(it.audioSessionId) } } catch (_: Exception) {} }
-    fun toggle() { try { exo?.let { if (it.isPlaying) it.pause() else it.play() } } catch (_: Exception) {} }
-    fun next() { jumpWithFade { try { exo?.seekToNextMediaItem() } catch (_: Exception) {} } }
-    fun prev() { jumpWithFade { try { exo?.seekToPreviousMediaItem() } catch (_: Exception) {} } }
+    fun toggle() { ensureBound(); try { exo?.let { if (it.isPlaying) it.pause() else it.play() } } catch (_: Exception) {} }
+    fun next() { ensureBound(); jumpWithFade { try { exo?.seekToNextMediaItem() } catch (_: Exception) {} } }
+    fun prev() { ensureBound(); jumpWithFade { try { exo?.seekToPreviousMediaItem() } catch (_: Exception) {} } }
 
     // ── Fundido entre canciones (activable) ──
     private val prefs = context.getSharedPreferences("melodia_player", Context.MODE_PRIVATE)
@@ -283,9 +294,9 @@ class MusicPlayer(private val context: Context) {
     fun cycleRepeat() {
         try { exo?.let { it.repeatMode = when (it.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF }; updateState() } } catch (_: Exception) {}
     }
-    fun seekTo(f: Float) { try { exo?.let { val d = it.duration.coerceAtLeast(0); it.seekTo((d * f).toLong()) } } catch (_: Exception) {} }
+    fun seekTo(f: Float) { ensureBound(); try { exo?.let { val d = it.duration.coerceAtLeast(0); it.seekTo((d * f).toLong()) } } catch (_: Exception) {} }
     /** Salto relativo en ms (doble toque ±10 s, modo auto). */
-    fun seekBy(ms: Long) { try { exo?.let { it.seekTo((it.currentPosition + ms).coerceAtLeast(0)) } } catch (_: Exception) {} }
+    fun seekBy(ms: Long) { ensureBound(); try { exo?.let { it.seekTo((it.currentPosition + ms).coerceAtLeast(0)) } } catch (_: Exception) {} }
 
     private fun updateState() {
         try {

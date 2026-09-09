@@ -392,7 +392,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                     0 -> HomeTab(vm, songs, all, current?.id, state.isPlaying, favIds,
                         onAdd = { showInfo = it }, onTab = { tab = it },
                         onOpenPlayer = { showPlayer = true })
-                    1 -> ExploreTab(vm, folders, albums, artists, folderSel, albumSel, artistSel, songs,
+                    1 -> ExploreTab(vm, folders, albums, artists, folderSel, albumSel, artistSel, songs, all,
                         current?.id, state.isPlaying, favIds, onAdd = { showInfo = it })
                     2 -> {
                         if (openPid == null) PlaylistsTab(playlists, allLinks, all,
@@ -769,9 +769,48 @@ fun ExploreTab(
     albums: List<com.melodia.app.data.Album>,
     artists: List<com.melodia.app.data.Artist>,
     folderSel: String?, albumSel: String?, artistSel: String?,
-    songs: List<Song>, currentId: Long?, playing: Boolean, favs: Set<Long>, onAdd: (Song) -> Unit
+    songs: List<Song>, all: List<Song>,
+    currentId: Long?, playing: Boolean, favs: Set<Long>, onAdd: (Song) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
+    var seg by remember { mutableStateOf(0) }
+    var artistDetail by remember { mutableStateOf<String?>(null) }
+    var albumDetail by remember { mutableStateOf<String?>(null) }
+    if (artistDetail != null || albumDetail != null) {
+        BackHandler { artistDetail = null; albumDetail = null }
+    }
+    // Detalle de artista / álbum con cabecera propia
+    val aName = artistDetail
+    val alName = albumDetail
+    if (aName != null) {
+        val mine = remember(all, aName) { all.filter { (it.artist.ifBlank { "Desconocido" }) == aName } }
+        if (mine.isEmpty()) artistDetail = null
+        else {
+            ArtistDetail(
+                name = aName, songs = mine, currentId = currentId, playing = playing, favs = favs,
+                onBack = { artistDetail = null },
+                onPlay = { vm.playArtist(aName) }, onShuffle = { vm.shuffleArtist(aName) },
+                onTap = { vm.playListAt(mine, mine.indexOfFirst { s -> s.id == it }.takeIf { i -> i >= 0 } ?: 0) },
+                onFav = { vm.toggleFav(it) }, onLongPress = onAdd
+            )
+            return
+        }
+    }
+    if (alName != null) {
+        val mine = remember(all, alName) { all.filter { (it.album.ifBlank { "Sin álbum" }) == alName } }
+        if (mine.isEmpty()) albumDetail = null
+        else {
+            AlbumDetail(
+                album = albums.find { it.name == alName }, name = alName, songs = mine,
+                currentId = currentId, playing = playing, favs = favs,
+                onBack = { albumDetail = null },
+                onPlay = { vm.playAlbum(alName) }, onShuffle = { vm.shuffleAlbum(alName) },
+                onTap = { vm.playListAt(mine, mine.indexOfFirst { s -> s.id == it }.takeIf { i -> i >= 0 } ?: 0) },
+                onFav = { vm.toggleFav(it) }, onLongPress = onAdd
+            )
+            return
+        }
+    }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 200.dp)) {
         if (folderSel != null || albumSel != null || artistSel != null) {
             item {
@@ -787,57 +826,189 @@ fun ExploreTab(
                     onTap = { vm.playSong(s.id) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) })
             }
         } else {
-            item { SectionHeader("Carpetas", "${folders.size}") }
-            items(folders) { f ->
+            item {
+                // Sub-pestañas: Carpetas · Artistas · Álbumes
                 Row(
-                    Modifier.fillMaxWidth().clickable { vm.setFolder(f.path) }.padding(horizontal = 20.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.Folder, null, tint = cs.onSurfaceVariant)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(f.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
-                        Text("${f.count} temas", style = Ds.Sub, color = cs.onSurfaceVariant)
-                    }
-                    Icon(Icons.Default.ChevronRight, null, tint = cs.onSurfaceVariant)
+                    ToggleChip(selected = seg == 0, text = "Carpetas", icon = Icons.Default.Folder) { seg = 0 }
+                    ToggleChip(selected = seg == 1, text = "Artistas", icon = Icons.Default.Person) { seg = 1 }
+                    ToggleChip(selected = seg == 2, text = "Álbumes", icon = Icons.Default.Album) { seg = 2 }
                 }
             }
-            item { Spacer(Modifier.height(10.dp)) }
-            item { SectionHeader("Álbumes", "${albums.size}") }
-            items(albums.take(50)) { a ->
-                Row(
-                    Modifier.fillMaxWidth().clickable { vm.setAlbum(a.name) }.padding(horizontal = 20.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(44.dp).clip(RoundedCornerShape(Ds.RRow)).background(cs.surfaceVariant),
+            when (seg) {
+                0 -> {
+                    item { SectionHeader("Carpetas", "${folders.size}") }
+                    items(folders) { f ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { vm.setFolder(f.path) }.padding(horizontal = 20.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Folder, null, tint = cs.onSurfaceVariant)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(f.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
+                                Text("${f.count} temas", style = Ds.Sub, color = cs.onSurfaceVariant)
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = cs.onSurfaceVariant)
+                        }
+                    }
+                }
+                1 -> {
+                    item { SectionHeader("Artistas", "${artists.size}") }
+                    items(artists) { ar ->
+                        val artId = remember(all, ar.name) {
+                            all.firstOrNull { (it.artist.ifBlank { "Desconocido" }) == ar.name }?.albumId ?: 0L
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().clickable { artistDetail = ar.name }.padding(horizontal = 20.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (artId > 0) SongArt(artId, 48.dp, CircleShape, iconSize = 20.dp)
+                            else Box(
+                                Modifier.size(48.dp).clip(CircleShape).background(cs.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) { Icon(Icons.Default.Person, null, Modifier.size(22.dp), tint = cs.onSurfaceVariant) }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(ar.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
+                                Text("${ar.count} temas", style = Ds.Sub, color = cs.onSurfaceVariant)
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = cs.onSurfaceVariant)
+                        }
+                    }
+                }
+                else -> {
+                    item { SectionHeader("Álbumes", "${albums.size}") }
+                    items(albums) { a ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { albumDetail = a.name }.padding(horizontal = 20.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (a.artId > 0) SongArt(a.artId, 48.dp, RoundedCornerShape(Ds.RRow), iconSize = 20.dp)
+                            else Box(
+                                Modifier.size(48.dp).clip(RoundedCornerShape(Ds.RRow)).background(cs.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) { Icon(Icons.Default.Album, null, Modifier.size(22.dp), tint = cs.onSurfaceVariant) }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
+                                Text("${a.artist} · ${a.count}", style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = cs.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Cabecera de colección (artista o álbum): arte, conteo, duración y botones propios. */
+@Composable
+private fun CollectionHeader(
+    title: String,
+    subtitle: String,
+    art: @Composable () -> Unit,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+    onBack: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.ArrowBack, "Atrás", tint = cs.onBackground)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(84.dp)) { art() }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = Ds.Title, color = cs.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(2.dp))
+                Text(subtitle, style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(onClick = onPlay, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Reproducir")
+            }
+            FilledTonalButton(onClick = onShuffle, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Default.Shuffle, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Aleatorio")
+            }
+        }
+    }
+}
+
+private fun totalDur(list: List<Song>): String {
+    val ms = list.sumOf { it.durationMs }
+    val m = (ms / 60000).toInt()
+    return if (m >= 60) "${m / 60} h ${m % 60} min" else "$m min"
+}
+
+@Composable
+private fun ArtistDetail(
+    name: String, songs: List<Song>,
+    currentId: Long?, playing: Boolean, favs: Set<Long>,
+    onBack: () -> Unit, onPlay: () -> Unit, onShuffle: () -> Unit,
+    onTap: (Long) -> Unit, onFav: (Long) -> Unit, onLongPress: (Song) -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val artId = remember(songs) { songs.firstOrNull { it.albumId > 0 }?.albumId ?: 0L }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 200.dp)) {
+        item {
+            CollectionHeader(
+                title = name,
+                subtitle = "${songs.size} temas · ${totalDur(songs)}",
+                art = {
+                    if (artId > 0) SongArt(artId, 84.dp, CircleShape, iconSize = 32.dp)
+                    else Box(
+                        Modifier.size(84.dp).clip(CircleShape).background(cs.surfaceVariant),
                         contentAlignment = Alignment.Center
-                    ) { Icon(Icons.Default.Album, null, Modifier.size(22.dp), tint = cs.onSurfaceVariant) }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
-                        Text("${a.artist} · ${a.count}", style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-            item { Spacer(Modifier.height(10.dp)) }
-            item { SectionHeader("Artistas", "${artists.size}") }
-            items(artists.take(50)) { ar ->
-                Row(
-                    Modifier.fillMaxWidth().clickable { vm.setArtist(ar.name) }.padding(horizontal = 20.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(44.dp).clip(CircleShape).background(cs.surfaceVariant),
+                    ) { Icon(Icons.Default.Person, null, Modifier.size(36.dp), tint = cs.onSurfaceVariant) }
+                },
+                onPlay = onPlay, onShuffle = onShuffle, onBack = onBack
+            )
+        }
+        items(songs, key = { it.id }) { s ->
+            TrackRow(s, s.id == currentId && playing, favs.contains(s.id),
+                onTap = { onTap(s.id) }, onFav = { onFav(s.id) }, onLongPress = { onLongPress(s) })
+        }
+    }
+}
+
+@Composable
+private fun AlbumDetail(
+    album: com.melodia.app.data.Album?, name: String, songs: List<Song>,
+    currentId: Long?, playing: Boolean, favs: Set<Long>,
+    onBack: () -> Unit, onPlay: () -> Unit, onShuffle: () -> Unit,
+    onTap: (Long) -> Unit, onFav: (Long) -> Unit, onLongPress: (Song) -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val artId = album?.artId ?: songs.firstOrNull { it.albumId > 0 }?.albumId ?: 0L
+    val artist = album?.artist?.ifBlank { songs.firstOrNull()?.artist ?: "" } ?: ""
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 200.dp)) {
+        item {
+            CollectionHeader(
+                title = name,
+                subtitle = (if (artist.isNotBlank()) "$artist · " else "") + "${songs.size} temas · ${totalDur(songs)}",
+                art = {
+                    if (artId > 0) SongArt(artId, 84.dp, RoundedCornerShape(Ds.RRow), iconSize = 32.dp)
+                    else Box(
+                        Modifier.size(84.dp).clip(RoundedCornerShape(Ds.RRow)).background(cs.surfaceVariant),
                         contentAlignment = Alignment.Center
-                    ) { Icon(Icons.Default.Person, null, Modifier.size(22.dp), tint = cs.onSurfaceVariant) }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(ar.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
-                        Text("${ar.count} temas", style = Ds.Sub, color = cs.onSurfaceVariant)
-                    }
-                }
-            }
+                    ) { Icon(Icons.Default.Album, null, Modifier.size(36.dp), tint = cs.onSurfaceVariant) }
+                },
+                onPlay = onPlay, onShuffle = onShuffle, onBack = onBack
+            )
+        }
+        items(songs, key = { it.id }) { s ->
+            TrackRow(s, s.id == currentId && playing, favs.contains(s.id),
+                onTap = { onTap(s.id) }, onFav = { onFav(s.id) }, onLongPress = { onLongPress(s) })
         }
     }
 }

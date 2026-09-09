@@ -13,8 +13,9 @@ android {
         applicationId = "com.melodia.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 33
-        versionName = "3.7"
+        versionCode = 34
+        versionName = "3.8"
+        resConfigs("es")
     }
     signingConfigs {
         create("release") {
@@ -31,7 +32,12 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("release")
         }
     }

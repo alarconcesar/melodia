@@ -27,9 +27,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -93,6 +96,9 @@ fun OnlineTab(vm: MainViewModel) {
     val dlHist by vm.dlHistory.collectAsState()
     var dlPick by remember { mutableStateOf<YtTrack?>(null) }
     var showDls by remember { mutableStateOf(false) }
+    var showImport by remember { mutableStateOf(false) }
+    var importUrl by remember { mutableStateOf("") }
+    val importState by vm.ytImport.collectAsState()
     LaunchedEffect(Unit) { vm.refreshDlHistory() }
     if (showDls) DownloadsSheet(vm, onDismiss = { showDls = false })
     dlPick?.let { track ->
@@ -139,6 +145,55 @@ fun OnlineTab(vm: MainViewModel) {
                 text = if (dlHist.isEmpty() && dl.values.isEmpty()) "Descargas" else "Descargas · ${dl.size + dlHist.size}",
                 icon = Icons.Default.History, onClick = { showDls = true }
             )
+        }
+        Spacer(Modifier.height(8.dp))
+        // Importar playlist de YouTube pegando su link
+        ToggleChip(
+            selected = showImport, text = "Importar playlist",
+            icon = Icons.Default.PlaylistAdd,
+            onClick = { showImport = !showImport; vm.clearYtImport() }
+        )
+        if (showImport) {
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextField(
+                    value = importUrl, onValueChange = { importUrl = it; vm.clearYtImport() },
+                    placeholder = { Text("Pega el link de la playlist…", style = Ds.Body) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { kb?.hide(); vm.importYtPlaylist(importUrl) }),
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Surface(shape = RoundedCornerShape(14.dp), color = cs.primary, modifier = Modifier.size(52.dp)) {
+                    Box(
+                        Modifier.clickable(enabled = importState != "…") { kb?.hide(); vm.importYtPlaylist(importUrl) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (importState == "…") MelodiaSpinner(size = 22.dp, width = 2.dp, color = cs.surface)
+                        else Icon(Icons.Default.Download, null, tint = cs.surface)
+                    }
+                }
+            }
+            val imp = importState
+            if (imp != null && imp != "…") {
+                Spacer(Modifier.height(6.dp))
+                if (imp.startsWith("OK|")) {
+                    val parts = imp.split("|")
+                    Text(
+                        "«${parts.getOrNull(2) ?: "Playlist"}»: ${parts.getOrNull(1) ?: "?"} temas encolados",
+                        style = Ds.Body, color = cs.primary
+                    )
+                    LaunchedEffect(imp) { showDls = true }
+                } else {
+                    Text(imp, style = Ds.Body, color = cs.error)
+                }
+            }
         }
         Spacer(Modifier.height(6.dp))
         Spacer(Modifier.height(14.dp))
@@ -343,37 +398,29 @@ fun OnlineTab(vm: MainViewModel) {
     }
 }
 
-/** Descargas: progreso en vivo + historial con calidad y fecha. */
+/** Descargas: cola con pausa/reintento + historial con calidad y fecha. */
 @Composable
 fun DownloadsSheet(vm: MainViewModel, onDismiss: () -> Unit) {
     val cs = MaterialTheme.colorScheme
-    val dl by vm.dlProgress.collectAsState()
+    val jobs by vm.dlJobs.collectAsState()
     val hist by vm.dlHistory.collectAsState()
-    val results by vm.ytResults.collectAsState()
-    val byId = remember(results) { results.associateBy { it.id } }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Descargas", color = cs.onBackground) },
         text = {
             Column(Modifier.fillMaxWidth()) {
-                if (dl.isEmpty() && hist.isEmpty()) {
+                if (jobs.isEmpty() && hist.isEmpty()) {
                     Text("Aún no descargas nada — elige un tema y guárdalo en tu música", style = Ds.Body, color = cs.onSurfaceVariant)
                 }
-                dl.forEach { (id, p) ->
-                    val t = byId[id]
-                    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                        Text(
-                            t?.title ?: "Descargando…", style = Ds.Body, color = cs.onBackground,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            LinearProgressIndicator(
-                                progress = p.coerceIn(0f, 1f),
-                                modifier = Modifier.weight(1f),
-                                color = cs.primary
+                if (jobs.isNotEmpty()) {
+                    Column(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
+                        jobs.forEach { j ->
+                            DlJobRow(
+                                job = j,
+                                onPause = { vm.pauseDl(j.track.id) },
+                                onResume = { vm.resumeDl(j.track.id) },
+                                onCancel = { vm.cancelDl(j.track.id) }
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Text("${(p * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
                         }
                     }
                 }
@@ -410,6 +457,70 @@ fun DownloadsSheet(vm: MainViewModel, onDismiss: () -> Unit) {
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } }
     )
+}
+
+private fun mb(b: Long): String = "%.1f MB".format(b / 1048576f)
+
+/** Fila de descarga: progreso, pausa, reintento y cancelar. */
+@Composable
+private fun DlJobRow(
+    job: com.melodia.app.data.online.DlJob,
+    onPause: () -> Unit, onResume: () -> Unit, onCancel: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val st = job.status
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(
+            job.track.title, style = Ds.Body, color = cs.onBackground,
+            maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            "${job.track.artist.ifBlank { "YouTube" }} · ${if (job.high) "Alta" else "Estándar"}" +
+                when (st) {
+                    com.melodia.app.data.online.DlStatus.QUEUED -> " · En cola"
+                    com.melodia.app.data.online.DlStatus.PAUSED ->
+                        if (job.total > 0) " · Pausada · ${mb(job.downloaded)}/${mb(job.total)}" else " · Pausada"
+                    com.melodia.app.data.online.DlStatus.ERROR -> " · ${job.error ?: "Falló"}"
+                    com.melodia.app.data.online.DlStatus.DONE -> " · Guardando…"
+                    else -> if (job.total > 0) " · ${mb(job.downloaded)}/${mb(job.total)}" else ""
+                },
+            style = Ds.Sub,
+            color = if (st == com.melodia.app.data.online.DlStatus.ERROR) cs.error else cs.onSurfaceVariant,
+            maxLines = 2, overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (st == com.melodia.app.data.online.DlStatus.ACTIVE ||
+                st == com.melodia.app.data.online.DlStatus.QUEUED ||
+                st == com.melodia.app.data.online.DlStatus.PAUSED
+            ) {
+                LinearProgressIndicator(
+                    progress = job.progress.coerceIn(0f, 1f),
+                    modifier = Modifier.weight(1f),
+                    color = cs.primary
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("${(job.progress * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
+                Spacer(Modifier.width(4.dp))
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            when (st) {
+                com.melodia.app.data.online.DlStatus.ACTIVE,
+                com.melodia.app.data.online.DlStatus.QUEUED -> IconButton(onClick = onPause, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Pause, "Pausar", Modifier.size(18.dp), tint = cs.onBackground)
+                }
+                com.melodia.app.data.online.DlStatus.PAUSED,
+                com.melodia.app.data.online.DlStatus.ERROR -> IconButton(onClick = onResume, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.PlayArrow, "Reanudar", Modifier.size(18.dp), tint = cs.primary)
+                }
+                else -> {}
+            }
+            IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Close, "Quitar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
+            }
+        }
+    }
 }
 
 @Composable
