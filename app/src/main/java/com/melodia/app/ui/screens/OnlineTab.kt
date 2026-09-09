@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.melodia.app.MainViewModel
 import com.melodia.app.data.online.YtTrack
@@ -82,7 +83,7 @@ fun OnlineTab(vm: MainViewModel) {
         Text("Online", style = Ds.Display, color = cs.onBackground)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Busca en YouTube · ▶ para escuchar · ⬇ para guardar en tu música",
+            "Busca en YouTube, escucha al instante o guarda en tu música",
             style = Ds.Body, color = cs.onSurfaceVariant
         )
         Spacer(Modifier.height(14.dp))
@@ -103,8 +104,9 @@ fun OnlineTab(vm: MainViewModel) {
             )
             Spacer(Modifier.width(8.dp))
             Surface(shape = RoundedCornerShape(16.dp), color = cs.primary, modifier = Modifier.size(52.dp)) {
-                Box(Modifier.clickable { kb?.hide(); vm.searchYt() }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Search, null, tint = cs.surface)
+                Box(Modifier.clickable(enabled = !loading) { kb?.hide(); vm.searchYt() }, contentAlignment = Alignment.Center) {
+                    if (loading) MelodiaSpinner(size = 22.dp, width = 2.dp, color = cs.surface)
+                    else Icon(Icons.Default.Search, null, tint = cs.surface)
                 }
             }
         }
@@ -127,6 +129,27 @@ fun OnlineTab(vm: MainViewModel) {
                 }
             }
             results.isEmpty() -> {
+                if (recent.isEmpty() && history.isEmpty()) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp)
+                    ) {
+                        Box(
+                            Modifier.size(72.dp).clip(RoundedCornerShape(22.dp))
+                                .background(cs.primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Search, null, Modifier.size(32.dp), tint = cs.primary)
+                        }
+                        Spacer(Modifier.height(14.dp))
+                        Text("Busca música en YouTube", style = Ds.Title, color = cs.onBackground)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Escribe una canción o un artista para empezar",
+                            style = Ds.Body, color = cs.onSurfaceVariant
+                        )
+                    }
+                }
                 if (recent.isNotEmpty()) {
                     Text("Recientes", style = Ds.Sub, color = cs.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
@@ -152,11 +175,6 @@ fun OnlineTab(vm: MainViewModel) {
                     }
                     Spacer(Modifier.height(12.dp))
                 }
-                Text(
-                    "Escribe algo y pulsa buscar 🔎",
-                    style = Ds.Body, color = cs.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
                 if (history.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
                     Text("Escuchado online", style = Ds.Sub, color = cs.onSurfaceVariant)
@@ -190,7 +208,9 @@ fun OnlineTab(vm: MainViewModel) {
                                             maxLines = 2, overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            track.artist.ifBlank { "YouTube" }, style = Ds.Sub,
+                                            track.artist.ifBlank { "YouTube" } +
+                                                if (track.durationSec > 0) " · ${fmtDur(track.durationSec)}" else "",
+                                            style = Ds.Sub,
                                             color = cs.onSurfaceVariant,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis
                                         )
@@ -207,17 +227,22 @@ fun OnlineTab(vm: MainViewModel) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        "${results.size} resultados", style = Ds.Sub, color = cs.onSurfaceVariant,
+                        "${results.size} ${if (results.size == 1) "resultado" else "resultados"}",
+                        style = Ds.Sub, color = cs.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
                     Surface(
                         shape = RoundedCornerShape(12.dp), color = cs.surfaceVariant,
                         modifier = Modifier.clickable { vm.downloadAllYt() }
                     ) {
-                        Text(
-                            "⬇ Todo", style = Ds.Body, color = cs.primary,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                        )
+                        ) {
+                            Icon(Icons.Default.Download, null, Modifier.size(16.dp), tint = cs.primary)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Descargar todo", style = Ds.Body, color = cs.primary)
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -249,7 +274,7 @@ fun OnlineTab(vm: MainViewModel) {
                                         modifier = Modifier.clickable { vm.loadMoreYt() }
                                     ) {
                                         Text(
-                                            "Ver más ↓", style = Ds.Body, color = cs.primary,
+                                            "Ver más", style = Ds.Body, color = cs.primary,
                                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
                                         )
                                     }
@@ -276,12 +301,26 @@ private fun YtRow(
         Column(Modifier.fillMaxWidth().padding(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (track.thumbUrl != null) {
-                    AsyncImage(
-                        model = track.thumbUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp))
-                    )
+                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(10.dp))) {
+                        AsyncImage(
+                            model = track.thumbUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        if (track.durationSec > 0) {
+                            Box(
+                                Modifier.align(Alignment.BottomEnd).padding(4.dp)
+                                    .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(5.dp))
+                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    fmtDur(track.durationSec), color = Color.White,
+                                    style = Ds.Sub.copy(fontSize = 10.sp)
+                                )
+                            }
+                        }
+                    }
                 } else {
                     Box(
                         Modifier.size(56.dp).clip(RoundedCornerShape(10.dp))

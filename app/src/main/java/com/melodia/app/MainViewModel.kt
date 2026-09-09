@@ -227,10 +227,12 @@ class MainViewModel(
     }
 
     fun setYtQuery(q: String) { _ytQuery.value = q }
+    private var searchJob: kotlinx.coroutines.Job? = null
     fun searchYt(q: String = _ytQuery.value) {
         val query = q.trim()
         if (query.isBlank()) return
-        viewModelScope.launch {
+        searchJob?.cancel() // evita que una búsqueda anterior pise a la nueva
+        searchJob = viewModelScope.launch {
             _ytLoading.value = true
             _ytError.value = null
             try {
@@ -243,9 +245,10 @@ class MainViewModel(
                         _ytRecent.value = yt.getRecent()
                     } catch (_: Exception) {}
                     // Prefetch del primer resultado: el play más común arranca al instante
+                    // (hijo de este job: se cancela si llega otra búsqueda)
                     val top = _ytResults.value.firstOrNull()
                     if (top != null) {
-                        viewModelScope.launch {
+                        launch {
                             try { withContext(Dispatchers.IO) { yt.prefetchAudio(top.url) } } catch (_: Exception) {}
                         }
                     }
@@ -333,7 +336,7 @@ class MainViewModel(
                 }
                 val ui: LyricsUi = when {
                     got == null -> LyricsUi.None
-                    got.instrumental -> LyricsUi.Plain("🎵 Tema instrumental — sin letra")
+                    got.instrumental -> LyricsUi.Plain("Tema instrumental — sin letra")
                     got.synced.size >= 3 -> LyricsUi.Synced(got.synced)
                     got.plain != null -> LyricsUi.Plain(got.plain)
                     else -> LyricsUi.None
