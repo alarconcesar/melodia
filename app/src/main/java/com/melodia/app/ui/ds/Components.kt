@@ -78,6 +78,14 @@ import com.melodia.app.data.model.Song
 import com.melodia.app.ui.screens.fmt
 import com.melodia.app.ui.theme.Ds
 
+// ── Modelo de carátula: URL online o contenido de MediaStore ─────
+@Composable
+fun songArtModel(albumId: Long, artUrl: String?): Any? = remember(albumId, artUrl) {
+    artUrl ?: if (albumId > 0) ContentUris.withAppendedId(
+        MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, albumId
+    ) else null
+}
+
 // ── Carátula real del álbum (MediaStore) con fallback a icono ─────
 // El icono va DETRÁS: si la imagen carga lo tapa; si no hay arte, se ve el icono.
 @Composable
@@ -91,11 +99,7 @@ fun SongArt(
     artUrl: String? = null
 ) {
     val cs = MaterialTheme.colorScheme
-    val uri = remember(albumId, artUrl) {
-        if (albumId > 0) ContentUris.withAppendedId(
-            MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, albumId
-        ) else null
-    }
+    val model = songArtModel(albumId, artUrl)
     Box(
         modifier = modifier.size(size).clip(shape)
             .background(if (active) cs.primary.copy(alpha = 0.16f) else cs.surfaceVariant),
@@ -109,7 +113,6 @@ fun SongArt(
                 tint = cs.onSurfaceVariant,
                 modifier = Modifier.size(iconSize)
             )
-            val model = artUrl ?: uri
             if (model != null) {
                 AsyncImage(
                     model = model, contentDescription = null,
@@ -348,21 +351,6 @@ fun EqBars(color: Color, modifier: Modifier = Modifier) {
     }
 }
 
-// ── Punto indicador del tab: espacio reservado, aparece con pop ──
-@Composable
-private fun SelectionDot(visible: Boolean) {
-    val cs = MaterialTheme.colorScheme
-    Box(Modifier.height(6.dp), contentAlignment = Alignment.Center) {
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(tween(200)) + scaleIn(tween(200)),
-            exit = fadeOut(tween(150)) + scaleOut(tween(150))
-        ) {
-            Box(Modifier.size(4.dp).clip(CircleShape).background(cs.primary))
-        }
-    }
-}
-
 // ── PillNav DS · barra flotante ──────────────────────────────────
 @Composable
 fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier, badges: List<String> = emptyList()) {
@@ -381,7 +369,7 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
             .border(1.dp, cs.outline.copy(alpha = 0.6f), CircleShape)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -396,19 +384,19 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
                     modifier = Modifier.weight(1f).clip(CircleShape)
                         .background(pillBg)
                         .clickable { onTab(idx) }
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 7.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         val tabScale by animateFloatAsState(
-                            if (sel) 1.18f else 1f,
+                            if (sel) 1.14f else 1f,
                             spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
                             label = "tab"
                         )
                         Icon(
                             icon, null,
                             tint = if (sel) cs.primary else cs.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp).graphicsLayer { scaleX = tabScale; scaleY = tabScale }
+                            modifier = Modifier.size(21.dp).graphicsLayer { scaleX = tabScale; scaleY = tabScale }
                         )
                         Text(
                             label,
@@ -419,12 +407,10 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
                         Text(
                             badges.getOrNull(idx) ?: " ",
                             style = Ds.Sub.copy(fontSize = 9.sp),
-                            color = cs.onSurfaceVariant.copy(alpha = 0.8f),
+                            color = cs.onSurfaceVariant.copy(alpha = 0.75f),
                             maxLines = 1,
-                            modifier = Modifier.height(12.dp)
+                            modifier = Modifier.height(11.dp)
                         )
-                        // Punto indicador: espacio reservado, aparece con pop
-                        SelectionDot(sel)
                     }
                 }
             }

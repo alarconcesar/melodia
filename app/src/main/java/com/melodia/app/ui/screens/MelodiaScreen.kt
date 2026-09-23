@@ -1,13 +1,18 @@
 package com.melodia.app.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -28,6 +33,7 @@ import androidx.compose.ui.platform.LocalDensity
 import dev.chrisbanes.haze.haze
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
@@ -121,15 +127,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.melodia.app.MainViewModel
 import com.melodia.app.player.YT_STREAM_ID
 import com.melodia.app.SortMode
@@ -144,6 +154,7 @@ import com.melodia.app.ui.ds.SectionHeader
 import com.melodia.app.ui.ds.SongArt
 import com.melodia.app.ui.ds.TrackRow
 import com.melodia.app.ui.ds.pressClick
+import com.melodia.app.ui.ds.songArtModel
 import com.melodia.app.ui.theme.Ds
 import com.melodia.app.ui.theme.Accents
 import com.melodia.app.ui.theme.accentName
@@ -162,6 +173,18 @@ private fun greeting(): String {
         in 12..20 -> "Buenas tardes"
         else -> "Buenas noches"
     }
+}
+
+/** Abre la pantalla de ajustes de la app (para permisos denegados). */
+private fun openAppSettings(ctx: android.content.Context) {
+    try {
+        ctx.startActivity(
+            android.content.Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.fromParts("package", ctx.packageName, null)
+            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (_: Exception) {}
 }
 
 @Composable
@@ -207,6 +230,9 @@ fun MelodiaScreen(vm: MainViewModel) {
     var navArea by remember { mutableStateOf<Rect?>(null) }
     var miniArea by remember { mutableStateOf<Rect?>(null) }
     var contentPos by remember { mutableStateOf(Offset.Zero) }
+    // Alto real de la barra inferior: el miniplayer se apoya justo encima (sin taparla)
+    var navHeight by remember { mutableStateOf(0.dp) }
+    val dens = LocalDensity.current
 
     // ── Reporte del último crash (si la app se cerró sola) ──
     val appCtx = LocalContext.current.applicationContext
@@ -273,25 +299,20 @@ fun MelodiaScreen(vm: MainViewModel) {
     Box(Modifier.fillMaxSize().background(cs.background)) {
         DsBackground()
         Column(Modifier.fillMaxSize()) {
-            // ── Top bar DS ──
+            // ── Top bar DS compacta: menos cromo, más música ──
             Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(20.dp, 12.dp, 20.dp, 4.dp),
+                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 10.dp, top = 10.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(shape = CircleShape, color = cs.surface, modifier = Modifier.clickable { }) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp, 4.dp, 14.dp, 4.dp)) {
-                        Box(
-                            Modifier.size(36.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.16f)),
-                            contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.MusicNote, null, tint = cs.primary, modifier = Modifier.size(20.dp)) }
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            Text(greeting(), style = Ds.Sub, color = cs.onSurfaceVariant)
-                            Text("Melodia", style = Ds.Title, color = cs.onBackground)
-                        }
-                    }
+                Box(
+                    Modifier.size(34.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Default.MusicNote, null, tint = cs.primary, modifier = Modifier.size(18.dp)) }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(greeting(), style = Ds.Micro, color = cs.onSurfaceVariant)
+                    Text("Melodia", style = Ds.Title, color = cs.onBackground)
                 }
-                Spacer(Modifier.weight(1f))
                 if (sleepLeft != null) AssistChip(
                     onClick = { vm.sleep.cancel() },
                     label = { Text("${sleepLeft}m") },
@@ -348,15 +369,17 @@ fun MelodiaScreen(vm: MainViewModel) {
                     }
                 }
             }
-            // ── Search ──
-            OutlinedTextField(
-                value = query, onValueChange = vm::setQuery,
-                placeholder = { Text("Buscar temas, álbumes, artistas", style = Ds.Body, maxLines = 1) },
-                leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
-                trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { vm.setQuery("") }) { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) } },
-                singleLine = true, shape = RoundedCornerShape(Ds.RChip),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)
-            )
+            // ── Search: solo donde filtra (Inicio / Explorar), el resto gana espacio ──
+            AnimatedVisibility(visible = tab <= 1 || query.isNotBlank()) {
+                OutlinedTextField(
+                    value = query, onValueChange = vm::setQuery,
+                    placeholder = { Text("Buscar temas, álbumes, artistas", style = Ds.Body, maxLines = 1) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
+                    trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { vm.setQuery("") }) { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) } },
+                    singleLine = true, shape = RoundedCornerShape(Ds.RChip),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)
+                )
+            }
             if (folderSel != null || albumSel != null || artistSel != null) {
                 AssistChip(
                     onClick = { vm.clearFilters() },
@@ -389,7 +412,12 @@ fun MelodiaScreen(vm: MainViewModel) {
             ) {
                 AnimatedContent(
                     targetState = tab, label = "tabs",
-                    transitionSpec = { fadeIn() togetherWith fadeOut() }
+                    transitionSpec = {
+                        // Deslizamiento direccional: la pestaña entra desde el lado al que vas
+                        val dir = if (targetState > initialState) 1 else -1
+                        (slideInHorizontally(tween(280)) { w -> dir * w / 7 } + fadeIn(tween(220))) togetherWith
+                            (slideOutHorizontally(tween(220)) { w -> -dir * w / 7 } + fadeOut(tween(180)))
+                    }
                 ) { t ->
                 when (t) {
                     0 -> HomeTab(vm, songs, all, current?.id, state.isPlaying, favIds,
@@ -429,7 +457,10 @@ fun MelodiaScreen(vm: MainViewModel) {
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 10.dp)
-                .onGloballyPositioned { navArea = it.boundsInRoot() }
+                .onGloballyPositioned {
+                    navArea = it.boundsInRoot()
+                    navHeight = with(dens) { it.size.height.toDp() }
+                }
         ) {
             MelodiaPillNav(
                 tab = tab, onTab = { tab = it },
@@ -450,7 +481,8 @@ fun MelodiaScreen(vm: MainViewModel) {
         ) {
             current?.let { s ->
                 Box(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 96.dp)
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                        .padding(bottom = (if (navHeight > 0.dp) navHeight else 100.dp) + 10.dp)
                         .onGloballyPositioned { miniArea = it.boundsInRoot() }
                 ) {
                     MiniPlayerDs(
@@ -626,12 +658,54 @@ fun HomeTab(
     val state by vm.playerState.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
     if (all.isEmpty()) {
+        // Estado vacío accionable: antes solo pedía el permiso con texto, sin botón
+        val ctx = LocalContext.current
+        val audioPerm =
+            if (android.os.Build.VERSION.SDK_INT >= 33) android.Manifest.permission.READ_MEDIA_AUDIO
+            else android.Manifest.permission.READ_EXTERNAL_STORAGE
+        val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) vm.reload()
+        }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.MusicNote, null, Modifier.size(44.dp), tint = cs.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                Text("Sin canciones aún", style = Ds.Body, color = cs.onSurfaceVariant)
-                Text("Concede permiso de audio", style = Ds.Sub, color = cs.onSurfaceVariant)
+            Column(Modifier.padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier.size(92.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Default.MusicNote, null, Modifier.size(42.dp), tint = cs.primary) }
+                Spacer(Modifier.height(18.dp))
+                Text("Tu biblioteca está vacía", style = Ds.Title, color = cs.onBackground)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Melodia reproduce la música que ya está en tu teléfono. Concede el permiso de audio y aparecerá aquí.",
+                    style = Ds.Body, color = cs.onSurfaceVariant, textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(20.dp))
+                Surface(
+                    shape = CircleShape, color = cs.primary,
+                    modifier = Modifier.clickable { permLauncher.launch(audioPerm) }
+                ) {
+                    Text(
+                        "Conceder permiso de audio", style = Ds.Body, color = cs.onPrimary,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    shape = CircleShape, color = cs.surface,
+                    modifier = Modifier
+                        .border(1.dp, cs.outline.copy(alpha = 0.6f), CircleShape)
+                        .clickable { openAppSettings(ctx) }
+                ) {
+                    Text(
+                        "Abrir ajustes de la app", style = Ds.Sub, color = cs.onBackground,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "¿Tu música está en una carpeta concreta? Elige la carpeta desde Biblioteca, en el menú de arriba.",
+                    style = Ds.Sub, color = cs.onSurfaceVariant, textAlign = TextAlign.Center
+                )
             }
         }
         return
@@ -1324,62 +1398,111 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     LaunchedEffect(tapMsg) { if (tapMsg != null) { kotlinx.coroutines.delay(900); tapMsg = null } }
     if (showQueue) QueueSheet(vm, onDismiss = { showQueue = false })
     if (showPitch) PitchSheet(vm, state.pitch, state.speed, onDismiss = { showPitch = false })
-    Column(Modifier.fillMaxSize().background(cs.background).statusBarsPadding().navigationBarsPadding().padding(20.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(28.dp), tint = cs.onBackground) }
-            Spacer(Modifier.weight(1f))
-            MicroLabel("Ahora suena")
-            Spacer(Modifier.weight(1f))
-            if (isStream && curTrack != null) {
-                val prog = dlMap[curTrack!!.id]
-                if (prog != null) {
-                    Text(
-                        "${(prog * 100).toInt()}%", style = Ds.Sub, color = cs.primary,
-                        modifier = Modifier.padding(horizontal = 12.dp)
+    BoxWithConstraints(Modifier.fillMaxSize().background(cs.background)) {
+        // Fondo teñido con la carátula actual (color dinámico, sin costo)
+        val bgModel = songArtModel(s.albumId, s.artUrl)
+        if (bgModel != null) {
+            AsyncImage(
+                model = bgModel, contentDescription = null,
+                contentScale = ContentScale.Crop, alpha = 0.16f,
+                modifier = Modifier.fillMaxSize().blur(60.dp)
+            )
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        listOf(
+                            cs.background.copy(alpha = 0.45f),
+                            cs.background.copy(alpha = 0.72f),
+                            cs.background.copy(alpha = 0.94f)
+                        )
                     )
-                } else {
-                    IconButton(onClick = { vm.downloadYt(curTrack!!) }) {
-                        Icon(Icons.Default.Download, "Descargar", tint = cs.onBackground)
+                )
+            )
+        } else {
+            DsBackground()
+        }
+        // La carátula se adapta a la pantalla: en móviles pequeños no se cortan los controles
+        // (el factor ya descuenta barras del sistema y el bloque de controles)
+        val artSize = minOf(maxWidth - 56.dp, maxHeight * 0.34f).coerceIn(170.dp, 330.dp)
+        val dlProg = if (isStream) curTrack?.let { dlMap[it.id] } else null
+        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
+            Box(Modifier.fillMaxWidth()) {
+                MicroLabel("Ahora suena", Modifier.align(Alignment.Center))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(26.dp), tint = cs.onBackground)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (dlProg != null) {
+                            Surface(shape = CircleShape, color = cs.primary.copy(alpha = 0.16f)) {
+                                Text(
+                                    "${(dlProg * 100).toInt()}%", style = Ds.Sub, color = cs.primary,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        IconButton(onClick = { if (!isStream) vm.toggleFav(s.id) }, modifier = Modifier.size(40.dp)) {
+                            Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onBackground)
+                        }
+                        var npMenu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { npMenu = true }, modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Default.MoreVert, "Más opciones", tint = cs.onBackground)
+                            }
+                            DropdownMenu(expanded = npMenu, onDismissRequest = { npMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Cola de reproducción") },
+                                    leadingIcon = { Icon(Icons.Default.QueueMusic, null) },
+                                    onClick = { npMenu = false; showQueue = true }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (state.pitch != 1f || state.speed != 1f) "Tono y velocidad · activo" else "Tono y velocidad") },
+                                    leadingIcon = { Icon(Icons.Default.Tune, null) },
+                                    onClick = { npMenu = false; showPitch = true }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (autoMode) "Modo auto · activado" else "Modo auto") },
+                                    leadingIcon = { Icon(Icons.Default.DirectionsCar, null) },
+                                    onClick = { npMenu = false; autoMode = !autoMode }
+                                )
+                                if (isStream && curTrack != null && dlProg == null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Descargar audio") },
+                                        leadingIcon = { Icon(Icons.Default.Download, null) },
+                                        onClick = { npMenu = false; vm.downloadYt(curTrack!!) }
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text("Añadir a playlist") },
+                                    leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) },
+                                    onClick = { npMenu = false; onAdd() }
+                                )
+                            }
+                        }
                     }
                 }
-            } else {
-                IconButton(onClick = { autoMode = !autoMode }) {
-                    Icon(
-                        Icons.Default.DirectionsCar, "Modo auto",
-                        tint = if (autoMode) cs.primary else cs.onBackground
-                    )
-                }
-                IconButton(onClick = { showQueue = true }) {
-                    Icon(Icons.Default.QueueMusic, "Cola", tint = cs.onBackground)
-                }
-                IconButton(onClick = { showPitch = true }) {
-                    Icon(
-                        Icons.Default.Tune, "Tono y velocidad",
-                        tint = if (state.pitch != 1f || state.speed != 1f) cs.primary else cs.onBackground
-                    )
-                }
-                IconButton(onClick = { if (!isStream) vm.toggleFav(s.id) }) {
-                    Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onBackground)
-                }
-                IconButton(onClick = onAdd) { Icon(Icons.Default.PlaylistAdd, null, tint = cs.onBackground) }
             }
-        }
-        Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(10.dp))
         AnimatedContent(
             targetState = s.id, label = "nowplaying",
             transitionSpec = { (fadeIn() + slideInVertically { it / 4 } + scaleIn(initialScale = 0.94f)) togetherWith (fadeOut() + slideOutVertically { -it / 4 } + scaleOut(targetScale = 0.94f)) },
             modifier = Modifier.align(Alignment.CenterHorizontally)
         ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(300.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(artSize), contentAlignment = Alignment.Center) {
             // Sombra ambiental del acento: la carátula flota sobre el fondo
             Surface(
-                shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(300.dp)
+                shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(artSize)
                     .shadow(28.dp, Ds.HeroShape, spotColor = cs.primary.copy(alpha = 0.28f))
             ) {
                 SongArt(
-                    albumId = s.albumId, size = 300.dp, shape = Ds.HeroShape,
-                    iconSize = 110.dp, artUrl = s.artUrl
+                    albumId = s.albumId, size = artSize, shape = Ds.HeroShape,
+                    iconSize = artSize * 0.36f, artUrl = s.artUrl
                 )
             }
             // Doble toque: izquierda −10 s, derecha +10 s
@@ -1397,10 +1520,10 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                 }
             }
         }
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(18.dp))
         Text(s.title, style = if (autoMode) Ds.Display.copy(fontSize = 26.sp) else Ds.Display, color = cs.onBackground, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE))
         Text("${s.artist} · ${s.album.ifBlank { "Sencillo" }}", style = Ds.Body, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         Surface(
             shape = RoundedCornerShape(14.dp), color = cs.surfaceVariant,
             modifier = Modifier.clickable { onLyrics() }
@@ -1412,7 +1535,9 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         }
         }
         }
-        Spacer(Modifier.height(16.dp))
+        // Espacio flexible: absorbe la altura sobrante y evita que se corten los controles
+        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(6.dp))
         var dragging by remember { mutableStateOf(false) }
         var dragPos by remember { mutableStateOf(0f) }
         val basePos = if (dragging) dragPos else state.progress
@@ -1448,6 +1573,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                 val icon = when (state.repeatMode) { 2 -> Icons.Default.RepeatOne; 1 -> Icons.Default.Repeat; else -> Icons.Default.Repeat }
                 Icon(icon, null, tint = if (state.repeatMode != 0) cs.primary else cs.onSurfaceVariant)
             }
+        }
         }
     }
 }

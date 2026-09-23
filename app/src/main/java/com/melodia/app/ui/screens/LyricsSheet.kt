@@ -122,14 +122,19 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
                     Modifier.fillMaxWidth().padding(vertical = 48.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Sin letra disponible 😕", style = Ds.Body, color = cs.onSurfaceVariant)
-                    Spacer(Modifier.height(12.dp))
+                    Text("Sin letra para este tema", style = Ds.Title, color = cs.onBackground)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "No está en la base pública de letras. Puedes reintentar más tarde.",
+                        style = Ds.Sub, color = cs.onSurfaceVariant, textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(16.dp))
                     Surface(
                         shape = RoundedCornerShape(12.dp), color = cs.primary,
                         modifier = Modifier.clickable { vm.retryLyrics() }
                     ) {
                         Text(
-                            "Reintentar", style = Ds.Body, color = cs.surface,
+                            "Reintentar", style = Ds.Body, color = cs.onPrimary,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
                         )
                     }
