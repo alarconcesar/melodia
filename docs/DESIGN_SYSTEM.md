@@ -43,10 +43,25 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
   tap = play, long-press = ficha. Barras de EQ animadas si suena.
 - **HeroCard** — "Seguir escuchando", FAB verde 72dp, borde hairline.
 - **QuickCard** — grid 2 col (Favoritos / Aleatorio / Recientes / Artistas).
-- **MelodiaPillNav** — barra flotante translúcida (80%) + borde + sombra,
-  4 tabs fijos (layout estable, sin saltos).
-- **MiniPlayerDs** — flotante sobre la nav, progreso de 2dp.
-- **DsBackground** — degradado + glows (único fondo de la app).
+- **MelodiaPillNav** — barra flotante translúcida (78%) + borde + sombra,
+  5 tabs fijos (layout estable, sin saltos). **Sin punto indicador**: el
+  estado seleccionado ya lo dicen el fondo pill + acento + escala del icono.
+- **MiniPlayerDs** — flotante, apoyado **justo encima** de la nav: su margen
+  inferior se calcula del alto real de la nav (`onGloballyPositioned`), nunca
+  la tapa ni en gestos ni en navegación de 3 botones.
+- **NowPlaying** — `BoxWithConstraints`: la carátula escala con la pantalla
+  (`min(ancho−56dp, alto×0.34)` clamp 170–330dp) y un espaciador con `weight(1f)`
+  absorbe el sobrante → los controles nunca se cortan. Fondo teñido con la
+  carátula (alpha 0.16 + degradado + `blur(60dp)` en Android 12+).
+  Fila superior: cerrar · etiqueta centrada · ♥ · **⋮** (cola, tono y
+  velocidad, modo auto, descargar, añadir a playlist).
+- **Cabecera** — compacta (logo 34dp + saludo + Melodia) y el buscador global
+  **solo aparece en Inicio/Explorar** (o si hay una búsqueda activa); el resto
+  de secciones gana ~60dp de contenido.
+- **Estado vacío de Inicio** — icono en círculo + botón *Conceder permiso de
+  audio* (lanzador real) + *Abrir ajustes de la app*: nunca solo texto.
+- **DsBackground** — degradado + glows (fondo por defecto; el player usa el
+  tinte de la carátula).
 - **TrackInfoSheet / EqSheet** — diálogos con scroll, colores explícitos.
 
 ## 📏 Reglas duras (aprende de nuestros bugs)
