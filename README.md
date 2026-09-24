@@ -22,6 +22,8 @@ sin Hilt: arranque estable con DI manual.
 | 📄 Ficha del tema | Long-press: duración, álbum, carpeta, fecha y **ruta completa** + acciones |
 | ↩️ Back por capas | Player → detalle → filtro → salir |
 | 🌗 Tema | Claro / oscuro / sistema, dark-first verdoso |
+| ⚙️ Ajustes | Pantalla propia: apariencia (tema + acento), reproducción, biblioteca, datos |
+| 👉 Gestos | Deslizar una fila: derecha = encolar, izquierda = favorito |
 | ▶️ Player | Play/pause/next/prev, shuffle, repeat (off/all/one), seek con preview, MediaSession |
 
 ## 🧱 Stack (versiones fijadas y probadas)

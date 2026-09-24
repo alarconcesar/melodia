@@ -93,6 +93,7 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Tune
@@ -146,6 +147,7 @@ import com.melodia.app.SortMode
 import com.melodia.app.data.model.Song
 import com.melodia.app.ui.ds.DsBackground
 import com.melodia.app.ui.ds.HeroCard
+import com.melodia.app.ui.ds.HomeSkeleton
 import com.melodia.app.ui.ds.MelodiaPillNav
 import com.melodia.app.ui.ds.MicroLabel
 import com.melodia.app.ui.ds.MiniPlayerDs
@@ -173,6 +175,10 @@ private fun greeting(): String {
         in 12..20 -> "Buenas tardes"
         else -> "Buenas noches"
     }
+}
+
+private fun toast(ctx: android.content.Context, msg: String) {
+    try { android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show() } catch (_: Exception) {}
 }
 
 /** Abre la pantalla de ajustes de la app (para permisos denegados). */
@@ -214,7 +220,7 @@ fun MelodiaScreen(vm: MainViewModel) {
     val sleepLeft by vm.sleep.minsLeft.collectAsState()
     var showPlayer by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
-    var showAccent by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     var showCreate by remember { mutableStateOf(false) }
     var showAddTo by remember { mutableStateOf<Song?>(null) }
     var showSort by remember { mutableStateOf(false) }
@@ -285,8 +291,10 @@ fun MelodiaScreen(vm: MainViewModel) {
         )
     }
 
-    // ── Back Android por capas: letra → player → detalle → filtro → salir ──
-    if (showLyrics) {
+    // ── Back Android por capas: ajustes → letra → player → detalle → filtro → salir ──
+    if (showSettings) {
+        BackHandler { showSettings = false }
+    } else if (showLyrics) {
         BackHandler { showLyrics = false }
     } else if (showPlayer) {
         BackHandler { showPlayer = false }
@@ -318,55 +326,8 @@ fun MelodiaScreen(vm: MainViewModel) {
                     label = { Text("${sleepLeft}m") },
                     leadingIcon = { Icon(Icons.Default.Timer, null, Modifier.size(14.dp)) }
                 )
-                var showMenu by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null, tint = cs.onBackground) }
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Ecualizador") },
-                            leadingIcon = { Icon(Icons.Default.Equalizer, null) },
-                            onClick = { showMenu = false; showEq = true }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(if (sleepLeft != null) "Temporizador (${sleepLeft}m)" else "Temporizador") },
-                            leadingIcon = { Icon(Icons.Default.Timer, null) },
-                            onClick = { showMenu = false; showSleep = true }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(if (isDarkMode != false) "Modo claro" else "Modo oscuro") },
-                            leadingIcon = { Icon(Icons.Default.DarkMode, null) },
-                            onClick = {
-                                showMenu = false
-                                isDarkMode = if (isDarkMode == null) false else !(isDarkMode!!)
-                                saveUiPrefs(appCtx)
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(if (state.crossfade) "Fundido: activado" else "Fundido entre canciones") },
-                            leadingIcon = { Icon(Icons.Default.VolumeUp, null) },
-                            onClick = { showMenu = false; showXfade = true }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Color de acento") },
-                            leadingIcon = { Icon(Icons.Default.Palette, null) },
-                            onClick = { showMenu = false; showAccent = true }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Mis estadísticas") },
-                            leadingIcon = { Icon(Icons.Default.Assessment, null) },
-                            onClick = { showMenu = false; showStats = true }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Biblioteca") },
-                            leadingIcon = { Icon(Icons.Default.Folder, null) },
-                            onClick = { showMenu = false; showLib = true }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Respaldo") },
-                            leadingIcon = { Icon(Icons.Default.Save, null) },
-                            onClick = { showMenu = false; showBackup = true }
-                        )
-                    }
+                IconButton(onClick = { showSettings = true }) {
+                    Icon(Icons.Default.Settings, "Ajustes", tint = cs.onBackground)
                 }
             }
             // ── Search: solo donde filtra (Inicio / Explorar), el resto gana espacio ──
@@ -446,7 +407,8 @@ fun MelodiaScreen(vm: MainViewModel) {
                             onRemove = { sid -> vm.removeFromPlaylist(openPid!!, sid) })
                     }
                     3 -> FavsTab(favSongs, current?.id, state.isPlaying, favIds,
-                        onPlayAt = { vm.playFavAt(it) }, onFav = { vm.toggleFav(it) }, onAdd = { showInfo = it })
+                        onPlayAt = { vm.playFavAt(it) }, onFav = { vm.toggleFav(it) }, onAdd = { showInfo = it },
+                        onQueue = { s -> vm.queueEnd(s.id) { ok -> toast(appCtx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
                     else -> OnlineTab(vm)
                 }
                 }
@@ -525,10 +487,34 @@ fun MelodiaScreen(vm: MainViewModel) {
                 current?.let { s -> LyricsSheet(s, vm, onClose = { showLyrics = false }) }
             }
         }
+        // ── Ajustes: pantalla propia, entra desde la derecha ──
+        AnimatedVisibility(
+            visible = showSettings,
+            enter = slideInHorizontally(tween(300)) { it } + fadeIn(tween(180)),
+            exit = slideOutHorizontally(tween(240)) { it } + fadeOut(tween(160)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                Modifier.fillMaxSize()
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {}
+            ) {
+                SettingsScreen(
+                    vm = vm,
+                    onClose = { showSettings = false },
+                    onOpenEq = { showEq = true },
+                    onOpenLibrary = { showLib = true },
+                    onOpenBackup = { showBackup = true },
+                    onOpenCrossfade = { showXfade = true },
+                    onOpenStats = { showStats = true }
+                )
+            }
+        }
     }
 
     if (showCreate) TextDialog("Nueva playlist", "", onDismiss = { showCreate = false }) { vm.createPlaylist(it) { showCreate = false } }
-    if (showAccent) AccentDialog(onDismiss = { showAccent = false })
     renameId?.let { pid ->
         TextDialog("Renombrar", playlists.find { it.id == pid }?.name ?: "", onDismiss = { renameId = null }) {
             vm.renamePlaylist(pid, it); renameId = null
@@ -657,9 +643,14 @@ fun HomeTab(
     val current by vm.currentSong.collectAsState()
     val state by vm.playerState.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
+    val loaded by vm.loaded.collectAsState()
+    val ctx = LocalContext.current.applicationContext
+    if (all.isEmpty() && !loaded) {
+        HomeSkeleton()
+        return
+    }
     if (all.isEmpty()) {
         // Estado vacío accionable: antes solo pedía el permiso con texto, sin botón
-        val ctx = LocalContext.current
         val audioPerm =
             if (android.os.Build.VERSION.SDK_INT >= 33) android.Manifest.permission.READ_MEDIA_AUDIO
             else android.Manifest.permission.READ_EXTERNAL_STORAGE
@@ -823,6 +814,52 @@ fun HomeTab(
                 }
             }
         }
+        item {
+            val albums by vm.albums.collectAsState()
+            val shown = remember(albums) { albums.sortedByDescending { it.count }.take(14) }
+            if (shown.isNotEmpty()) {
+                Column(Modifier.padding(vertical = 4.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Tus álbumes", style = Ds.Title, color = cs.onBackground, modifier = Modifier.weight(1f))
+                        Text(
+                            "Ver todos", style = Ds.Sub, color = cs.primary,
+                            modifier = Modifier.clickable { onTab(1) }.padding(4.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp)
+                    ) {
+                        items(shown, key = { "${it.name}|${it.artist}" }) { a ->
+                            Column(
+                                Modifier.width(138.dp).clickable {
+                                    vm.setQuery(""); vm.setAlbum(a.name); onTab(1)
+                                }
+                            ) {
+                                SongArt(
+                                    albumId = a.artId, size = 138.dp, shape = RoundedCornerShape(Ds.RCard),
+                                    iconSize = 34.dp
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    a.name, style = Ds.Body, color = cs.onBackground,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    a.artist.ifBlank { "Varios artistas" }, style = Ds.Sub,
+                                    color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        }
         item { SectionHeader("Tus temas", "${songs.size}") }
         if (songs.isEmpty()) {
             item {
@@ -833,7 +870,8 @@ fun HomeTab(
         } else {
             items(songs, key = { it.id }) { s ->
                 TrackRow(s, s.id == currentId && playing, favs.contains(s.id),
-                    onTap = { vm.playSong(s.id) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) })
+                    onTap = { vm.playSong(s.id) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) },
+                    onQueue = { vm.queueEnd(s.id) { ok -> toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
             }
         }
     }
@@ -851,6 +889,7 @@ fun ExploreTab(
     currentId: Long?, playing: Boolean, favs: Set<Long>, onAdd: (Song) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
+    val ctx = LocalContext.current.applicationContext
     var seg by remember { mutableStateOf(0) }
     var artistDetail by remember { mutableStateOf<String?>(null) }
     var albumDetail by remember { mutableStateOf<String?>(null) }
@@ -869,7 +908,8 @@ fun ExploreTab(
                 onBack = { artistDetail = null },
                 onPlay = { vm.playArtist(aName) }, onShuffle = { vm.shuffleArtist(aName) },
                 onTap = { vm.playListAt(mine, mine.indexOfFirst { s -> s.id == it }.takeIf { i -> i >= 0 } ?: 0) },
-                onFav = { vm.toggleFav(it) }, onLongPress = onAdd
+                onFav = { vm.toggleFav(it) }, onLongPress = onAdd,
+                onQueue = { vm.queueEnd(it.id) { ok -> toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } }
             )
             return
         }
@@ -884,7 +924,8 @@ fun ExploreTab(
                 onBack = { albumDetail = null },
                 onPlay = { vm.playAlbum(alName) }, onShuffle = { vm.shuffleAlbum(alName) },
                 onTap = { vm.playListAt(mine, mine.indexOfFirst { s -> s.id == it }.takeIf { i -> i >= 0 } ?: 0) },
-                onFav = { vm.toggleFav(it) }, onLongPress = onAdd
+                onFav = { vm.toggleFav(it) }, onLongPress = onAdd,
+                onQueue = { vm.queueEnd(it.id) { ok -> toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } }
             )
             return
         }
@@ -901,7 +942,8 @@ fun ExploreTab(
             }
             items(songs, key = { it.id }) { s ->
                 TrackRow(s, s.id == currentId && playing, favs.contains(s.id),
-                    onTap = { vm.playSong(s.id) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) })
+                    onTap = { vm.playSong(s.id) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) },
+                    onQueue = { vm.queueEnd(s.id) { ok -> toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
             }
         } else {
             item {
@@ -1033,7 +1075,8 @@ private fun ArtistDetail(
     name: String, songs: List<Song>,
     currentId: Long?, playing: Boolean, favs: Set<Long>,
     onBack: () -> Unit, onPlay: () -> Unit, onShuffle: () -> Unit,
-    onTap: (Long) -> Unit, onFav: (Long) -> Unit, onLongPress: (Song) -> Unit
+    onTap: (Long) -> Unit, onFav: (Long) -> Unit, onLongPress: (Song) -> Unit,
+    onQueue: ((Song) -> Unit)? = null
 ) {
     val cs = MaterialTheme.colorScheme
     val artId = remember(songs) { songs.firstOrNull { it.albumId > 0 }?.albumId ?: 0L }
@@ -1054,7 +1097,8 @@ private fun ArtistDetail(
         }
         items(songs, key = { it.id }) { s ->
             TrackRow(s, s.id == currentId && playing, favs.contains(s.id),
-                onTap = { onTap(s.id) }, onFav = { onFav(s.id) }, onLongPress = { onLongPress(s) })
+                onTap = { onTap(s.id) }, onFav = { onFav(s.id) }, onLongPress = { onLongPress(s) },
+                onQueue = onQueue?.let { q -> { q(s) } })
         }
     }
 }
@@ -1064,7 +1108,8 @@ private fun AlbumDetail(
     album: com.melodia.app.data.Album?, name: String, songs: List<Song>,
     currentId: Long?, playing: Boolean, favs: Set<Long>,
     onBack: () -> Unit, onPlay: () -> Unit, onShuffle: () -> Unit,
-    onTap: (Long) -> Unit, onFav: (Long) -> Unit, onLongPress: (Song) -> Unit
+    onTap: (Long) -> Unit, onFav: (Long) -> Unit, onLongPress: (Song) -> Unit,
+    onQueue: ((Song) -> Unit)? = null
 ) {
     val cs = MaterialTheme.colorScheme
     val artId = album?.artId ?: songs.firstOrNull { it.albumId > 0 }?.albumId ?: 0L
@@ -1086,7 +1131,8 @@ private fun AlbumDetail(
         }
         items(songs, key = { it.id }) { s ->
             TrackRow(s, s.id == currentId && playing, favs.contains(s.id),
-                onTap = { onTap(s.id) }, onFav = { onFav(s.id) }, onLongPress = { onLongPress(s) })
+                onTap = { onTap(s.id) }, onFav = { onFav(s.id) }, onLongPress = { onLongPress(s) },
+                onQueue = onQueue?.let { q -> { q(s) } })
         }
     }
 }
@@ -1343,7 +1389,8 @@ fun PlaylistDetail(
 @Composable
 fun FavsTab(
     favSongs: List<Song>, currentId: Long?, playing: Boolean, favs: Set<Long>,
-    onPlayAt: (Int) -> Unit, onFav: (Long) -> Unit, onAdd: (Song) -> Unit
+    onPlayAt: (Int) -> Unit, onFav: (Long) -> Unit, onAdd: (Song) -> Unit,
+    onQueue: ((Song) -> Unit)? = null
 ) {
     val cs = MaterialTheme.colorScheme
     if (favSongs.isEmpty()) {
@@ -1359,7 +1406,8 @@ fun FavsTab(
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 200.dp)) {
             itemsIndexed(favSongs, key = { _, s -> s.id }) { idx, s ->
                 TrackRow(s, s.id == currentId && playing, true,
-                    onTap = { onPlayAt(idx) }, onFav = { onFav(s.id) }, onLongPress = { onAdd(s) })
+                    onTap = { onPlayAt(idx) }, onFav = { onFav(s.id) }, onLongPress = { onAdd(s) },
+                    onQueue = onQueue?.let { q -> { q(s) } })
             }
         }
     }
@@ -2187,44 +2235,8 @@ fun InfoRow(label: String, value: String) {
     }
 }
 
-// ── Diálogo de color de acento ─────────────────────────────────────
-@Composable
-fun AccentDialog(onDismiss: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    val ctx = LocalContext.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Color de acento", color = cs.onBackground) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Accents.forEach { a ->
-                    val sel = accentName == a.name
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                accentName = a.name
-                                saveUiPrefs(ctx)
-                                onDismiss()
-                            }
-                            .padding(vertical = 10.dp, horizontal = 4.dp)
-                    ) {
-                        Box(
-                            Modifier.size(24.dp).clip(CircleShape)
-                                .background(a.dark)
-                                .border(1.dp, cs.outline, CircleShape)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(a.name, style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f))
-                        if (sel) Icon(Icons.Default.Check, null, tint = cs.primary, modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } }
-    )
-}
+// ── Diálogo de color de acento (ahora vive dentro de Ajustes) ─────
+// Se mantiene por si se necesita como diálogo suelto en el futuro.
 
 @Composable
 fun TextDialog(title: String, initial: String, onDismiss: () -> Unit, onOk: (String) -> Unit) {

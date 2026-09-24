@@ -4,8 +4,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -27,6 +29,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,10 +40,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
@@ -48,6 +55,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -59,6 +67,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,13 +76,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.ContentUris
 import android.provider.MediaStore
 import coil.compose.AsyncImage
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import com.melodia.app.data.model.Song
 import com.melodia.app.ui.screens.fmt
 import com.melodia.app.ui.theme.Ds
@@ -190,6 +203,7 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
 
 // ── TrackRow DS · UN solo corazón ────────────────────────────────
 // Tap = reproducir · long-press = añadir a playlist
+// Deslizar → derecha encola al final · izquierda marca favorito
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackRow(
@@ -198,15 +212,69 @@ fun TrackRow(
     isFav: Boolean,
     onTap: () -> Unit,
     onFav: () -> Unit,
-    onLongPress: () -> Unit
+    onLongPress: () -> Unit,
+    onQueue: (() -> Unit)? = null
 ) {
     val cs = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier.fillMaxWidth()
-            .combinedClickable(onClick = onTap, onLongClick = onLongPress)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    val scope = rememberCoroutineScope()
+    val offset = remember { Animatable(0f) }
+    val maxSwipe = with(LocalDensity.current) { 140.dp.toPx() }
+    val threshold = maxSwipe * 0.5f
+    Box(Modifier.fillMaxWidth()) {
+        // Franja de acción: solo se pinta lo que el deslizamiento va descubriendo
+        Canvas(Modifier.matchParentSize()) {
+            val v = offset.value
+            val a = (kotlin.math.abs(v) / maxSwipe).coerceIn(0f, 1f) * 0.18f
+            if (v > 0f) {
+                drawRect(
+                    color = cs.primary.copy(alpha = a),
+                    size = androidx.compose.ui.geometry.Size(v, size.height)
+                )
+            } else if (v < 0f) {
+                drawRect(
+                    color = cs.primary.copy(alpha = a),
+                    topLeft = androidx.compose.ui.geometry.Offset(size.width + v, 0f),
+                    size = androidx.compose.ui.geometry.Size(-v, size.height)
+                )
+            }
+        }
+        Box(Modifier.matchParentSize()) {
+            val leftA = (offset.value / maxSwipe).coerceIn(0f, 1f)
+            val rightA = (-offset.value / maxSwipe).coerceIn(0f, 1f)
+            if (onQueue != null) Icon(
+                Icons.Default.PlaylistAdd, null,
+                tint = cs.primary, modifier = Modifier.align(Alignment.CenterStart)
+                    .padding(start = 20.dp).size(20.dp)
+                    .graphicsLayer { alpha = leftA }
+            )
+            Icon(
+                if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null,
+                tint = cs.primary, modifier = Modifier.align(Alignment.CenterEnd)
+                    .padding(end = 20.dp).size(20.dp)
+                    .graphicsLayer { alpha = rightA }
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .offset { IntOffset(offset.value.roundToInt(), 0) }
+                .draggable(
+                    state = rememberDraggableState { d ->
+                        scope.launch {
+                            offset.snapTo((offset.value + d).coerceIn(-maxSwipe, maxSwipe))
+                        }
+                    },
+                    orientation = Orientation.Horizontal,
+                    onDragStopped = {
+                        val v = offset.value
+                        if (v >= threshold && onQueue != null) onQueue()
+                        else if (v <= -threshold) onFav()
+                        offset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                    }
+                )
+                .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         SongArt(
             albumId = s.albumId, size = Ds.ArtRow, shape = Ds.RowShape,
             iconSize = 24.dp, active = active, artUrl = s.artUrl
@@ -228,6 +296,50 @@ fun TrackRow(
                 tint = if (isFav) cs.primary else cs.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
+        }
+        }
+    }
+}
+
+// ── Esqueleto de carga (mientras se lee la biblioteca) ───────────
+@Composable
+fun SkeletonBlock(modifier: Modifier = Modifier, shape: Shape = RoundedCornerShape(8.dp)) {
+    val cs = MaterialTheme.colorScheme
+    val t = rememberInfiniteTransition(label = "sk")
+    val a by t.animateFloat(
+        initialValue = 0.10f, targetValue = 0.22f,
+        animationSpec = infiniteRepeatable(tween(950, easing = LinearEasing), RepeatMode.Reverse),
+        label = "ska"
+    )
+    Box(modifier.clip(shape).background(cs.onSurfaceVariant.copy(alpha = a)))
+}
+
+/** Silueta de Inicio: evita el parpadeo de "biblioteca vacía" al abrir la app. */
+@Composable
+fun HomeSkeleton(modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        SkeletonBlock(Modifier.fillMaxWidth().height(150.dp), Ds.HeroShape)
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SkeletonBlock(Modifier.weight(1f).height(92.dp), Ds.CardShape)
+            SkeletonBlock(Modifier.weight(1f).height(92.dp), Ds.CardShape)
+        }
+        Spacer(Modifier.height(22.dp))
+        SkeletonBlock(Modifier.width(150.dp).height(18.dp), RoundedCornerShape(6.dp))
+        Spacer(Modifier.height(10.dp))
+        repeat(5) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            ) {
+                SkeletonBlock(Modifier.size(56.dp), Ds.RowShape)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    SkeletonBlock(Modifier.fillMaxWidth(0.7f).height(14.dp), RoundedCornerShape(6.dp))
+                    Spacer(Modifier.height(8.dp))
+                    SkeletonBlock(Modifier.fillMaxWidth(0.45f).height(11.dp), RoundedCornerShape(6.dp))
+                }
+            }
         }
     }
 }

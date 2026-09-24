@@ -93,11 +93,16 @@ class MainViewModel(
 
     private val _reload = MutableStateFlow(0)
 
+    /** false hasta la primera lectura real de la biblioteca (evita parpadeo de "vacío"). */
+    private val _loaded = MutableStateFlow(false)
+    val loaded: StateFlow<Boolean> = _loaded
+
     init {
         viewModelScope.launch {
             _reload.flatMapLatest { repo.loadAllSongs() }.collect { list ->
                 player.setQueue(list)
                 _songs.value = list
+                _loaded.value = true
                 enrichArtwork(list)
             }
         }

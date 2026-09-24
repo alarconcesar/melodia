@@ -25,7 +25,8 @@ data class PlayerState(
     val currentId: Long = -1L,
     val pitch: Float = 1f,
     val speed: Float = 1f,
-    val crossfade: Boolean = false
+    val crossfade: Boolean = false,
+    val crossfadeSecs: Int = 3
 )
 
 /** ID virtual del tema que suena desde Online (no existe en la biblioteca). */
@@ -130,8 +131,15 @@ class MusicPlayer(private val context: Context) {
     /** Inserta un tema local en la posición indicada de la cola. */
     private fun insertAt(id: Long, index: Int): Boolean {
         return try {
-            val p = exo ?: return false
             val s = songMap[id] ?: return false
+            val p = exo
+            if (p == null) {
+                // Nadie ha reproducido todavía: la cola se aplica al conectar el servicio
+                val prev = pending
+                pending = { prev?.invoke(); try { insertAt(id, index) } catch (_: Exception) {} }
+                ensureBound()
+                return true
+            }
             val idx = index.coerceIn(0, queueIds.size)
             queueIds.add(idx, id)
             p.addMediaItem(idx.coerceAtMost(p.mediaItemCount), buildItem(s))
@@ -230,6 +238,7 @@ class MusicPlayer(private val context: Context) {
     fun setCrossfadeSecs(s: Int) {
         crossfadeSecs = s.coerceIn(1, 12)
         prefs.edit().putInt("xfade_secs", crossfadeSecs).apply()
+        updateState()
     }
 
     private fun rampVolume(to: Float, ms: Long, then: (() -> Unit)? = null) {
@@ -310,7 +319,7 @@ class MusicPlayer(private val context: Context) {
                 shuffle = p.shuffleModeEnabled, repeatMode = p.repeatMode,
                 currentIndex = p.currentMediaItemIndex,
                 currentId = queueIds.getOrNull(p.currentMediaItemIndex) ?: -1L,
-                pitch = pitch, speed = speed, crossfade = crossfade
+                pitch = pitch, speed = speed, crossfade = crossfade, crossfadeSecs = crossfadeSecs
             )
         } catch (_: Exception) {}
     }

@@ -40,7 +40,10 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
 ## 🧩 Componentes
 
 - **TrackRow** — art 56dp, título + artista·duración, **un corazón**,
-  tap = play, long-press = ficha. Barras de EQ animadas si suena.
+  tap = play, long-press = ficha, **deslizar** → derecha encola al final /
+  izquierda alterna favorito (franja de acción que se dibuja solo en lo
+  descubierto, icono con alfa en fase de dibujo: cero recomposición al arrastrar).
+  Barras de EQ animadas si suena.
 - **HeroCard** — "Seguir escuchando", FAB verde 72dp, borde hairline.
 - **QuickCard** — grid 2 col (Favoritos / Aleatorio / Recientes / Artistas).
 - **MelodiaPillNav** — barra flotante translúcida (78%) + borde + sombra,
@@ -62,6 +65,15 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
   audio* (lanzador real) + *Abrir ajustes de la app*: nunca solo texto.
 - **DsBackground** — degradado + glows (fondo por defecto; el player usa el
   tinte de la carátula).
+- **SettingsScreen** — pantalla propia (entra desde la derecha, con `BackHandler`):
+  Apariencia (tema claro/oscuro/sistema + acento en línea), Reproducción
+  (fundido, EQ, temporizador), Biblioteca (carpetas, estadísticas, respaldo),
+  Datos (calidad y ahorro) e Información (versión y privacidad). Reemplaza el
+  menú de 8 opciones; el encabezado queda con un solo engranaje.
+- **HomeSkeleton** — silueta con pulso suave mientras se lee MediaStore
+  (`vm.loaded`), para no mostrar "biblioteca vacía" durante el arranque.
+- **Carrusel "Tus álbumes"** en Inicio — tarjetas de 138dp ordenadas por
+  cantidad de temas; tocar aplica el filtro de álbum en Explorar.
 - **TrackInfoSheet / EqSheet** — diálogos con scroll, colores explícitos.
 
 ## 📏 Reglas duras (aprende de nuestros bugs)
