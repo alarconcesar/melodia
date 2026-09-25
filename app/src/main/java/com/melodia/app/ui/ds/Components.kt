@@ -76,6 +76,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -88,6 +89,7 @@ import coil.compose.AsyncImage
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import com.melodia.app.data.model.Song
+import com.melodia.app.SafeMode
 import com.melodia.app.ui.screens.fmt
 import com.melodia.app.ui.theme.Ds
 
@@ -217,12 +219,14 @@ fun TrackRow(
 ) {
     val cs = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
+    val rowCtx = LocalContext.current.applicationContext
+    val safeGestures = remember { SafeMode.isOn(rowCtx, SafeMode.NO_EXTRAS) }
     val offset = remember { Animatable(0f) }
     val maxSwipe = with(LocalDensity.current) { 140.dp.toPx() }
     val threshold = maxSwipe * 0.5f
     Box(Modifier.fillMaxWidth()) {
         // Franja de acción: solo se pinta lo que el deslizamiento va descubriendo
-        Canvas(Modifier.matchParentSize()) {
+        if (!safeGestures) Canvas(Modifier.matchParentSize()) {
             val v = offset.value
             val a = (kotlin.math.abs(v) / maxSwipe).coerceIn(0f, 1f) * 0.18f
             if (v > 0f) {
@@ -238,7 +242,7 @@ fun TrackRow(
                 )
             }
         }
-        Box(Modifier.matchParentSize()) {
+        if (!safeGestures) Box(Modifier.matchParentSize()) {
             val leftA = (offset.value / maxSwipe).coerceIn(0f, 1f)
             val rightA = (-offset.value / maxSwipe).coerceIn(0f, 1f)
             if (onQueue != null) Icon(
@@ -257,19 +261,21 @@ fun TrackRow(
         Row(
             modifier = Modifier.fillMaxWidth()
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
-                .draggable(
-                    state = rememberDraggableState { d ->
-                        scope.launch {
-                            offset.snapTo((offset.value + d).coerceIn(-maxSwipe, maxSwipe))
+                .then(
+                    if (safeGestures) Modifier else Modifier.draggable(
+                        state = rememberDraggableState { d ->
+                            scope.launch {
+                                offset.snapTo((offset.value + d).coerceIn(-maxSwipe, maxSwipe))
+                            }
+                        },
+                        orientation = Orientation.Horizontal,
+                        onDragStopped = {
+                            val v = offset.value
+                            if (v >= threshold && onQueue != null) onQueue()
+                            else if (v <= -threshold) onFav()
+                            offset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
                         }
-                    },
-                    orientation = Orientation.Horizontal,
-                    onDragStopped = {
-                        val v = offset.value
-                        if (v >= threshold && onQueue != null) onQueue()
-                        else if (v <= -threshold) onFav()
-                        offset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
-                    }
+                    )
                 )
                 .combinedClickable(onClick = onTap, onLongClick = onLongPress)
                 .padding(horizontal = 20.dp, vertical = 8.dp),

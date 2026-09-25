@@ -32,8 +32,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Pantalla completa real: el fondo y el blur llegan hasta los bordes
         try { enableEdgeToEdge() } catch (_: Exception) {}
-        loadUiPrefs(this)
         val app = application as MelodiaApp
+        // ── Red de seguridad: si el arranque anterior murió, el detalle va primero.
+        //    Es Views puro, así que se ve aunque el fallo esté dentro de Compose.
+        CrashScreen.leer(this)?.let { trace ->
+            setContentView(CrashScreen.build(this, trace))
+            return
+        }
+        app.containerError?.let { err ->
+            setContentView(CrashScreen.build(this, err))
+            return
+        }
+        loadUiPrefs(this)
         val c = app.appContainer
         vm = ViewModelProvider(
             this,
@@ -59,6 +69,10 @@ class MainActivity : ComponentActivity() {
             writePerm.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
         setContent { MelodiaTheme { MelodiaScreen(vm) } }
+        // Si la app ya arrancó bien 8 s, el crash previo quedó atrás: limpiar el rastro
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+            { try { CrashScreen.borrar(this) } catch (_: Exception) {} }, 8_000L
+        )
     }
 
     override fun onResume() {

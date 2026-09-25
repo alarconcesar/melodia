@@ -143,6 +143,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.melodia.app.MainViewModel
 import com.melodia.app.player.YT_STREAM_ID
+import com.melodia.app.SafeMode
 import com.melodia.app.SortMode
 import com.melodia.app.data.model.Song
 import com.melodia.app.ui.ds.DsBackground
@@ -242,6 +243,9 @@ fun MelodiaScreen(vm: MainViewModel) {
 
     // ── Reporte del último crash (si la app se cerró sola) ──
     val appCtx = LocalContext.current.applicationContext
+    // Modo seguro: si la app se cerró sola, entra sin efectos de vidrio ni extras
+    val safeEffects = remember { SafeMode.isOn(appCtx, SafeMode.NO_EFFECTS) }
+    val safeExtras = remember { SafeMode.isOn(appCtx, SafeMode.NO_EXTRAS) }
     var lastCrash by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         lastCrash = try {
@@ -365,10 +369,12 @@ fun MelodiaScreen(vm: MainViewModel) {
             Box(
                 Modifier.weight(1f)
                     .onGloballyPositioned { contentPos = it.positionInRoot() }
-                    .haze(
-                        *hazeAreas.toTypedArray(),
-                        backgroundColor = cs.surface.copy(alpha = 0.32f),
-                        blurRadius = 26.dp
+                    .then(
+                        if (safeEffects) Modifier else Modifier.haze(
+                            *hazeAreas.toTypedArray(),
+                            backgroundColor = cs.surface.copy(alpha = 0.32f),
+                            blurRadius = 26.dp
+                        )
                     )
             ) {
                 AnimatedContent(
@@ -645,7 +651,8 @@ fun HomeTab(
     val favSongs by vm.favSongs.collectAsState()
     val loaded by vm.loaded.collectAsState()
     val ctx = LocalContext.current.applicationContext
-    if (all.isEmpty() && !loaded) {
+    val safeExtras2 = remember { SafeMode.isOn(ctx, SafeMode.NO_EXTRAS) }
+    if (all.isEmpty() && !loaded && !safeExtras2) {
         HomeSkeleton()
         return
     }
@@ -814,7 +821,7 @@ fun HomeTab(
                 }
             }
         }
-        item {
+        if (!safeExtras2) item {
             val albums by vm.albums.collectAsState()
             val shown = remember(albums) { albums.sortedByDescending { it.count }.take(14) }
             if (shown.isNotEmpty()) {
@@ -1446,6 +1453,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     LaunchedEffect(tapMsg) { if (tapMsg != null) { kotlinx.coroutines.delay(900); tapMsg = null } }
     if (showQueue) QueueSheet(vm, onDismiss = { showQueue = false })
     if (showPitch) PitchSheet(vm, state.pitch, state.speed, onDismiss = { showPitch = false })
+    val safeFx = remember { SafeMode.isOn(ctx.applicationContext, SafeMode.NO_EFFECTS) }
     BoxWithConstraints(Modifier.fillMaxSize().background(cs.background)) {
         // Fondo teñido con la carátula actual (color dinámico, sin costo)
         val bgModel = songArtModel(s.albumId, s.artUrl)
@@ -1453,7 +1461,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             AsyncImage(
                 model = bgModel, contentDescription = null,
                 contentScale = ContentScale.Crop, alpha = 0.16f,
-                modifier = Modifier.fillMaxSize().blur(60.dp)
+                modifier = Modifier.fillMaxSize().then(if (safeFx) Modifier else Modifier.blur(60.dp))
             )
             Box(
                 Modifier.fillMaxSize().background(

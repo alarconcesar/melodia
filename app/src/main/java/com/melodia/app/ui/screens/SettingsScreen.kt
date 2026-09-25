@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -92,6 +93,7 @@ fun SettingsScreen(
     val highQ by vm.ytHighQuality.collectAsState()
     val sleepLeft by vm.sleep.minsLeft.collectAsState()
     var showSleep by remember { mutableStateOf(false) }
+    var safeMode by remember { mutableStateOf(com.melodia.app.SafeMode.estaActivo(ctx)) }
     var showAbout by remember { mutableStateOf(false) }
     val version = remember {
         try {
@@ -256,6 +258,18 @@ fun SettingsScreen(
                         title = "Privacidad",
                         value = "No recopilamos nada",
                         onClick = { showAbout = true }
+                    )
+                    SettingsDivider()
+                    SettingsSwitch(
+                        icon = Icons.Default.HealthAndSafety,
+                        title = "Modo seguro",
+                        subtitle = "Sin efectos de vidrio, esqueleto ni gestos",
+                        checked = safeMode,
+                        onChecked = { on ->
+                            safeMode = on
+                            if (on) com.melodia.app.SafeMode.activarTodo(ctx)
+                            else com.melodia.app.SafeMode.apagarTodo(ctx)
+                        }
                     )
                 }
             }

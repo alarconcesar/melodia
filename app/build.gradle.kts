@@ -13,8 +13,8 @@ android {
         applicationId = "com.melodia.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 37
-        versionName = "4.1"
+        versionCode = 38
+        versionName = "4.2"
         resConfigs("es")
     }
     signingConfigs {
@@ -39,6 +39,11 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+        }
+    }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
         }
     }
     buildFeatures { compose = true }
@@ -72,4 +77,17 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+
+    // Arnés JVM (Robolectric): permite componer la UI en el VPS sin dispositivo
+    testImplementation("junit:junit:4.13.2")
+    // conscrypt no trae nativos para Linux aarch64 (VPS): fuera del classpath de test
+    testImplementation("org.robolectric:robolectric:4.11.1") {
+        exclude(group = "org.conscrypt", module = "conscrypt-openjdk-uber")
+    }
+    testImplementation("androidx.test:core-ktx:1.5.0")
+    testImplementation("androidx.test.ext:junit-ktx:1.1.5")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation(platform("androidx.compose:compose-bom:2024.01.00"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
