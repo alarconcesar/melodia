@@ -97,6 +97,16 @@ class MainViewModel(
     private val _loaded = MutableStateFlow(false)
     val loaded: StateFlow<Boolean> = _loaded
 
+    // OJO: estos estados los toca el init más abajo. Un StateFlow entrega su valor
+    // al suscriptor de inmediato y sin suspender, así que deben existir ANTES del
+    // init o el constructor revienta con NPE (la app no abría).
+    /** videoId -> progreso 0..1 de descarga */
+    private val _dlProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val dlProgress: StateFlow<Map<String, Float>> = _dlProgress
+    /** Historial de descargas completadas. */
+    private val _dlHistory = MutableStateFlow<List<YtRepository.DlRecord>>(emptyList())
+    val dlHistory: StateFlow<List<YtRepository.DlRecord>> = _dlHistory
+
     init {
         viewModelScope.launch {
             _reload.flatMapLatest { repo.loadAllSongs() }.collect { list ->
@@ -127,7 +137,9 @@ class MainViewModel(
             currentSong.collect { s -> if (s != null) loadLyrics(s) }
         }
         // Motor de descargas: progreso + guardado con etiquetas incrustadas
-        viewModelScope.launch { dl.progress.collect { _dlProgress.value = it } }
+        viewModelScope.launch {
+            try { dl.progress.collect { _dlProgress.value = it } } catch (_: Exception) {}
+        }
         dl.onFinished = { track, high, audio, part ->
             // Letra y carátula para incrustar en el archivo
             val lyricText = try {
@@ -476,9 +488,6 @@ class MainViewModel(
     val ytLoading: StateFlow<Boolean> = _ytLoading
     private val _ytError = MutableStateFlow<String?>(null)
     val ytError: StateFlow<String?> = _ytError
-    /** videoId -> progreso 0..1 de descarga */
-    private val _dlProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
-    val dlProgress: StateFlow<Map<String, Float>> = _dlProgress
     /** videoId cuyo audio se está resolviendo para reproducir */
     private val _busyYt = MutableStateFlow<String?>(null)
     val busyYt: StateFlow<String?> = _busyYt
@@ -499,10 +508,6 @@ class MainViewModel(
     /** Ahorro de datos: el streaming online usa bitrate modesto (solo audio, sin video). */
     private val _dataSaver = MutableStateFlow(false)
     val dataSaver: StateFlow<Boolean> = _dataSaver
-    /** Historial de descargas completadas. */
-    private val _dlHistory = MutableStateFlow<List<YtRepository.DlRecord>>(emptyList())
-    val dlHistory: StateFlow<List<YtRepository.DlRecord>> = _dlHistory
-
     fun setYtQuality(high: Boolean) { _ytHighQuality.value = high }
     fun setDataSaver(on: Boolean) { _dataSaver.value = on }
     fun refreshDlHistory() { try { _dlHistory.value = yt.getDlHistory() } catch (_: Exception) {} }
