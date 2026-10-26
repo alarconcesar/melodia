@@ -91,7 +91,9 @@ object Mp4Tagger {
         artBytes: ByteArray? = null,
         artMime: String? = null
     ): ByteArray {
-        val moovBox = findTopLevel(data, "moov") ?: error("sin moov")
+        // Sin moov (archivo truncado o formato raro) se devuelve tal cual: el
+        // llamador no tiene que envolver esto en try/catch para no romper la descarga.
+        val moovBox = findTopLevel(data, "moov") ?: return data
         val moovKids = childrenOf(data, moovBox)
         val udta = moovKids.firstOrNull { it.type == "udta" }
 

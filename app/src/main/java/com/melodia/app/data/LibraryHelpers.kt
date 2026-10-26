@@ -5,9 +5,13 @@ data class MusicFolder(val path: String, val name: String, val count: Int)
 data class Album(val name: String, val artist: String, val count: Int, val artId: Long)
 data class Artist(val name: String, val count: Int)
 
-/** Orden de álbum: disco → pista → título (los sin número van al final). */
+/**
+ * Orden de álbum: disco → pista → título. Los temas sin número de pista van al
+ * final del álbum, incluso si el álbum tiene varios discos (antes se colaban
+ * entre el disco 1 y el 2 porque el disco desconocido se asumía 1).
+ */
 val AlbumTrackOrder: Comparator<Song> = compareBy<Song>(
-    { if (it.discNumber > 0) it.discNumber else 1 },
+    { if (it.trackNumber > 0) (if (it.discNumber > 0) it.discNumber else 1) else Int.MAX_VALUE },
     { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE },
     { it.title.lowercase() }
 )

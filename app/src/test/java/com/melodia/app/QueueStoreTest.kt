@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.melodia.app.data.model.Song
 import com.melodia.app.player.QueueStore
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -72,5 +73,33 @@ class QueueStoreTest {
         val store = QueueStore(ctx()).apply { clear() }
         store.save(emptyList(), 0, 0, false, 0)
         assertNull(store.load())
+    }
+
+    @Test
+    fun jsonCorruptoDevuelveNullSinReventar() {
+        val prefs = ctx().getSharedPreferences("melodia_queue", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putString("songs", "{esto no es json").apply()
+        assertNull(QueueStore(ctx()).load())
+    }
+
+    @Test
+    fun entradasIncompletasSeSaltanYElRestoSobrevive() {
+        val prefs = ctx().getSharedPreferences("melodia_queue", android.content.Context.MODE_PRIVATE)
+        val arr = org.json.JSONArray()
+        arr.put(org.json.JSONObject().put("id", 1L).put("t", "Uno").put("p", "/a/1.mp3"))
+        arr.put(org.json.JSONObject().put("t", "Sin id")) // inválida
+        arr.put(org.json.JSONObject().put("id", 2L).put("t", "Dos").put("p", "/a/2.mp3"))
+        prefs.edit().putString("songs", arr.toString()).apply()
+        val snap = QueueStore(ctx()).load()
+        assertNotNull(snap)
+        assertEquals(listOf(1L, 2L), snap!!.songs.map { it.id })
+    }
+
+    @Test
+    fun unSoloTemaInvalidoDevuelveNull() {
+        val prefs = ctx().getSharedPreferences("melodia_queue", android.content.Context.MODE_PRIVATE)
+        val arr = org.json.JSONArray().put(org.json.JSONObject().put("t", "Sin id"))
+        prefs.edit().putString("songs", arr.toString()).apply()
+        assertNull(QueueStore(ctx()).load())
     }
 }
