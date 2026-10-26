@@ -63,7 +63,11 @@ class YtRepository(private val context: Context) {
     private data class CachedAudio(val audio: YtAudio, val expiresAt: Long)
     private val audioCache = mutableMapOf<String, CachedAudio>()
 
-    suspend fun search(query: String): List<YtTrack> = withContext(Dispatchers.IO) {
+    /**
+     * Búsqueda mixta: YouTube devuelve videos y playlists/álbumes en la misma
+     * página. Se conserva el orden y se deduplica por tipo.
+     */
+    suspend fun search(query: String): List<YtSearchItem> = withContext(Dispatchers.IO) {
         ensure()
         // Índice general primero (mejores resultados para videos). Si YouTube
         // no devuelve nada —filtra búsquedas que considera "inapropiadas" con
@@ -81,22 +85,22 @@ class YtRepository(private val context: Context) {
     }
 
     /** Ejecuta la búsqueda y deja listo el paginador. filters=null → índice general. */
-    private fun fetchPage(query: String, filters: List<String>?): List<YtTrack> {
+    private fun fetchPage(query: String, filters: List<String>?): List<YtSearchItem> {
         val service = yt()
         val ex = if (filters == null) service.getSearchExtractor(query)
         else service.getSearchExtractor(service.searchQHFactory.fromQuery(query, filters, ""))
         ex.fetchPage()
         val page = ex.initialPage
-        val tracks = mapItems(page.items)
+        val items = mapItems(page.items)
         pager = ex
         next = try { page.nextPage } catch (_: Exception) { null }
-        return tracks
+        return items
     }
 
     /** Devuelve true si hay más páginas por cargar. */
     fun hasMore(): Boolean = pager != null && next != null
 
-    suspend fun more(): List<YtTrack> = withContext(Dispatchers.IO) {
+    suspend fun more(): List<YtSearchItem> = withContext(Dispatchers.IO) {
         val ex = pager ?: return@withContext emptyList()
         val np = next ?: return@withContext emptyList()
         ensure()
@@ -105,25 +109,54 @@ class YtRepository(private val context: Context) {
         mapItems(page.items)
     }
 
-    private fun mapItems(items: List<org.schabi.newpipe.extractor.InfoItem>): List<YtTrack> {
+    private fun mapItems(items: List<org.schabi.newpipe.extractor.InfoItem>): List<YtSearchItem> {
         return items.mapNotNull { item ->
             try {
-                if (item.infoType != InfoType.STREAM) return@mapNotNull null
-                val s = item as StreamInfoItem
-                if (s.streamType == StreamType.LIVE_STREAM || s.streamType == StreamType.AUDIO_LIVE_STREAM) return@mapNotNull null
-                val url = s.url ?: return@mapNotNull null
-                val id = Regex("[?&]v=([^&]+)").find(url)?.groupValues?.getOrNull(1)
-                    ?: url.substringAfterLast("/").substringBefore("?").ifBlank { return@mapNotNull null }
-                val thumbs = try { s.thumbnails } catch (_: Exception) { emptyList() }
-                YtTrack(
-                    id = id,
-                    title = (try { s.name } catch (_: Exception) { "Sin título" }) ?: "Sin título",
-                    artist = ((try { s.uploaderName } catch (_: Exception) { "" }) ?: "")
-                        .replace(" - Topic", "").replace("VEVO", "").trim(),
-                    durationSec = try { s.duration } catch (_: Exception) { -1L },
-                    thumbUrl = try { thumbs.maxByOrNull { it.height * it.width }?.url } catch (_: Exception) { null },
-                    url = url
-                )
+                when (item.infoType) {
+                    InfoType.STREAM -> {
+                        val s = item as StreamInfoItem
+                        if (s.streamType == StreamType.LIVE_STREAM ||
+                            s.streamType == StreamType.AUDIO_LIVE_STREAM
+                        ) return@mapNotNull null
+                        val url = s.url ?: return@mapNotNull null
+                        val id = Regex("[?&]v=([^&]+)").find(url)?.groupValues?.getOrNull(1)
+                            ?: url.substringAfterLast("/").substringBefore("?").ifBlank { return@mapNotNull null }
+                        val thumbs = try { s.thumbnails } catch (_: Exception) { emptyList() }
+                        YtSearchItem.Track(
+                            YtTrack(
+                                id = id,
+                                title = (try { s.name } catch (_: Exception) { "Sin título" }) ?: "Sin título",
+                                artist = ((try { s.uploaderName } catch (_: Exception) { "" }) ?: "")
+                                    .replace(" - Topic", "").replace("VEVO", "").trim(),
+                                durationSec = try { s.duration } catch (_: Exception) { -1L },
+                                thumbUrl = try { thumbs.maxByOrNull { it.height * it.width }?.url } catch (_: Exception) { null },
+                                url = url
+                            )
+                        )
+                    }
+
+                    InfoType.PLAYLIST -> {
+                        val pl = item as org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
+                        val url = pl.url ?: return@mapNotNull null
+                        // list=RD… es un "mix" automático (radio infinita): no es
+                        // una playlist descargable de verdad.
+                        if (url.contains("list=RD")) return@mapNotNull null
+                        val id = Regex("[?&]list=([^&]+)").find(url)?.groupValues?.getOrNull(1)
+                            ?: url.substringAfterLast("/").ifBlank { return@mapNotNull null }
+                        val thumbs = try { pl.thumbnails } catch (_: Exception) { emptyList() }
+                        YtSearchItem.Collection(
+                            id = id,
+                            title = (try { pl.name } catch (_: Exception) { "Playlist" }) ?: "Playlist",
+                            uploader = ((try { pl.uploaderName } catch (_: Exception) { "" }) ?: "")
+                                .replace(" - Topic", "").trim(),
+                            count = try { pl.streamCount } catch (_: Exception) { 0L }.toInt(),
+                            thumbUrl = try { thumbs.maxByOrNull { it.height * it.width }?.url } catch (_: Exception) { null },
+                            url = url
+                        )
+                    }
+
+                    else -> null
+                }
             } catch (_: Exception) { null }
         }
     }
@@ -432,7 +465,7 @@ class YtRepository(private val context: Context) {
         var page = ex.initialPage
         var rounds = 0
         while (true) {
-            out += mapItems(page.items)
+            out += mapItems(page.items).filterIsInstance<YtSearchItem.Track>().map { it.track }
             if (out.size >= 100 || !page.hasNextPage() || rounds++ >= 4) break
             page = ex.getPage(page.nextPage)
         }

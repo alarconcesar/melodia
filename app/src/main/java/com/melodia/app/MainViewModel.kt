@@ -646,8 +646,11 @@ class MainViewModel(
     // ── Online (YouTube: buscar, escuchar, descargar) ──
     private val _ytQuery = MutableStateFlow("")
     val ytQuery: StateFlow<String> = _ytQuery
-    private val _ytResults = MutableStateFlow<List<YtTrack>>(emptyList())
-    val ytResults: StateFlow<List<YtTrack>> = _ytResults
+    private val _ytResults = MutableStateFlow<List<com.melodia.app.data.online.YtSearchItem>>(emptyList())
+    val ytResults: StateFlow<List<com.melodia.app.data.online.YtSearchItem>> = _ytResults
+    /** Aviso efímero de la pestaña Online (p. ej. "playlist en cola"). */
+    private val _ytMsg = MutableStateFlow<String?>(null)
+    val ytMsg: StateFlow<String?> = _ytMsg
     private val _ytLoading = MutableStateFlow(false)
     val ytLoading: StateFlow<Boolean> = _ytLoading
     private val _ytError = MutableStateFlow<String?>(null)
@@ -706,10 +709,11 @@ class MainViewModel(
                     } catch (_: Exception) {}
                     // Prefetch del primer resultado: el play más común arranca al instante
                     // (hijo de este job: se cancela si llega otra búsqueda)
-                    val top = _ytResults.value.firstOrNull()
+                    val top = _ytResults.value.filterIsInstance<com.melodia.app.data.online.YtSearchItem.Track>()
+                        .firstOrNull()
                     if (top != null) {
                         launch {
-                            try { withContext(Dispatchers.IO) { yt.prefetchAudio(top.url, !_dataSaver.value) } } catch (_: Exception) {}
+                            try { withContext(Dispatchers.IO) { yt.prefetchAudio(top.track.url, !_dataSaver.value) } } catch (_: Exception) {}
                         }
                     }
                 }
@@ -729,8 +733,8 @@ class MainViewModel(
             try {
                 val extra = withContext(Dispatchers.IO) { yt.more() }
                 if (extra.isNotEmpty()) {
-                    val known = _ytResults.value.map { it.id }.toSet()
-                    _ytResults.value = _ytResults.value + extra.filter { !known.contains(it.id) }
+                    val known = _ytResults.value.map { it.key }.toSet()
+                    _ytResults.value = _ytResults.value + extra.filter { !known.contains(it.key) }
                 }
                 _ytHasMore.value = yt.hasMore()
             } catch (t: Throwable) {
@@ -840,10 +844,37 @@ class MainViewModel(
 
     /** Descarga todos los resultados actuales (el motor los encola de 3 en 3). */
     fun downloadAllYt() {
-        val list = _ytResults.value.filter { t -> dlJobs.value.none { it.track.id == t.id } }
+        val list = _ytResults.value.filterIsInstance<com.melodia.app.data.online.YtSearchItem.Track>()
+            .map { it.track }
+            .filter { t -> dlJobs.value.none { it.track.id == t.id } }
         if (list.isEmpty()) return
         dl.enqueueAll(list, _ytHighQuality.value)
     }
+
+    /** Descarga entera una playlist o álbum que salió en la búsqueda. */
+    fun downloadYtCollection(col: com.melodia.app.data.online.YtSearchItem.Collection) {
+        if (_busyYt.value != null) return
+        viewModelScope.launch {
+            _busyYt.value = col.key
+            _ytMsg.value = null
+            try {
+                val (title, tracks) = withContext(Dispatchers.IO) { yt.playlistTracks(col.url) }
+                if (tracks.isEmpty()) {
+                    _ytMsg.value = "«${col.title}» no tiene temas visibles"
+                } else {
+                    dl.enqueueAll(tracks, _ytHighQuality.value)
+                    _ytMsg.value = "«$title»: ${tracks.size} temas a la cola de descargas"
+                }
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                _ytMsg.value = errMsg(t, "No se pudo leer la playlist")
+            } finally {
+                _busyYt.value = null
+            }
+        }
+    }
+
+    fun clearYtMsg() { _ytMsg.value = null }
 
     fun retryLyrics() { currentSong.value?.let { loadLyrics(it, force = true) } }
 

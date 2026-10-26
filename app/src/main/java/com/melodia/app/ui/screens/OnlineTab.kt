@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
@@ -69,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.melodia.app.MainViewModel
+import com.melodia.app.data.online.YtSearchItem
 import com.melodia.app.data.online.YtTrack
 import com.melodia.app.ui.ds.EmptyState
 import com.melodia.app.ui.ds.MelodiaSpinner
@@ -107,6 +109,7 @@ fun OnlineTab(vm: MainViewModel) {
     val moreLoading by vm.ytMoreLoading.collectAsState()
     val highQ by vm.ytHighQuality.collectAsState()
     val saver by vm.dataSaver.collectAsState()
+    val notice by vm.ytMsg.collectAsState()
 
     var dlPick by remember { mutableStateOf<YtTrack?>(null) }
     var showDls by remember { mutableStateOf(false) }
@@ -115,7 +118,7 @@ fun OnlineTab(vm: MainViewModel) {
 
     OnlineTabContent(
         query = query,
-        results = results,
+        items = results,
         loading = loading,
         error = error,
         errorRetry = errorRetry,
@@ -137,7 +140,10 @@ fun OnlineTab(vm: MainViewModel) {
         onOpenDownloads = { showDls = true },
         onOpenImport = { vm.clearYtImport(); showImport = true },
         onToggleSaver = { vm.setDataSaver(!saver) },
-        onToggleQuality = { vm.setYtQuality(!highQ) }
+        onToggleQuality = { vm.setYtQuality(!highQ) },
+        notice = notice,
+        onClearNotice = vm::clearYtMsg,
+        onDownloadCollection = { vm.downloadYtCollection(it) }
     )
 
     if (showDls) DownloadsSheet(vm, onDismiss = { showDls = false })
@@ -161,7 +167,7 @@ fun OnlineTab(vm: MainViewModel) {
 @Composable
 fun OnlineTabContent(
     query: String,
-    results: List<YtTrack>,
+    items: List<YtSearchItem>,
     loading: Boolean,
     error: String?,
     errorRetry: Boolean,
@@ -183,7 +189,10 @@ fun OnlineTabContent(
     onOpenDownloads: () -> Unit,
     onOpenImport: () -> Unit,
     onToggleSaver: () -> Unit,
-    onToggleQuality: () -> Unit
+    onToggleQuality: () -> Unit,
+    notice: String? = null,
+    onClearNotice: () -> Unit = {},
+    onDownloadCollection: (YtSearchItem.Collection) -> Unit = {}
 ) {
     val cs = MaterialTheme.colorScheme
     var menu by remember { mutableStateOf(false) }
@@ -258,18 +267,30 @@ fun OnlineTabContent(
             }
         }
 
+        if (notice != null) {
+            Text(
+                notice, style = Ds.Sub, color = cs.primary,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+            )
+            LaunchedEffect(notice) {
+                kotlinx.coroutines.delay(4500)
+                onClearNotice()
+            }
+        }
+
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 200.dp)
         ) {
             when {
-                loading && results.isEmpty() -> item {
+                loading && items.isEmpty() -> item {
                     Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
                         MelodiaSpinner()
                     }
                 }
 
-                error != null && results.isEmpty() -> item {
+                error != null && items.isEmpty() -> item {
                     Column(Modifier.padding(top = 24.dp)) {
                         Text(
                             error, style = Ds.Body,
@@ -289,7 +310,7 @@ fun OnlineTabContent(
                     }
                 }
 
-                results.isEmpty() -> {
+                items.isEmpty() -> {
                     if (recent.isEmpty() && history.isEmpty()) {
                         item {
                             EmptyState(
@@ -363,7 +384,7 @@ fun OnlineTabContent(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "${results.size} ${if (results.size == 1) "resultado" else "resultados"}",
+                                "${items.size} ${if (items.size == 1) "resultado" else "resultados"}",
                                 style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f)
                             )
                             Text(
@@ -374,14 +395,21 @@ fun OnlineTabContent(
                             )
                         }
                     }
-                    items(results, key = { it.id }) { track ->
-                        YtRowFlat(
-                            track = track,
-                            progress = dlProgress[track.id],
-                            busy = busyId == track.id,
-                            onPlay = { onPlay(track) },
-                            onDownload = { onDownload(track) }
-                        )
+                    items(items, key = { it.key }) { item ->
+                        when (item) {
+                            is YtSearchItem.Track -> YtRowFlat(
+                                track = item.track,
+                                progress = dlProgress[item.track.id],
+                                busy = busyId == item.track.id,
+                                onPlay = { onPlay(item.track) },
+                                onDownload = { onDownload(item.track) }
+                            )
+                            is YtSearchItem.Collection -> YtCollectionRow(
+                                item = item,
+                                busy = busyId == item.key,
+                                onDownload = { onDownloadCollection(item) }
+                            )
+                        }
                     }
                     if (hasMore || moreLoading) {
                         item {
@@ -445,6 +473,63 @@ private fun YtRowFlat(
                 color = cs.primary,
                 modifier = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(2.dp))
             )
+        }
+    }
+}
+
+/** Playlist o álbum: se descarga entero (es lo que se busca al buscar en YT). */
+@Composable
+private fun YtCollectionRow(
+    item: YtSearchItem.Collection,
+    busy: Boolean,
+    onDownload: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onDownload).padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(48.dp).clip(RoundedCornerShape(Ds.RCard))) {
+            if (item.thumbUrl != null) {
+                AsyncImage(
+                    model = item.thumbUrl, contentDescription = null,
+                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(cs.surfaceVariant), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.QueueMusic, null, Modifier.size(20.dp), tint = cs.onSurfaceVariant)
+                }
+            }
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(4.dp)
+                    .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(4.dp))
+                    .padding(3.dp)
+            ) {
+                Icon(Icons.Default.QueueMusic, null, Modifier.size(11.dp), tint = Color.White)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.title, style = Ds.Body, color = cs.onBackground,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                listOfNotNull(
+                    item.uploader.ifBlank { null },
+                    if (item.count > 0) "${item.count} temas" else null,
+                    "Playlist o álbum"
+                ).joinToString(" · "),
+                style = Ds.Sub, color = cs.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (busy) {
+            Box(Modifier.padding(horizontal = 8.dp)) { MelodiaSpinner(size = 20.dp, width = 2.dp) }
+        } else {
+            IconButton(onClick = onDownload, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Download, "Descargar entera", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+            }
         }
     }
 }

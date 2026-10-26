@@ -132,6 +132,11 @@ La pestaña tenía tres filas de chips antes de llegar al buscador. Ahora:
   spinner embebido mientras carga. Sin botón cuadrado aparte.
 - Resultados como **filas planas** (arte 48dp, título 1 línea, artista ·
   duración, descarga fantasma) en vez de tarjetas dentro de tarjetas.
+- La búsqueda es **mixta** (`YtSearchItem`): YouTube devuelve videos y
+  playlists/álbumes en la misma página. Las colecciones se pintan con la
+  miniatura, la insignia de lista y "N temas · Playlist o álbum"; tocarlas
+  descarga la colección entera (con aviso efímero bajo el buscador). Se filtran
+  los `list=RD…` porque son mixes automáticos, no listas reales.
 - Cabecera de resultados: conteo + "Descargar todo" como texto.
 - Importar playlist y calidad pasan a diálogos; el estado vacío es una línea.
 
