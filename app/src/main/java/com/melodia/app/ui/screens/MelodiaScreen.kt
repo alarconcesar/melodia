@@ -725,6 +725,7 @@ fun HomeTab(
     val query by vm.query.collectAsState()
     val homeYt by vm.homeYt.collectAsState()
     val homeYtLoading by vm.homeYtLoading.collectAsState()
+    val homeYtQuery by vm.homeYtQuery.collectAsState()
     val busyYt by vm.busyYt.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
     // La biblioteca filtra al instante; YouTube espera a que deje de teclear.
@@ -943,10 +944,18 @@ fun HomeTab(
                     vm.searchYt(query)
                 })
             }
+            // "Sin resultados" solo cuando la búsqueda de ESA consulta terminó.
+            // Antes se mostraba al instante, mientras todavía estaba buscando.
+            val buscando = homeYtLoading || homeYtQuery != query.trim()
             when {
-                homeYtLoading && homeYt.isEmpty() -> item {
-                    Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                        MelodiaSpinner(size = 22.dp, width = 2.dp)
+                buscando -> item {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MelodiaSpinner(size = 18.dp, width = 2.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Text("Buscando en YouTube…", style = Ds.Sub, color = cs.onSurfaceVariant)
                     }
                 }
                 homeYt.isEmpty() -> item {

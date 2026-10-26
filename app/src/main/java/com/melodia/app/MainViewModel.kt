@@ -401,6 +401,9 @@ class MainViewModel(
     val homeYt: StateFlow<List<com.melodia.app.data.online.YtSearchItem>> = _homeYt
     private val _homeYtLoading = MutableStateFlow(false)
     val homeYtLoading: StateFlow<Boolean> = _homeYtLoading
+    /** Consulta cuyos resultados ya están en [homeYt]; distinta de la actual = buscando. */
+    private val _homeYtQuery = MutableStateFlow("")
+    val homeYtQuery: StateFlow<String> = _homeYtQuery
     private var homeYtJob: kotlinx.coroutines.Job? = null
 
     fun searchHomeYt(q: String = _query.value) {
@@ -409,12 +412,15 @@ class MainViewModel(
         if (query.length < 2) {
             _homeYt.value = emptyList()
             _homeYtLoading.value = false
+            _homeYtQuery.value = ""
             return
         }
         homeYtJob = viewModelScope.launch {
             _homeYtLoading.value = true
             try {
-                _homeYt.value = withContext(Dispatchers.IO) { yt.searchFirstPage(query) }
+                val encontrados = withContext(Dispatchers.IO) { yt.searchFirstPage(query) }
+                _homeYt.value = encontrados
+                _homeYtQuery.value = query
                 val primeros = _homeYt.value
                     .filterIsInstance<com.melodia.app.data.online.YtSearchItem.Track>()
                     .take(3)
@@ -426,6 +432,7 @@ class MainViewModel(
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _homeYt.value = emptyList()
+                _homeYtQuery.value = query
             } finally {
                 _homeYtLoading.value = false
             }
@@ -436,6 +443,7 @@ class MainViewModel(
         homeYtJob?.cancel()
         _homeYt.value = emptyList()
         _homeYtLoading.value = false
+        _homeYtQuery.value = ""
     }
     fun setSort(s: SortMode) { _sort.value = s }
     fun setFolder(p: String?) { _folder.value = p; _album.value = null; _artistF2(null) }
