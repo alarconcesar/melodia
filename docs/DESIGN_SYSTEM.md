@@ -52,12 +52,17 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
 - **MiniPlayerDs** — flotante, apoyado **justo encima** de la nav: su margen
   inferior se calcula del alto real de la nav (`onGloballyPositioned`), nunca
   la tapa ni en gestos ni en navegación de 3 botones.
-- **NowPlaying** — `BoxWithConstraints`: la carátula escala con la pantalla
-  (`min(ancho−56dp, alto×0.34)` clamp 170–330dp) y un espaciador con `weight(1f)`
-  absorbe el sobrante → los controles nunca se cortan. Fondo teñido con la
-  carátula (alpha 0.16 + degradado + `blur(60dp)` en Android 12+).
-  Fila superior: cerrar · etiqueta centrada · ♥ · **⋮** (cola, tono y
-  velocidad, modo auto, descargar, añadir a playlist).
+- **NowPlaying** (rediseño 5.3) — `BoxWithConstraints`: la carátula escala con
+  la pantalla (`min(ancho−56dp, alto×0.34)` clamp 170–330dp), plana y sin sombra,
+  con fondo teñido a 160 px + degradado. Columna: barra superior (cerrar ·
+  `N de M` en Micro · ⋮), carátula, título en `Display` a 2 líneas, artista ·
+  álbum, espaciador flexible, barra de avance, transporte y **fila de acciones**
+  (Favorito · Letra · Cola) como píldoras planas. El corazón ya no vive en la
+  barra superior y "Ver letra" dejó de ser un link suelto: la letra y la cola
+  están a un toque, no en el menú.
+- **SeekBar** — pista propia de 4dp con relleno del acento y perilla de 12dp;
+  toque para saltar y arrastre horizontal. Reemplaza el `Slider` de Material
+  (grueso, con sombra y sin relación con el resto del DS).
 - **Cabecera** — compacta (logo 34dp + saludo + Melodia) y el buscador global
   **solo aparece en Inicio/Explorar** (o si hay una búsqueda activa); el resto
   de secciones gana ~60dp de contenido.

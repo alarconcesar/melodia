@@ -23,6 +23,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
@@ -98,6 +101,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -1327,8 +1331,6 @@ private fun MiniPlayerHost(
 @Composable
 private fun PlaybackProgress(state: com.melodia.app.player.PlayerState, onSeek: (Float) -> Unit) {
     val cs = MaterialTheme.colorScheme
-    var dragging by remember { mutableStateOf(false) }
-    var dragPos by remember { mutableStateOf(0f) }
     val nowElapsed = playbackNow(state.isPlaying)
     val livePos = PlaybackClock.positionMs(
         positionMs = state.positionMs,
@@ -1338,23 +1340,72 @@ private fun PlaybackProgress(state: com.melodia.app.player.PlayerState, onSeek: 
         durationMs = state.durationMs,
         speed = state.speed
     )
-    val basePos = if (dragging) dragPos else PlaybackClock.progress(livePos, state.durationMs)
     val smoothPos by androidx.compose.animation.core.animateFloatAsState(
-        basePos.coerceIn(0f, 1f),
+        PlaybackClock.progress(livePos, state.durationMs).coerceIn(0f, 1f),
         androidx.compose.animation.core.tween(180), label = "heroslider"
     )
-    Slider(
-        value = smoothPos,
-        onValueChange = { dragging = true; dragPos = it },
-        onValueChangeFinished = { onSeek(dragPos); dragging = false }
-    )
-    Row(Modifier.fillMaxWidth()) {
-        Text(
-            fmt(if (dragging) (dragPos * state.durationMs).toLong() else livePos),
-            style = Ds.Sub, color = cs.onSurfaceVariant
-        )
+    SeekBar(progress = smoothPos, onSeek = onSeek)
+    Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+        Text(fmt(livePos), style = Ds.Sub, color = cs.onSurfaceVariant)
         Spacer(Modifier.weight(1f))
         Text(fmt(state.durationMs), style = Ds.Sub, color = cs.onSurfaceVariant)
+    }
+}
+
+/**
+ * Barra de avance propia: pista de 4dp, relleno del acento y perilla de 12dp.
+ * El Slider de Material era grueso y con sombra; acá manda el trazo fino.
+ */
+@Composable
+private fun SeekBar(progress: Float, onSeek: (Float) -> Unit, modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
+    var widthPx by remember { mutableStateOf(1f) }
+    var dragging by remember { mutableStateOf(false) }
+    var dragValue by remember { mutableStateOf(0f) }
+    val shown = (if (dragging) dragValue else progress).coerceIn(0f, 1f)
+    Box(
+        modifier.fillMaxWidth().height(28.dp)
+            .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
+            .pointerInput(Unit) {
+                detectTapGestures { off -> onSeek((off.x / widthPx).coerceIn(0f, 1f)) }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { off ->
+                        dragging = true
+                        dragValue = (off.x / widthPx).coerceIn(0f, 1f)
+                    },
+                    onDragEnd = { dragging = false; onSeek(dragValue) },
+                    onDragCancel = { dragging = false }
+                ) { change, _ ->
+                    change.consume()
+                    dragValue = (change.position.x / widthPx).coerceIn(0f, 1f)
+                }
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(28.dp)) {
+            val cy = size.height / 2f
+            val r = 2.dp.toPx()
+            drawRoundRect(
+                color = cs.onSurfaceVariant.copy(alpha = 0.20f),
+                topLeft = androidx.compose.ui.geometry.Offset(0f, cy - r),
+                size = androidx.compose.ui.geometry.Size(size.width, r * 2),
+                cornerRadius = CornerRadius(r)
+            )
+            val fill = (size.width * shown).coerceAtLeast(0f)
+            if (fill > 0f) {
+                drawRoundRect(
+                    color = cs.primary,
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, cy - r),
+                    size = androidx.compose.ui.geometry.Size(fill, r * 2),
+                    cornerRadius = CornerRadius(r)
+                )
+            }
+            val knobR = 6.dp.toPx()
+            val knobX = fill.coerceIn(knobR, (size.width - knobR).coerceAtLeast(knobR))
+            drawCircle(color = cs.primary, radius = knobR, center = androidx.compose.ui.geometry.Offset(knobX, cy))
+        }
     }
 }
 
@@ -1456,6 +1507,8 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     val state by vm.playerState.collectAsState()
     val dlMap by vm.dlProgress.collectAsState()
     val curTrack by vm.currentTrack.collectAsState()
+    val queue by vm.queueSongs.collectAsState()
+    val queueTotal = queue.size
     val isStream = s.id == YT_STREAM_ID
     var showQueue by remember { mutableStateOf(false) }
     var showPitch by remember { mutableStateOf(false) }
@@ -1514,135 +1567,212 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         // (el factor ya descuenta barras del sistema y el bloque de controles)
         val artSize = minOf(maxWidth - 56.dp, maxHeight * 0.34f).coerceIn(170.dp, 330.dp)
         val dlProg = if (isStream) curTrack?.let { dlMap[it.id] } else null
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
-            Box(Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(26.dp), tint = cs.onBackground)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (dlProg != null) {
-                            Surface(shape = CircleShape, color = cs.primary.copy(alpha = 0.16f)) {
-                                Text(
-                                    "${(dlProg * 100).toInt()}%", style = Ds.Sub, color = cs.primary,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(6.dp))
-                        }
-                        IconButton(onClick = { if (!isStream) vm.toggleFav(s.id) }, modifier = Modifier.size(40.dp)) {
-                            Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onBackground)
-                        }
-                        var npMenu by remember { mutableStateOf(false) }
-                        Box {
-                            IconButton(onClick = { npMenu = true }, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Default.MoreVert, "Más opciones", tint = cs.onBackground)
-                            }
-                            DropdownMenu(expanded = npMenu, onDismissRequest = { npMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Cola de reproducción") },
-                                    leadingIcon = { Icon(Icons.Default.QueueMusic, null) },
-                                    onClick = { npMenu = false; showQueue = true }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(if (state.pitch != 1f || state.speed != 1f) "Tono y velocidad · activo" else "Tono y velocidad") },
-                                    leadingIcon = { Icon(Icons.Default.Tune, null) },
-                                    onClick = { npMenu = false; showPitch = true }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(if (autoMode) "Modo auto · activado" else "Modo auto") },
-                                    leadingIcon = { Icon(Icons.Default.DirectionsCar, null) },
-                                    onClick = { npMenu = false; autoMode = !autoMode }
-                                )
-                                if (isStream && curTrack != null && dlProg == null) {
-                                    DropdownMenuItem(
-                                        text = { Text("Descargar audio") },
-                                        leadingIcon = { Icon(Icons.Default.Download, null) },
-                                        onClick = { npMenu = false; vm.downloadYt(curTrack!!) }
-                                    )
-                                }
-                                DropdownMenuItem(
-                                    text = { Text("Añadir a playlist") },
-                                    leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) },
-                                    onClick = { npMenu = false; onAdd() }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-        AnimatedContent(
-            targetState = s.id, label = "nowplaying",
-            transitionSpec = { (fadeIn() + slideInVertically { it / 4 } + scaleIn(initialScale = 0.94f)) togetherWith (fadeOut() + slideOutVertically { -it / 4 } + scaleOut(targetScale = 0.94f)) },
-            modifier = Modifier.align(Alignment.CenterHorizontally)
+        Column(
+            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(artSize), contentAlignment = Alignment.Center) {
-            // Sombra ambiental del acento: la carátula flota sobre el fondo
-            Surface(
-                shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(artSize)
-                    
-            ) {
-                SongArt(
-                    albumId = s.albumId, size = artSize, shape = Ds.HeroShape,
-                    iconSize = artSize * 0.36f, artUrl = s.artUrl
+            // ── Barra superior: cerrar · posición en la cola · menú ──
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.KeyboardArrowDown, "Cerrar", Modifier.size(26.dp), tint = cs.onBackground)
+                }
+                Text(
+                    if (queueTotal > 0) "${state.currentIndex + 1} de $queueTotal" else "Reproduciendo",
+                    style = Ds.Micro, color = cs.onSurfaceVariant, textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
                 )
-            }
-            // Doble toque: izquierda −10 s, derecha +10 s
-            Box(
-                Modifier.matchParentSize().pointerInput(s.id) {
-                    detectTapGestures(onDoubleTap = { off ->
-                        if (off.x < size.width / 2) { vm.player.seekBy(-10_000); tapMsg = "−10 segundos" }
-                        else { vm.player.seekBy(10_000); tapMsg = "+10 segundos" }
-                    })
-                }
-            )
-            tapMsg?.let {
-                Surface(shape = RoundedCornerShape(12.dp), color = Color.Black.copy(alpha = 0.7f)) {
-                    Text(it, color = Color.White, style = Ds.Body, modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp))
-                }
-            }
-        }
-        Spacer(Modifier.height(18.dp))
-        Text(s.title, style = if (autoMode) Ds.Display.copy(fontSize = 26.sp) else Ds.Display, color = cs.onBackground, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        Text("${s.artist} · ${s.album.ifBlank { "Sencillo" }}", style = Ds.Body, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Ver letra", style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
-            color = cs.primary,
-            modifier = Modifier.clickable { onLyrics() }.padding(vertical = 4.dp, horizontal = 2.dp)
-        )
-        }
-        }
-        // Espacio flexible: absorbe la altura sobrante y evita que se corten los controles
-        Spacer(Modifier.weight(1f))
-        Spacer(Modifier.height(6.dp))
-        PlaybackProgress(state) { vm.player.seekTo(it) }
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
-            IconButton(onClick = { vm.player.toggleShuffle() }) {
-                Icon(Icons.Default.Shuffle, null, tint = if (state.shuffle) cs.primary else cs.onSurfaceVariant)
-            }
-            IconButton(onClick = { vm.player.prev() }) { Icon(Icons.Default.SkipPrevious, null, Modifier.size(if (autoMode) 46.dp else 36.dp), tint = cs.onBackground) }
-            Surface(shape = CircleShape, color = cs.primary, modifier = Modifier.size(if (autoMode) 88.dp else Ds.PlayHero).then(pressClick({ vm.player.toggle() }, min = 0.88f))) {
-                Box(contentAlignment = Alignment.Center) {
-                    AnimatedContent(targetState = state.isPlaying, label = "pp-hero") { p ->
-                        Icon(if (p) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = cs.surface, modifier = Modifier.size(36.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (dlProg != null) {
+                        Surface(shape = CircleShape, color = cs.primary.copy(alpha = 0.16f)) {
+                            Text(
+                                "${(dlProg * 100).toInt()}%", style = Ds.Sub, color = cs.primary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    var npMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { npMenu = true }, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Default.MoreVert, "Más opciones", tint = cs.onBackground)
+                        }
+                        DropdownMenu(expanded = npMenu, onDismissRequest = { npMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Cola de reproducción") },
+                                leadingIcon = { Icon(Icons.Default.QueueMusic, null) },
+                                onClick = { npMenu = false; showQueue = true }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (state.pitch != 1f || state.speed != 1f) "Tono y velocidad · activo" else "Tono y velocidad") },
+                                leadingIcon = { Icon(Icons.Default.Tune, null) },
+                                onClick = { npMenu = false; showPitch = true }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (autoMode) "Modo auto · activado" else "Modo auto") },
+                                leadingIcon = { Icon(Icons.Default.DirectionsCar, null) },
+                                onClick = { npMenu = false; autoMode = !autoMode }
+                            )
+                            if (isStream && curTrack != null && dlProg == null) {
+                                DropdownMenuItem(
+                                    text = { Text("Descargar audio") },
+                                    leadingIcon = { Icon(Icons.Default.Download, null) },
+                                    onClick = { npMenu = false; vm.downloadYt(curTrack!!) }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Añadir a playlist") },
+                                leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) },
+                                onClick = { npMenu = false; onAdd() }
+                            )
+                        }
                     }
                 }
             }
-            IconButton(onClick = { vm.player.next() }) { Icon(Icons.Default.SkipNext, null, Modifier.size(if (autoMode) 46.dp else 36.dp), tint = cs.onBackground) }
-            IconButton(onClick = { vm.player.cycleRepeat() }) {
-                val icon = when (state.repeatMode) { 2 -> Icons.Default.RepeatOne; 1 -> Icons.Default.Repeat; else -> Icons.Default.Repeat }
-                Icon(icon, null, tint = if (state.repeatMode != 0) cs.primary else cs.onSurfaceVariant)
+
+            Spacer(Modifier.height(10.dp))
+
+            // ── Carátula, título y artista ──
+            AnimatedContent(
+                targetState = s.id, label = "nowplaying",
+                transitionSpec = {
+                    (fadeIn(tween(220)) + scaleIn(initialScale = 0.97f)) togetherWith
+                        (fadeOut(tween(160)) + scaleOut(targetScale = 0.97f))
+                },
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(artSize), contentAlignment = Alignment.Center) {
+                        SongArt(
+                            albumId = s.albumId, size = artSize, shape = Ds.HeroShape,
+                            iconSize = artSize * 0.36f, artUrl = s.artUrl
+                        )
+                        // Doble toque: izquierda −10 s, derecha +10 s
+                        Box(
+                            Modifier.matchParentSize().pointerInput(s.id) {
+                                detectTapGestures(onDoubleTap = { off ->
+                                    if (off.x < size.width / 2) { vm.player.seekBy(-10_000); tapMsg = "−10 segundos" }
+                                    else { vm.player.seekBy(10_000); tapMsg = "+10 segundos" }
+                                })
+                            }
+                        )
+                        tapMsg?.let {
+                            Surface(shape = RoundedCornerShape(12.dp), color = Color.Black.copy(alpha = 0.7f)) {
+                                Text(
+                                    it, color = Color.White, style = Ds.Body,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                    Text(
+                        s.title, style = Ds.Display, color = cs.onBackground,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "${s.artist.ifBlank { "Desconocido" }} · ${s.album.ifBlank { "Sencillo" }}",
+                        style = Ds.Body, color = cs.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // Espacio flexible: absorbe la altura sobrante y evita que se corten los controles
+            Spacer(Modifier.weight(1f))
+
+            PlaybackProgress(state) { vm.player.seekTo(it) }
+            Spacer(Modifier.height(6.dp))
+
+            // ── Transporte ──
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                IconButton(onClick = { vm.player.toggleShuffle() }) {
+                    Icon(
+                        Icons.Default.Shuffle, "Aleatorio",
+                        tint = if (state.shuffle) cs.primary else cs.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { vm.player.prev() }) {
+                    Icon(
+                        Icons.Default.SkipPrevious, "Anterior",
+                        Modifier.size(if (autoMode) 46.dp else 36.dp), tint = cs.onBackground
+                    )
+                }
+                Surface(
+                    shape = CircleShape, color = cs.primary,
+                    modifier = Modifier.size(if (autoMode) 88.dp else Ds.PlayHero)
+                        .then(pressClick({ vm.player.toggle() }, min = 0.88f))
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        AnimatedContent(targetState = state.isPlaying, label = "pp-hero") { p ->
+                            Icon(
+                                if (p) Icons.Default.Pause else Icons.Default.PlayArrow, null,
+                                tint = cs.surface, modifier = Modifier.size(36.dp)
+                            )
+                        }
+                    }
+                }
+                IconButton(onClick = { vm.player.next() }) {
+                    Icon(
+                        Icons.Default.SkipNext, "Siguiente",
+                        Modifier.size(if (autoMode) 46.dp else 36.dp), tint = cs.onBackground
+                    )
+                }
+                IconButton(onClick = { vm.player.cycleRepeat() }) {
+                    val icon = when (state.repeatMode) {
+                        2 -> Icons.Default.RepeatOne
+                        1 -> Icons.Default.Repeat
+                        else -> Icons.Default.Repeat
+                    }
+                    Icon(
+                        icon, "Repetir",
+                        tint = if (state.repeatMode != 0) cs.primary else cs.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // ── Acciones de la canción: antes vivían escondidas en el menú ──
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!isStream) {
+                    NpAction(Icons.Default.Favorite, "Favorito", active = isFav) { vm.toggleFav(s.id) }
+                }
+                NpAction(Icons.Default.Lyrics, "Letra") { onLyrics() }
+                NpAction(Icons.Default.QueueMusic, "Cola") { showQueue = true }
             }
         }
-        }
+    }
+}
+
+/** Acción secundaria del reproductor: icono + etiqueta en una píldora plana. */
+@Composable
+private fun NpAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    active: Boolean = false,
+    onClick: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        Modifier.clip(RoundedCornerShape(12.dp))
+            .background(if (active) cs.primary.copy(alpha = 0.14f) else cs.surface.copy(alpha = 0.55f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, Modifier.size(16.dp), tint = if (active) cs.primary else cs.onSurfaceVariant)
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = Ds.Sub, color = if (active) cs.primary else cs.onBackground)
     }
 }
 
