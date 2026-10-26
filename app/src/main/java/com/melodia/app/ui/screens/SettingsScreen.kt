@@ -248,23 +248,47 @@ fun SettingsScreen(
             item { SectionLabel("Rendimiento") }
             item {
                 SettingsCard {
-                    var stats by remember { mutableStateOf(com.melodia.app.perf.FrameMonitor.stats()) }
+                    var tick by remember { mutableStateOf(0) }
                     LaunchedEffect(Unit) {
                         while (true) {
-                            stats = com.melodia.app.perf.FrameMonitor.stats()
                             kotlinx.coroutines.delay(1000)
+                            tick++
                         }
                     }
+                    val overall = remember(tick) { com.melodia.app.perf.FrameMonitor.overall() }
+                    val perScreen = remember(tick) { com.melodia.app.perf.FrameMonitor.byScreen() }
                     SettingsRow(
                         icon = Icons.Default.Speed,
-                        title = if (stats.samples < 30) "Midiendo…" else "${stats.fps} fps",
-                        value = if (stats.samples < 30) "Navega un momento y vuelve"
-                        else "${stats.slowPct}% de frames lentos · peor ${stats.worstMs} ms"
+                        title = if (overall.frames < 30) "Midiendo…" else "${overall.fps} fps · ${overall.slowPct}% lentos",
+                        value = if (overall.frames < 30) "Navega un momento y vuelve"
+                        else "Peor frame: ${overall.worstMs} ms"
+                    )
+                    perScreen.take(4).forEach { st ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(st.screen, style = Ds.Sub, color = cs.onBackground, modifier = Modifier.weight(1f))
+                            Text(
+                                "${st.fps} fps · ${st.slowPct}% · ${st.worstMs} ms",
+                                style = Ds.Sub,
+                                color = if (st.slowPct >= 5) cs.error else cs.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Reinicia la medición, usa una pantalla 10 s y vuelve a mirar aquí.",
+                        style = Ds.Sub, color = cs.onSurfaceVariant
                     )
                     Text(
-                        "Últimos 15 s de uso. A 60 fps, menos de 2% de frames lentos se siente fluido.",
-                        style = Ds.Sub, color = cs.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 4.dp)
+                        "Reiniciar medición",
+                        style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                        color = cs.primary,
+                        modifier = Modifier.clickable {
+                            com.melodia.app.perf.FrameMonitor.reset()
+                            tick++
+                        }.padding(vertical = 6.dp)
                     )
                 }
             }

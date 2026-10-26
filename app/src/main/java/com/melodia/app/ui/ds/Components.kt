@@ -225,8 +225,10 @@ fun TrackRow(
     val maxSwipe = with(LocalDensity.current) { 140.dp.toPx() }
     val threshold = maxSwipe * 0.5f
     Box(Modifier.fillMaxWidth()) {
-        // Franja de acción: solo se pinta lo que el deslizamiento va descubriendo
-        if (!safeGestures) Canvas(Modifier.matchParentSize()) {
+        // Franja de acción: solo existe mientras hay deslizamiento. Sin esto cada
+        // fila visible arrastraba dos capas (Canvas + caja con alpha) al hacer scroll.
+        val swiping = !safeGestures && offset.value != 0f
+        if (swiping) Canvas(Modifier.matchParentSize()) {
             val v = offset.value
             val a = (kotlin.math.abs(v) / maxSwipe).coerceIn(0f, 1f) * 0.18f
             if (v > 0f) {
@@ -242,7 +244,7 @@ fun TrackRow(
                 )
             }
         }
-        if (!safeGestures) Box(Modifier.matchParentSize()) {
+        if (swiping) Box(Modifier.matchParentSize()) {
             val leftA = (offset.value / maxSwipe).coerceIn(0f, 1f)
             val rightA = (-offset.value / maxSwipe).coerceIn(0f, 1f)
             if (onQueue != null) Icon(
@@ -305,6 +307,17 @@ fun TrackRow(
         }
         }
     }
+}
+
+/** Barra de progreso del miniplayer aislada: el tween de 500 ms solo la toca a ella. */
+@Composable
+private fun MiniProgress(progress: Float) {
+    val cs = MaterialTheme.colorScheme
+    val smooth by animateFloatAsState(progress.coerceIn(0f, 1f), tween(500), label = "minip")
+    LinearProgressIndicator(
+        progress = smooth, modifier = Modifier.fillMaxWidth().height(2.dp),
+        color = cs.primary, trackColor = cs.onSurfaceVariant.copy(alpha = 0.22f)
+    )
 }
 
 // ── Esqueleto de carga (mientras se lee la biblioteca) ───────────
@@ -512,12 +525,9 @@ fun MiniPlayerDs(
                     }
                 }
             }
-            // Progreso fluido: el estado llega cada 500ms, se interpola con tween
-            val smooth by animateFloatAsState(progress.coerceIn(0f, 1f), tween(500), label = "minip")
-            LinearProgressIndicator(
-                progress = smooth, modifier = Modifier.fillMaxWidth().height(2.dp),
-                color = cs.primary, trackColor = cs.onSurfaceVariant.copy(alpha = 0.22f)
-            )
+            // Progreso fluido en su propio composable: si el tween vive aquí, cada
+            // frame de la animación recompone toda la barra (arte, textos y botones).
+            MiniProgress(progress = progress)
         }
     }
 }

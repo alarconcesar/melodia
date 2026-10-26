@@ -238,6 +238,21 @@ fun MelodiaScreen(vm: MainViewModel) {
     var showXfade by remember { mutableStateOf(false) }
     var showStats by remember { mutableStateOf(false) }
     var showLib by remember { mutableStateOf(false) }
+    // Etiqueta para el reporte de fluidez (Ajustes → Rendimiento).
+    LaunchedEffect(tab, showPlayer, showSettings, showLyrics) {
+        com.melodia.app.perf.FrameMonitor.screen(
+            when {
+                showSettings -> "Ajustes"
+                showLyrics -> "Letra"
+                showPlayer -> "Reproductor"
+                tab == 0 -> "Inicio"
+                tab == 1 -> "Explorar"
+                tab == 2 -> "Listas"
+                tab == 3 -> "Favs"
+                else -> "Online"
+            }
+        )
+    }
     var showBackup by remember { mutableStateOf(false) }
     var showEq by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf<Song?>(null) }
@@ -362,15 +377,10 @@ fun MelodiaScreen(vm: MainViewModel) {
             }
             // ── Content: sin blur en vivo (Haze re-blurea en cada frame de scroll) ──
             Box(Modifier.weight(1f)) {
-                AnimatedContent(
-                    targetState = tab, label = "tabs",
-                    transitionSpec = {
-                        // Deslizamiento direccional: la pestaña entra desde el lado al que vas
-                        val dir = if (targetState > initialState) 1 else -1
-                        (slideInHorizontally(tween(280)) { w -> dir * w / 7 } + fadeIn(tween(220))) togetherWith
-                            (slideOutHorizontally(tween(220)) { w -> -dir * w / 7 } + fadeOut(tween(180)))
-                    }
-                ) { t ->
+                // Sin transición entre pestañas: animar dos pantallas completas
+                // cuesta frames justo cuando el usuario acaba de tocar.
+                androidx.compose.runtime.key(tab) {
+                val t = tab
                 when (t) {
                     0 -> HomeTab(vm, songs, all, current?.id, isPlaying, favIds,
                         onAdd = { showInfo = it }, onTab = { tab = it },
@@ -1571,7 +1581,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             // Sombra ambiental del acento: la carátula flota sobre el fondo
             Surface(
                 shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(artSize)
-                    .shadow(28.dp, Ds.HeroShape, spotColor = cs.primary.copy(alpha = 0.28f))
+                    .shadow(10.dp, Ds.HeroShape)
             ) {
                 SongArt(
                     albumId = s.albumId, size = artSize, shape = Ds.HeroShape,
