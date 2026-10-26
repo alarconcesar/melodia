@@ -143,7 +143,8 @@ fun OnlineTab(vm: MainViewModel) {
         onToggleQuality = { vm.setYtQuality(!highQ) },
         notice = notice,
         onClearNotice = vm::clearYtMsg,
-        onDownloadCollection = { vm.downloadYtCollection(it) }
+        onDownloadCollection = { vm.downloadYtCollection(it) },
+        onOpenCollection = { vm.openYtCollection(it) }
     )
 
     if (showDls) DownloadsSheet(vm, onDismiss = { showDls = false })
@@ -192,7 +193,8 @@ fun OnlineTabContent(
     onToggleQuality: () -> Unit,
     notice: String? = null,
     onClearNotice: () -> Unit = {},
-    onDownloadCollection: (YtSearchItem.Collection) -> Unit = {}
+    onDownloadCollection: (YtSearchItem.Collection) -> Unit = {},
+    onOpenCollection: (YtSearchItem.Collection) -> Unit = {}
 ) {
     val cs = MaterialTheme.colorScheme
     var menu by remember { mutableStateOf(false) }
@@ -407,6 +409,7 @@ fun OnlineTabContent(
                             is YtSearchItem.Collection -> YtCollectionRow(
                                 item = item,
                                 busy = busyId == item.key,
+                                onOpen = { onOpenCollection(item) },
                                 onDownload = { onDownloadCollection(item) }
                             )
                         }
@@ -477,16 +480,17 @@ fun YtRowFlat(
     }
 }
 
-/** Playlist o álbum: se descarga entero (es lo que se busca al buscar en YT). */
+/** Playlist o álbum: el toque abre su contenido, el icono la descarga entera. */
 @Composable
 fun YtCollectionRow(
     item: YtSearchItem.Collection,
     busy: Boolean,
+    onOpen: () -> Unit,
     onDownload: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onDownload).padding(vertical = 6.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(48.dp).clip(RoundedCornerShape(Ds.RCard))) {
@@ -667,6 +671,81 @@ private fun QualityOption(title: String, subtitle: String, selected: Boolean, on
             if (selected) Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = cs.primary)
         }
     }
+}
+
+/**
+ * Vista previa de una playlist/álbum de YouTube: se abren sus temas para
+ * escuchar uno o descargar la lista entera. Antes tocar la fila descargaba
+ * directamente y no había forma de ver qué contenía.
+ */
+@Composable
+fun YtCollectionSheet(vm: MainViewModel) {
+    val cs = MaterialTheme.colorScheme
+    val preview by vm.ytPreview.collectAsState()
+    val p = preview ?: return
+    AlertDialog(
+        onDismissRequest = { vm.closeYtPreview() },
+        title = {
+            Column(Modifier.fillMaxWidth()) {
+                Text(
+                    p.title, style = Ds.Title, color = cs.onBackground,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    when {
+                        p.loading -> "Cargando temas…"
+                        p.tracks.isNotEmpty() -> "${p.tracks.size} temas"
+                        else -> "Playlist o álbum"
+                    },
+                    style = Ds.Sub, color = cs.onSurfaceVariant
+                )
+            }
+        },
+        text = {
+            Box(Modifier.fillMaxWidth().heightIn(max = 380.dp, min = 80.dp)) {
+                when {
+                    p.loading -> Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                        MelodiaSpinner(size = 24.dp, width = 2.dp)
+                    }
+                    p.error != null -> Text(p.error, style = Ds.Body, color = cs.error)
+                    else -> LazyColumn(Modifier.fillMaxWidth()) {
+                        items(p.tracks, key = { "pv-${it.id}" }) { t ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    vm.closeYtPreview()
+                                    vm.playYt(t)
+                                }.padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OnlineThumb(t, 40.dp)
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        t.title, style = Ds.Body, color = cs.onBackground,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        t.artist.ifBlank { "YouTube" } +
+                                            if (t.durationSec > 0) " · ${fmtDur(t.durationSec)}" else "",
+                                        style = Ds.Sub, color = cs.onSurfaceVariant,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp), tint = cs.primary)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { vm.downloadYtPreview() },
+                enabled = p.tracks.isNotEmpty()
+            ) { Text("Descargar todo") }
+        },
+        dismissButton = { TextButton(onClick = { vm.closeYtPreview() }) { Text("Cerrar") } }
+    )
 }
 
 /** Descargas: cola con pausa/reintento + historial con calidad y fecha. */

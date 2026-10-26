@@ -51,6 +51,7 @@ class OnlineTabTest {
         notice: String? = null,
         onPlay: (YtTrack) -> Unit = {},
         onDownloadCollection: (YtSearchItem.Collection) -> Unit = {},
+        onOpenCollection: (YtSearchItem.Collection) -> Unit = {},
         onOpenDownloads: () -> Unit = {},
         onOpenImport: () -> Unit = {}
     ) {
@@ -82,7 +83,8 @@ class OnlineTabTest {
                     onToggleSaver = {},
                     onToggleQuality = {},
                     notice = notice,
-                    onDownloadCollection = onDownloadCollection
+                    onDownloadCollection = onDownloadCollection,
+                    onOpenCollection = onOpenCollection
                 )
             }
         }
@@ -123,19 +125,32 @@ class OnlineTabTest {
     }
 
     @Test
-    fun lasPlaylistsSeMezclanYSeDescarganEnteras() {
-        var pedida: YtSearchItem.Collection? = null
+    fun lasPlaylistsSeMezclanYSeAbren() {
+        var abierta: YtSearchItem.Collection? = null
         componer(
             items = tracks(2) + collection(),
             query = "queen",
-            onDownloadCollection = { pedida = it }
+            onOpenCollection = { abierta = it }
         )
         rule.onNodeWithText("3 resultados").assertExists()
         rule.onNodeWithText("Queen Greatest Hits").assertExists()
         rule.onNodeWithText("Queen Official · 17 temas · Playlist o álbum").assertExists()
         rule.onNodeWithText("Queen Greatest Hits").performClick()
         rule.waitForIdle()
-        assert(pedida?.id == "PL123") { "no se pidió la colección: ${pedida?.id}" }
+        assert(abierta?.id == "PL123") { "no se abrió la colección: ${abierta?.id}" }
+    }
+
+    @Test
+    fun elIconoDescargaLaColeccionEntera() {
+        var descargada: YtSearchItem.Collection? = null
+        componer(
+            items = listOf(collection()),
+            query = "queen",
+            onDownloadCollection = { descargada = it }
+        )
+        rule.onNodeWithContentDescription("Descargar entera").performClick()
+        rule.waitForIdle()
+        assert(descargada?.id == "PL123") { "no se descargó: ${descargada?.id}" }
     }
 
     @Test

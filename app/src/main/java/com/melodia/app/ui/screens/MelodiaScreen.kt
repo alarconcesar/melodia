@@ -505,6 +505,8 @@ fun MelodiaScreen(vm: MainViewModel) {
         }
     }
 
+    YtCollectionSheet(vm)
+
     if (showCreate) TextDialog("Nueva playlist", "", onDismiss = { showCreate = false }) { vm.createPlaylist(it) { showCreate = false } }
     renameId?.let { pid ->
         TextDialog("Renombrar", playlists.find { it.id == pid }?.name ?: "", onDismiss = { renameId = null }) {
@@ -635,6 +637,7 @@ fun HomeTab(
     val query by vm.query.collectAsState()
     val homeYt by vm.homeYt.collectAsState()
     val homeYtLoading by vm.homeYtLoading.collectAsState()
+    val busyYt by vm.busyYt.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
     // La biblioteca filtra al instante; YouTube espera a que deje de teclear.
     LaunchedEffect(query) {
@@ -748,7 +751,7 @@ fun HomeTab(
         }
         item {
             val recent by vm.recentPlayed.collectAsState()
-            if (recent.isNotEmpty()) {
+            if (recent.isNotEmpty() && query.isBlank()) {
                 Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
                     Text("Escuchado recientemente", style = Ds.Title, color = cs.onBackground)
                     Spacer(Modifier.height(8.dp))
@@ -782,7 +785,7 @@ fun HomeTab(
         if (!safeExtras2) item {
             val albums by vm.albums.collectAsState()
             val shown = remember(albums) { albums.sortedByDescending { it.count }.take(14) }
-            if (shown.isNotEmpty()) {
+            if (shown.isNotEmpty() && query.isBlank()) {
                 Column(Modifier.padding(vertical = 10.dp)) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp),
@@ -869,13 +872,14 @@ fun HomeTab(
                         is com.melodia.app.data.online.YtSearchItem.Track -> YtRowFlat(
                             track = item.track,
                             progress = null,
-                            busy = false,
+                            busy = busyYt == item.track.id,
                             onPlay = { vm.playYt(item.track) },
                             onDownload = { vm.downloadYt(item.track) }
                         )
                         is com.melodia.app.data.online.YtSearchItem.Collection -> YtCollectionRow(
                             item = item,
-                            busy = false,
+                            busy = busyYt == item.key,
+                            onOpen = { vm.openYtCollection(item) },
                             onDownload = { vm.downloadYtCollection(item) }
                         )
                     }

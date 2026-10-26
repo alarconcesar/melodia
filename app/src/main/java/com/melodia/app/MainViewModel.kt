@@ -317,6 +317,14 @@ class MainViewModel(
             _homeYtLoading.value = true
             try {
                 _homeYt.value = withContext(Dispatchers.IO) { yt.searchFirstPage(query) }
+                val primeros = _homeYt.value
+                    .filterIsInstance<com.melodia.app.data.online.YtSearchItem.Track>()
+                    .take(3)
+                for (t in primeros) {
+                    try {
+                        withContext(Dispatchers.IO) { yt.prefetchAudio(t.track.url, !_dataSaver.value) }
+                    } catch (_: Exception) {}
+                }
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _homeYt.value = emptyList()
@@ -755,11 +763,18 @@ class MainViewModel(
                     } catch (_: Exception) {}
                     // Prefetch del primer resultado: el play más común arranca al instante
                     // (hijo de este job: se cancela si llega otra búsqueda)
-                    val top = _ytResults.value.filterIsInstance<com.melodia.app.data.online.YtSearchItem.Track>()
-                        .firstOrNull()
-                    if (top != null) {
+                    // Prefetch de los 3 primeros: al tocar el segundo o tercer
+                    // resultado, el audio ya está resuelto y arranca al instante.
+                    val primeros = _ytResults.value
+                        .filterIsInstance<com.melodia.app.data.online.YtSearchItem.Track>()
+                        .take(3)
+                    if (primeros.isNotEmpty()) {
                         launch {
-                            try { withContext(Dispatchers.IO) { yt.prefetchAudio(top.track.url, !_dataSaver.value) } } catch (_: Exception) {}
+                            for (t in primeros) {
+                                try {
+                                    withContext(Dispatchers.IO) { yt.prefetchAudio(t.track.url, !_dataSaver.value) }
+                                } catch (_: Exception) {}
+                            }
                         }
                     }
                 }
@@ -816,24 +831,33 @@ class MainViewModel(
         }
     }
 
+    private var playYtJob: kotlinx.coroutines.Job? = null
+
     fun playYt(track: YtTrack) {
-        if (_busyYt.value != null) return
-        viewModelScope.launch {
+        // Cambiar de tema online mientras otro resuelve: se cancela el anterior en
+        // vez de ignorar el toque (eso se sentía como que la app se trababa).
+        playYtJob?.cancel()
+        playYtJob = viewModelScope.launch {
             _busyYt.value = track.id
             _ytError.value = null
+            // El tema elegido aparece de inmediato en el miniplayer, aunque el
+            // audio tarde unos segundos en resolverse.
+            val pendiente = Song(
+                id = YT_STREAM_ID, title = track.title,
+                artist = track.artist.ifBlank { "YouTube" },
+                album = "Online", albumId = -1L, durationMs = track.durationSec * 1000,
+                dataPath = "", dateAdded = 0L, artUrl = track.thumbUrl
+            )
+            _currentTrack.value = track
+            _streamSong.value = pendiente
+            _queue.value = listOf(pendiente)
+            _currentId.value = YT_STREAM_ID
             try {
                 // Solo-audio real: nunca se toca el video; con ahorro usa bitrate modesto
                 val audio = withContext(Dispatchers.IO) { yt.bestAudio(track.url, !_dataSaver.value) }
-                _currentTrack.value = track
-                val stream = Song(
-                    id = YT_STREAM_ID, title = track.title,
-                    artist = track.artist.ifBlank { "YouTube" },
-                    album = "Online", albumId = -1L, durationMs = track.durationSec * 1000,
-                    dataPath = audio.url, dateAdded = 0L, artUrl = track.thumbUrl
-                )
+                val stream = pendiente.copy(dataPath = audio.url)
                 _streamSong.value = stream
                 _queue.value = listOf(stream)
-                _currentId.value = YT_STREAM_ID
                 player.playStream(audio.url, track.title, track.artist, track.thumbUrl)
                 try {
                     yt.pushHistory(track)
@@ -842,9 +866,51 @@ class MainViewModel(
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _ytError.value = errMsg(t, "No se pudo reproducir — reintenta")
+            } finally {
+                if (_busyYt.value == track.id) _busyYt.value = null
             }
-            _busyYt.value = null
         }
+    }
+
+    // ── Vista previa de una playlist/álbum de YouTube ──
+    data class YtPreview(
+        val title: String,
+        val url: String,
+        val loading: Boolean = false,
+        val tracks: List<YtTrack> = emptyList(),
+        val error: String? = null
+    )
+
+    private val _ytPreview = MutableStateFlow<YtPreview?>(null)
+    val ytPreview: StateFlow<YtPreview?> = _ytPreview
+
+    fun openYtCollection(col: com.melodia.app.data.online.YtSearchItem.Collection) {
+        _ytPreview.value = YtPreview(title = col.title, url = col.url, loading = true)
+        viewModelScope.launch {
+            try {
+                val (title, tracks) = withContext(Dispatchers.IO) { yt.playlistTracks(col.url) }
+                _ytPreview.value = YtPreview(
+                    title = title.ifBlank { col.title }, url = col.url,
+                    tracks = tracks, error = if (tracks.isEmpty()) "La lista no trae temas visibles" else null
+                )
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                _ytPreview.value = YtPreview(
+                    title = col.title, url = col.url,
+                    error = errMsg(t, "No se pudo abrir la lista")
+                )
+            }
+        }
+    }
+
+    fun closeYtPreview() { _ytPreview.value = null }
+
+    fun downloadYtPreview() {
+        val p = _ytPreview.value ?: return
+        if (p.tracks.isEmpty()) return
+        dl.enqueueAll(p.tracks, _ytHighQuality.value)
+        _ytMsg.value = "«${p.title}»: ${p.tracks.size} temas a la cola de descargas"
+        _ytPreview.value = null
     }
 
     // ── Letras sincronizadas ──
