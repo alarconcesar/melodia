@@ -74,7 +74,6 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Edit
@@ -1634,25 +1633,8 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     val isStream = s.id == YT_STREAM_ID
     var showQueue by remember { mutableStateOf(false) }
     var showPitch by remember { mutableStateOf(false) }
-    var autoMode by remember { mutableStateOf(false) }
     var tapMsg by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
-    // Modo auto: anuncia el tema con voz al cambiar (TTS del sistema, sin permisos)
-    val tts = remember {
-        var t: android.speech.tts.TextToSpeech? = null
-        t = android.speech.tts.TextToSpeech(ctx) { st ->
-            if (st == android.speech.tts.TextToSpeech.SUCCESS) {
-                try { t?.setLanguage(java.util.Locale.getDefault()) } catch (_: Exception) {}
-            }
-        }
-        t!!
-    }
-    DisposableEffect(Unit) { onDispose { try { tts.shutdown() } catch (_: Exception) {} } }
-    LaunchedEffect(s.id, autoMode) {
-        if (autoMode) {
-            try { tts.speak("${s.title}, de ${s.artist.ifBlank { "artista desconocido" }}", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "melodia-auto") } catch (_: Exception) {}
-        }
-    }
     LaunchedEffect(tapMsg) { if (tapMsg != null) { kotlinx.coroutines.delay(900); tapMsg = null } }
     if (showQueue) QueueSheet(vm, onDismiss = { showQueue = false })
     if (showPitch) PitchSheet(vm, state.pitch, state.speed, onDismiss = { showPitch = false })
@@ -1725,11 +1707,6 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                                 text = { Text(if (state.pitch != 1f || state.speed != 1f) "Tono y velocidad · activo" else "Tono y velocidad") },
                                 leadingIcon = { Icon(Icons.Default.Tune, null) },
                                 onClick = { npMenu = false; showPitch = true }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (autoMode) "Modo auto · activado" else "Modo auto") },
-                                leadingIcon = { Icon(Icons.Default.DirectionsCar, null) },
-                                onClick = { npMenu = false; autoMode = !autoMode }
                             )
                             if (isStream && curTrack != null && dlProg == null) {
                                 DropdownMenuItem(
@@ -1825,12 +1802,12 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                 IconButton(onClick = { vm.player.prev() }) {
                     Icon(
                         Icons.Default.SkipPrevious, "Anterior",
-                        Modifier.size(if (autoMode) 46.dp else 36.dp), tint = cs.onBackground
+                        Modifier.size(36.dp), tint = cs.onBackground
                     )
                 }
                 Surface(
                     shape = CircleShape, color = cs.primary,
-                    modifier = Modifier.size(if (autoMode) 88.dp else Ds.PlayHero)
+                    modifier = Modifier.size(Ds.PlayHero)
                         .then(pressClick({ vm.player.toggle() }, min = 0.88f))
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -1845,7 +1822,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                 IconButton(onClick = { vm.player.next() }) {
                     Icon(
                         Icons.Default.SkipNext, "Siguiente",
-                        Modifier.size(if (autoMode) 46.dp else 36.dp), tint = cs.onBackground
+                        Modifier.size(36.dp), tint = cs.onBackground
                     )
                 }
                 IconButton(onClick = { vm.player.cycleRepeat() }) {

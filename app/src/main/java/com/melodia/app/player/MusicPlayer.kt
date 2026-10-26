@@ -471,7 +471,7 @@ class MusicPlayer(private val context: Context) {
         ensureBound()
         try { exo?.let { val d = it.duration.coerceAtLeast(0); it.seekTo((d * f).toLong()); updateState() } } catch (_: Exception) {}
     }
-    /** Salto relativo en ms (doble toque ±10 s, modo auto). */
+    /** Salto relativo en ms (doble toque ±10 s en la carátula). */
     fun seekBy(ms: Long) {
         ensureBound()
         try { exo?.let { it.seekTo((it.currentPosition + ms).coerceAtLeast(0)); updateState() } } catch (_: Exception) {}
