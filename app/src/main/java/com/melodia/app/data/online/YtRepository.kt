@@ -583,7 +583,26 @@ class YtRepository(private val context: Context) {
             if (out.size >= 100 || !page.hasNextPage() || rounds++ >= 4) break
             page = ex.getPage(page.nextPage)
         }
-        title to out.take(100)
+        // Lo que llega de una playlist suele venir sin artista y con el canal
+        // pegado al título ("Tema - Canal Oficial"). Se limpia aquí, antes de
+        // descargar, para que el archivo y la biblioteca queden bien.
+        val owner = (try { ex.uploaderName } catch (_: Exception) { "" } ?: "")
+            .replace(" - Topic", "").replace("VEVO", "").trim()
+        val portada = try {
+            ex.thumbnails.maxByOrNull { it.height * it.width }?.url
+        } catch (_: Exception) { null }
+        val limpio = out.take(100).map { t ->
+            var titulo = t.title
+            if (owner.isNotBlank() && titulo.endsWith(" - $owner", ignoreCase = true)) {
+                titulo = titulo.dropLast(owner.length + 3).trim()
+            }
+            t.copy(
+                title = titulo.ifBlank { t.title },
+                artist = t.artist.ifBlank { owner },
+                thumbUrl = t.thumbUrl ?: portada
+            )
+        }
+        title to limpio
     }
 
     /** Descarga bytes crudos (miniatura para incrustar como carátula). */

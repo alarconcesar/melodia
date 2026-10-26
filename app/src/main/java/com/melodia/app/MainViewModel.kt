@@ -153,6 +153,7 @@ class MainViewModel(
                 _songs.value = list
                 _loaded.value = true
                 maybeRestoreQueue(list)
+                repairDownloads(list)
                 enrichArtwork(list)
             }
         }
@@ -220,9 +221,7 @@ class MainViewModel(
                 }
                 l?.let { plainOrSynced(it) }
             } catch (_: Exception) { null }
-            val art = try {
-                track.thumbUrl?.let { withContext(Dispatchers.IO) { yt.fetchBytes(it) } }
-            } catch (_: Exception) { null }
+            val art = try { mejorMiniatura(track) } catch (_: Exception) { null }
             // Además de incrustarla en el m4a, queda como carátula local del
             // tema: si el etiquetado falla, la biblioteca igual muestra la suya.
             try { withContext(Dispatchers.IO) { artRepo.saveLocal(track.artist, track.title, art) } } catch (_: Exception) {}
@@ -235,6 +234,71 @@ class MainViewModel(
             // Precalienta la caché de letra con la clave del tema ya guardado
             viewModelScope.launch { delayWarmLyric(track) }
         }
+    }
+
+    /**
+     * Carátula de la descarga en la mejor resolución disponible.
+     *
+     * La miniatura que trae un resultado de playlist suele ser pequeña (120 px)
+     * y al usarla como portada se ve pixelada. Se prueban maxres/sd y se queda
+     * con el candidato de mayor área; si nada llega a ~300x300 se usa igual la
+     * mejor encontrada.
+     */
+    private suspend fun mejorMiniatura(track: YtTrack): ByteArray? {
+        val candidatas = buildList {
+            if (track.id.isNotBlank()) {
+                add("https://i.ytimg.com/vi/${track.id}/maxresdefault.jpg")
+                add("https://i.ytimg.com/vi/${track.id}/sddefault.jpg")
+            }
+            track.thumbUrl?.let { add(it) }
+        }.distinct()
+        var mejor: ByteArray? = null
+        var mejorArea = 0
+        for (url in candidatas) {
+            val bytes = try {
+                withContext(Dispatchers.IO) { yt.fetchBytes(url) }
+            } catch (_: Exception) { null } ?: continue
+            val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            try {
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+            } catch (_: Exception) { continue }
+            val area = opts.outWidth * opts.outHeight
+            if (area > mejorArea) {
+                mejor = bytes
+                mejorArea = area
+            }
+        }
+        return mejor
+    }
+
+    private var downloadsReparadas = false
+
+    /**
+     * Repara descargas viejas sin artista: las que llegaron de una playlist con
+     * el canal pegado al título ("Tema - Canal Oficial") y quedaron como
+     * "Desconocido". Se separa el sufijo, se guarda como artista y se limpia el
+     * título en MediaStore. Corre una sola vez por sesión.
+     */
+    private suspend fun repairDownloads(list: List<Song>) {
+        if (downloadsReparadas) return
+        downloadsReparadas = true
+        try {
+            withContext(Dispatchers.IO) {
+                var cambios = 0
+                for (s in list) {
+                    if (!s.dataPath.contains("/Melodia/")) continue
+                    if (s.artist.isNotBlank() && s.artist != "Desconocido") continue
+                    val corte = s.title.lastIndexOf(" - ")
+                    if (corte <= 0) continue
+                    val posible = s.title.substring(corte + 3).trim()
+                    if (posible.isBlank() || posible.length > 40) continue
+                    val titulo = s.title.substring(0, corte).trim()
+                    if (titulo.isBlank()) continue
+                    if (repo.updateMetadata(s.id, titulo, posible, s.album.ifBlank { titulo })) cambios++
+                }
+                if (cambios > 0) withContext(Dispatchers.Main) { reload() }
+            }
+        } catch (_: Exception) {}
     }
 
     private var queueRestored = false
