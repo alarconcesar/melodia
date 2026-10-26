@@ -42,7 +42,8 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     // Dos descargas a la vez: cada una abre varios sockets y en LTE se cortan
-    private val slots = Semaphore(2)
+    // Tres transferencias a la vez: la extracción del enlace ya no ocupa cupo.
+    private val slots = Semaphore(3)
     private val dir = File(context.cacheDir, "dl").apply { mkdirs() }
 
     private val _jobs = MutableStateFlow<List<DlJob>>(emptyList())
@@ -76,11 +77,7 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             _jobs.value += DlJob(track, high, DlStatus.QUEUED)
             persist()
             running[track.id] = scope.launch {
-                try {
-                    slots.acquire()
-                    try { runJob(track, high, fromScratch = false) }
-                    finally { slots.release() }
-                } catch (_: Exception) {}
+                try { runJob(track, high, fromScratch = false) } catch (_: Exception) {}
                 synchronized(running) { running.remove(track.id) }
             }
         }
@@ -109,9 +106,7 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             update(id) { it.copy(status = DlStatus.QUEUED, error = null) }
             running[id] = scope.launch {
                 try {
-                    slots.acquire()
-                    try { runJob(j.track, j.high, fromScratch = j.status == DlStatus.ERROR && j.downloaded <= 0) }
-                    finally { slots.release() }
+                    runJob(j.track, j.high, fromScratch = j.status == DlStatus.ERROR && j.downloaded <= 0)
                 } catch (_: Exception) {}
                 synchronized(running) { running.remove(id) }
             }
@@ -145,7 +140,10 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             var ultimoBytes = done
             var ultimoMs = System.currentTimeMillis()
             var velocidad = 0L
-            val descargado = yt.downloadToFile(audio.url, part, done) { d, tot ->
+            var descargado = done
+            slots.acquire()
+            try {
+            descargado = yt.downloadToFile(audio.url, part, done) { d, tot ->
                 val ahora = System.currentTimeMillis()
                 val dt = ahora - ultimoMs
                 if (dt >= 400) {
@@ -163,6 +161,7 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
                 }
                 syncProgress()
             }
+            } finally { slots.release() }
             done = descargado
             if (total > 0 && done < total) error("Descarga incompleta")
             update(track.id) { it.copy(status = DlStatus.DONE, progress = 1f, downloaded = done, total = total) }

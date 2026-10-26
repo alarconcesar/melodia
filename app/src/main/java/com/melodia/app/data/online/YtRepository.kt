@@ -391,9 +391,8 @@ class YtRepository(private val context: Context) {
     /** Cantidad de conexiones según el tamaño: más trozos = más ancho de banda. */
     private fun partesPara(restante: Long): Int {
         val ideal = when {
-            restante >= 12L * 1024 * 1024 -> 8
-            restante >= 6L * 1024 * 1024 -> 6
-            restante >= 3L * 1024 * 1024 -> 4
+            restante >= 8L * 1024 * 1024 -> 6
+            restante >= 4L * 1024 * 1024 -> 4
             restante >= 1_500_000L -> 3
             else -> 2
         }
