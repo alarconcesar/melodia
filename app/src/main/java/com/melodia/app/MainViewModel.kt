@@ -18,6 +18,7 @@ import com.melodia.app.player.YT_STREAM_ID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -213,18 +214,32 @@ class MainViewModel(
             try { dl.progress.collect { _dlProgress.value = it } } catch (_: Exception) {}
         }
         dl.onFinished = { track, high, audio, part ->
-            // Letra y carátula para incrustar en el archivo
-            val lyricText = try {
-                val l = withContext(Dispatchers.IO) {
-                    lyricsRepo.get(track.artist, track.title, "", track.durationSec, "dl:${track.id}")
-                }
-                l?.let { plainOrSynced(it) }
-            } catch (_: Exception) { null }
-            val art = try { mejorMiniatura(track) } catch (_: Exception) { null }
+            kotlinx.coroutines.coroutineScope {
+            // Letra y carátula se buscan EN PARALELO y con tope de tiempo: antes
+            // eran dos esperas de red en fila y la descarga "terminaba" segundos
+            // antes de aparecer en el historial.
+            val letra = async {
+                try {
+                    val l = withContext(Dispatchers.IO) {
+                        kotlinx.coroutines.withTimeoutOrNull(2_500L) {
+                            lyricsRepo.get(track.artist, track.title, "", track.durationSec, "dl:${track.id}")
+                        }
+                    }
+                    l?.let { plainOrSynced(it) }
+                } catch (_: Exception) { null }
+            }
+            val arte = async {
+                try {
+                    kotlinx.coroutines.withTimeoutOrNull(4_000L) { mejorMiniatura(track) }
+                } catch (_: Exception) { null }
+            }
+            val lyricText = letra.await()
+            val art = arte.await()
             // Además de incrustarla en el m4a, queda como carátula local del
             // tema: si el etiquetado falla, la biblioteca igual muestra la suya.
             try { withContext(Dispatchers.IO) { artRepo.saveLocal(track.artist, track.title, art) } } catch (_: Exception) {}
             withContext(Dispatchers.IO) { yt.storeDownload(track, high, audio, part, lyricText, art, null) }
+            // Primero el historial (es lo que mira el usuario), después la biblioteca.
             try {
                 yt.pushDlHistory(track, high)
                 _dlHistory.value = yt.getDlHistory()
@@ -232,6 +247,7 @@ class MainViewModel(
             reload()
             // Precalienta la caché de letra con la clave del tema ya guardado
             viewModelScope.launch { delayWarmLyric(track) }
+            }
         }
     }
 
