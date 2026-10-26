@@ -417,7 +417,7 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
         Triple("Online", Icons.Default.Download, 4)
     )
     Surface(
-        shape = CircleShape, color = cs.surface.copy(alpha = 0.86f),
+        shape = CircleShape, color = cs.surface.copy(alpha = 0.95f),
         tonalElevation = 0.dp, shadowElevation = 6.dp,
         modifier = modifier.fillMaxWidth()
     ) {
@@ -481,7 +481,7 @@ fun MiniPlayerDs(
 ) {
     val cs = MaterialTheme.colorScheme
     Surface(
-        shape = Ds.CardShape, color = cs.surfaceVariant.copy(alpha = 0.9f),
+        shape = Ds.CardShape, color = cs.surfaceVariant.copy(alpha = 0.97f),
         tonalElevation = 0.dp, shadowElevation = 6.dp,
         modifier = modifier.fillMaxWidth().clickable(onClick = onOpen)
     ) {

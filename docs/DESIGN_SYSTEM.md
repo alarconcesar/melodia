@@ -126,4 +126,26 @@ La pestaña tenía tres filas de chips antes de llegar al buscador. Ahora:
 - Cabecera de resultados: conteo + "Descargar todo" como texto.
 - Importar playlist y calidad pasan a diálogos; el estado vacío es una línea.
 
+## Rendimiento (pase 4.9)
 
+Reglas nacidas de medir el jank, no de la intuición:
+
+- **Nada de blur en vivo sobre contenido que se mueve.** Haze re-blurea en cada
+  frame de scroll; el fondo del reproductor a `blur(60dp)` era un RenderEffect de
+  pantalla completa. Se usan velos translúcidos (`surface` al 95-97%) y el
+  gradiente sobre una miniatura de 160 px.
+- **Observa lo mínimo en la raíz.** `MelodiaScreen` solo escucha `isPlaying`
+  (`map{}.distinctUntilChanged()`); el `PlayerState` completo se observa dentro
+  del miniplayer y del reproductor. Antes el tick de 500 ms recomponía las 5
+  pestañas y la lista entera.
+- **Sin animaciones infinitas decorativas.** El marquee del título animaba en
+  cada frame con el reproductor abierto; ahora es una línea con elipsis.
+- **Trabajo pesado fuera del hilo principal.** Filtrado y agrupado de la
+  biblioteca (`filtered`, `folders`, `albums`, `artists`, `favSongs`) van con
+  `flowOn(Dispatchers.Default)`.
+- **Datos estables para Compose.** `Song` es `@Immutable`; las filas que no
+  cambian se saltan al recomponer.
+- **Latido adaptativo.** `MusicPlayer` emite solo si algo cambió y baja a 1.5 s
+  en pausa (antes 500 ms siempre).
+- **Medición en la app.** Ajustes → Rendimiento muestra fps, % de frames lentos
+  y el peor frame de los últimos 15 s (`perf/FrameMonitor`, Choreographer).

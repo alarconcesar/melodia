@@ -76,11 +76,18 @@ class MainViewModel(
                 SortMode.LONGEST -> out.sortedByDescending { it.durationMs }
             }
         }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val folders: StateFlow<List<MusicFolder>> = songs.map { groupFolders(it) }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val albums: StateFlow<List<Album>> = songs.map { groupAlbums(it) }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val artists: StateFlow<List<Artist>> = songs.map { groupArtists(it) }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val folders: StateFlow<List<MusicFolder>> = songs.map { groupFolders(it) }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val albums: StateFlow<List<Album>> = songs.map { groupAlbums(it) }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val artists: StateFlow<List<Artist>> = songs.map { groupArtists(it) }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val playlists: StateFlow<List<PlaylistEntity>> = lists.playlists().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     private val _openPlaylist = MutableStateFlow<Long?>(null)
@@ -94,7 +101,8 @@ class MainViewModel(
 
     private val _favIds = MutableStateFlow<Set<Long>>(emptySet())
     val favIds: StateFlow<Set<Long>> = _favIds
-    val favSongs: StateFlow<List<Song>> = combine(_songs, _favIds) { list, fav -> list.filter { fav.contains(it.id) } }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val favSongs: StateFlow<List<Song>> = combine(_songs, _favIds) { list, fav -> list.filter { fav.contains(it.id) } }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _reload = MutableStateFlow(0)
 

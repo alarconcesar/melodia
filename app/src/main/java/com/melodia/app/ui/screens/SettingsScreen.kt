@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Save
@@ -48,6 +49,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -238,6 +240,31 @@ fun SettingsScreen(
                         subtitle = "Audio más liviano al escuchar online",
                         checked = saver,
                         onChecked = { vm.setDataSaver(it) }
+                    )
+                }
+            }
+
+            // ── Rendimiento: medido en vivo, sin adb ──
+            item { SectionLabel("Rendimiento") }
+            item {
+                SettingsCard {
+                    var stats by remember { mutableStateOf(com.melodia.app.perf.FrameMonitor.stats()) }
+                    LaunchedEffect(Unit) {
+                        while (true) {
+                            stats = com.melodia.app.perf.FrameMonitor.stats()
+                            kotlinx.coroutines.delay(1000)
+                        }
+                    }
+                    SettingsRow(
+                        icon = Icons.Default.Speed,
+                        title = if (stats.samples < 30) "Midiendo…" else "${stats.fps} fps",
+                        value = if (stats.samples < 30) "Navega un momento y vuelve"
+                        else "${stats.slowPct}% de frames lentos · peor ${stats.worstMs} ms"
+                    )
+                    Text(
+                        "Últimos 15 s de uso. A 60 fps, menos de 2% de frames lentos se siente fluido.",
+                        style = Ds.Sub, color = cs.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp)
                     )
                 }
             }

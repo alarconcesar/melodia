@@ -128,6 +128,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -206,7 +208,10 @@ fun MelodiaScreen(vm: MainViewModel) {
     val songs by vm.filtered.collectAsState()
     val all by vm.songs.collectAsState()
     val query by vm.query.collectAsState()
-    val state by vm.playerState.collectAsState()
+    // Solo isPlaying en la raíz: el PlayerState completo se observa dentro del
+    // miniplayer y del reproductor, para no recomponer toda la pantalla cada tick.
+    val isPlaying by vm.playerState.map { it.isPlaying }.distinctUntilChanged()
+        .collectAsState(initial = false)
     val current by vm.currentSong.collectAsState()
     val folders by vm.folders.collectAsState()
     val albums by vm.albums.collectAsState()
@@ -238,9 +243,6 @@ fun MelodiaScreen(vm: MainViewModel) {
     var showInfo by remember { mutableStateOf<Song?>(null) }
     var renameId by remember { mutableStateOf<Long?>(null) }
     // Áreas de las barras flotantes para el blur (Haze)
-    var navArea by remember { mutableStateOf<Rect?>(null) }
-    var miniArea by remember { mutableStateOf<Rect?>(null) }
-    var contentPos by remember { mutableStateOf(Offset.Zero) }
     // Alto real de la barra inferior: el miniplayer se apoya justo encima (sin taparla)
     var navHeight by remember { mutableStateOf(0.dp) }
     val dens = LocalDensity.current
@@ -358,30 +360,8 @@ fun MelodiaScreen(vm: MainViewModel) {
                     modifier = Modifier.padding(start = 20.dp)
                 )
             }
-            // ── Content: única zona con blur (las barras están fuera) ──
-            // Velo con las mismas formas redondeadas de las barras (sin "cuadro")
-            val density = LocalDensity.current
-            fun rounded(rect: Rect, radiusPx: Float): RoundRect {
-                val moved = rect.translate(Offset(-contentPos.x, -contentPos.y))
-                val c = CornerRadius(radiusPx)
-                return RoundRect(moved, c, c, c, c)
-            }
-            val miniR = with(density) { 20.dp.toPx() }
-            val hazeAreas = listOfNotNull(
-                navArea?.let { rounded(it, it.height / 2f) },
-                miniArea.takeIf { current != null && !showPlayer }?.let { rounded(it, miniR) }
-            )
-            Box(
-                Modifier.weight(1f)
-                    .onGloballyPositioned { contentPos = it.positionInRoot() }
-                    .then(
-                        if (safeEffects) Modifier else Modifier.haze(
-                            *hazeAreas.toTypedArray(),
-                            backgroundColor = cs.surface.copy(alpha = 0.32f),
-                            blurRadius = 26.dp
-                        )
-                    )
-            ) {
+            // ── Content: sin blur en vivo (Haze re-blurea en cada frame de scroll) ──
+            Box(Modifier.weight(1f)) {
                 AnimatedContent(
                     targetState = tab, label = "tabs",
                     transitionSpec = {
@@ -392,11 +372,11 @@ fun MelodiaScreen(vm: MainViewModel) {
                     }
                 ) { t ->
                 when (t) {
-                    0 -> HomeTab(vm, songs, all, current?.id, state.isPlaying, favIds,
+                    0 -> HomeTab(vm, songs, all, current?.id, isPlaying, favIds,
                         onAdd = { showInfo = it }, onTab = { tab = it },
                         onOpenPlayer = { showPlayer = true })
                     1 -> ExploreTab(vm, folders, albums, artists, folderSel, albumSel, artistSel, songs, all,
-                        current?.id, state.isPlaying, favIds, onAdd = { showInfo = it })
+                        current?.id, isPlaying, favIds, onAdd = { showInfo = it })
                     2 -> {
                         if (openPid == null) PlaylistsTab(playlists, allLinks, all,
                             onOpen = { vm.openPl(it) }, onCreate = { showCreate = true },
@@ -417,7 +397,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                             onMove = { sid, up -> vm.moveInPlaylist(openPid!!, sid, up) },
                             onRemove = { sid -> vm.removeFromPlaylist(openPid!!, sid) })
                     }
-                    3 -> FavsTab(favSongs, current?.id, state.isPlaying, favIds,
+                    3 -> FavsTab(favSongs, current?.id, isPlaying, favIds,
                         onPlayAt = { vm.playFavAt(it) }, onFav = { vm.toggleFav(it) }, onAdd = { showInfo = it },
                         onQueue = { s -> vm.queueEnd(s.id) { ok -> toast(appCtx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
                     else -> OnlineTab(vm)
@@ -431,7 +411,6 @@ fun MelodiaScreen(vm: MainViewModel) {
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 10.dp)
                 .onGloballyPositioned {
-                    navArea = it.boundsInRoot()
                     navHeight = with(dens) { it.size.height.toDp() }
                 }
         ) {
@@ -446,19 +425,13 @@ fun MelodiaScreen(vm: MainViewModel) {
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             current?.let { s ->
-                Box(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                        .padding(bottom = (if (navHeight > 0.dp) navHeight else 100.dp) + 10.dp)
-                        .onGloballyPositioned { miniArea = it.boundsInRoot() }
-                ) {
-                    MiniPlayerDs(
-                        title = s.title, artist = s.artist, albumId = s.albumId, artUrl = s.artUrl,
-                        playing = state.isPlaying,
-                        progress = state.progress, isFav = s.id != YT_STREAM_ID && favIds.contains(s.id),
-                        onToggleFav = { if (s.id != YT_STREAM_ID) vm.toggleFav(s.id) }, onToggle = { vm.player.toggle() },
-                        onOpen = { showPlayer = true }
-                    )
-                }
+                MiniPlayerHost(
+                    vm = vm,
+                    song = s,
+                    isFav = s.id != YT_STREAM_ID && favIds.contains(s.id),
+                    bottomPadding = (if (navHeight > 0.dp) navHeight else 100.dp) + 10.dp,
+                    onOpen = { showPlayer = true }
+                )
             }
         }
         // ── Now Playing (consume todos los toques: nada pasa a la lista) ──
@@ -897,6 +870,15 @@ fun ExploreTab(
             return
         }
     }
+    // Portada por artista una sola vez: antes cada fila recorría toda la biblioteca.
+    val artistArt = remember(all, artists) {
+        val m = HashMap<String, Long>(artists.size * 2)
+        for (song in all) {
+            val k = song.artist.ifBlank { "Desconocido" }
+            if ((m[k] ?: 0L) <= 0L && song.albumId > 0L) m[k] = song.albumId
+        }
+        m
+    }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 200.dp)) {
         if (folderSel != null || albumSel != null || artistSel != null) {
             item {
@@ -942,9 +924,7 @@ fun ExploreTab(
                 }
                 1 -> {
                     items(artists) { ar ->
-                        val artId = remember(all, ar.name) {
-                            all.firstOrNull { (it.artist.ifBlank { "Desconocido" }) == ar.name }?.albumId ?: 0L
-                        }
+                        val artId = artistArt[ar.name] ?: 0L
                         Row(
                             Modifier.fillMaxWidth().clickable { artistDetail = ar.name }.padding(horizontal = 20.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -1301,6 +1281,30 @@ private fun playbackNow(playing: Boolean): Long {
 }
 
 /**
+ * Miniplayer aislado del árbol: es el único que observa [MainViewModel.playerState]
+ * completo, así el tick de progreso no recompone la lista ni las pestañas.
+ */
+@Composable
+private fun MiniPlayerHost(
+    vm: MainViewModel,
+    song: Song,
+    isFav: Boolean,
+    bottomPadding: androidx.compose.ui.unit.Dp,
+    onOpen: () -> Unit
+) {
+    val st by vm.playerState.collectAsState()
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = bottomPadding)) {
+        MiniPlayerDs(
+            title = song.title, artist = song.artist, albumId = song.albumId, artUrl = song.artUrl,
+            playing = st.isPlaying, progress = st.progress, isFav = isFav,
+            onToggleFav = { if (song.id != YT_STREAM_ID) vm.toggleFav(song.id) },
+            onToggle = { vm.player.toggle() },
+            onOpen = onOpen
+        )
+    }
+}
+
+/**
  * Barra de progreso aislada: el tick de 100 ms solo recompone este bloque,
  * no toda la pantalla del reproductor.
  */
@@ -1467,10 +1471,15 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         // Fondo teñido con la carátula actual (color dinámico, sin costo)
         val bgModel = songArtModel(s.albumId, s.artUrl)
         if (bgModel != null) {
+            // Fondo a 160 px y sin desenfoque en vivo: el gradiente hace el resto.
+            // Un blur(60dp) a pantalla completa es un RenderEffect por frame.
+            val bgReq = remember(bgModel) {
+                coil.request.ImageRequest.Builder(ctx).data(bgModel).size(160).build()
+            }
             AsyncImage(
-                model = bgModel, contentDescription = null,
-                contentScale = ContentScale.Crop, alpha = 0.16f,
-                modifier = Modifier.fillMaxSize().then(if (safeFx) Modifier else Modifier.blur(60.dp))
+                model = bgReq, contentDescription = null,
+                contentScale = ContentScale.Crop, alpha = 0.22f,
+                modifier = Modifier.fillMaxSize()
             )
             Box(
                 Modifier.fillMaxSize().background(
@@ -1585,7 +1594,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             }
         }
         Spacer(Modifier.height(18.dp))
-        Text(s.title, style = if (autoMode) Ds.Display.copy(fontSize = 26.sp) else Ds.Display, color = cs.onBackground, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE))
+        Text(s.title, style = if (autoMode) Ds.Display.copy(fontSize = 26.sp) else Ds.Display, color = cs.onBackground, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         Text("${s.artist} · ${s.album.ifBlank { "Sencillo" }}", style = Ds.Body, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(8.dp))
         Text(

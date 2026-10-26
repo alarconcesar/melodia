@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
     @Suppress("UNCHECKED_CAST")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.melodia.app.perf.FrameMonitor.start()
         // Pantalla completa real: el fondo y el blur llegan hasta los bordes
         try { enableEdgeToEdge() } catch (_: Exception) {}
         val app = application as MelodiaApp

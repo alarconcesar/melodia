@@ -106,7 +106,14 @@ class MusicPlayer(private val context: Context) {
             // Solo bind al abrir: el foreground + notificación se activan al sonar
             val intent = Intent(context, MelodiaPlaybackService::class.java)
             bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
-            scope.launch { while (isActive) { updateState(); checkFadeOut(); delay(500) } }
+            scope.launch {
+                while (isActive) {
+                    updateState()
+                    checkFadeOut()
+                    // En pausa no hace falta latir a 2 Hz: menos wakeups y menos recomposición.
+                    delay(if (_state.value.isPlaying) 500L else 1_500L)
+                }
+            }
         } catch (e: Exception) { Log.e("MusicPlayer", "init fail", e) }
     }
 
@@ -460,16 +467,22 @@ class MusicPlayer(private val context: Context) {
     fun cycleRepeat() {
         try { exo?.let { it.repeatMode = when (it.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF }; updateState() } } catch (_: Exception) {}
     }
-    fun seekTo(f: Float) { ensureBound(); try { exo?.let { val d = it.duration.coerceAtLeast(0); it.seekTo((d * f).toLong()) } } catch (_: Exception) {} }
+    fun seekTo(f: Float) {
+        ensureBound()
+        try { exo?.let { val d = it.duration.coerceAtLeast(0); it.seekTo((d * f).toLong()); updateState() } } catch (_: Exception) {}
+    }
     /** Salto relativo en ms (doble toque ±10 s, modo auto). */
-    fun seekBy(ms: Long) { ensureBound(); try { exo?.let { it.seekTo((it.currentPosition + ms).coerceAtLeast(0)) } } catch (_: Exception) {} }
+    fun seekBy(ms: Long) {
+        ensureBound()
+        try { exo?.let { it.seekTo((it.currentPosition + ms).coerceAtLeast(0)); updateState() } } catch (_: Exception) {}
+    }
 
     private fun updateState() {
         try {
             val p = exo ?: return
             val dur = p.duration.takeIf { it > 0 } ?: 0L
             val pos = p.currentPosition.coerceAtLeast(0)
-            _state.value = PlayerState(
+            val next = PlayerState(
                 isPlaying = p.isPlaying,
                 progress = if (dur > 0) pos.toFloat() / dur else 0f,
                 positionMs = pos, durationMs = dur,
@@ -479,6 +492,11 @@ class MusicPlayer(private val context: Context) {
                 pitch = pitch, speed = speed, crossfade = crossfade, crossfadeSecs = crossfadeSecs,
                 snapshotElapsedMs = android.os.SystemClock.elapsedRealtime()
             )
+            // Emitir solo si cambió algo real: en pausa el snapshot de tiempo no cuenta.
+            val prev = _state.value
+            val sameAsPrev = next.copy(snapshotElapsedMs = 0L, positionMs = 0L) ==
+                prev.copy(snapshotElapsedMs = 0L, positionMs = 0L)
+            if (!sameAsPrev || next.positionMs != prev.positionMs) _state.value = next
         } catch (_: Exception) {}
     }
 
