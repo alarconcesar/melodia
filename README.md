@@ -26,6 +26,7 @@ sin Hilt: arranque estable con DI manual.
 | ⚙️ Ajustes | Pantalla propia: apariencia (tema + acento), reproducción, biblioteca, datos |
 | 👉 Gestos | Deslizar una fila: derecha = encolar, izquierda = favorito |
 | ▶️ Player | Play/pause/next/prev, shuffle, repeat (off/all/one), seek con preview, MediaSession |
+| 🎧 Estabilidad | Foco de audio (pausa en llamadas), wake lock para streams, botón de auriculares, re-resolución automática si YouTube vence la URL |
 
 ## 🧱 Stack (versiones fijadas y probadas)
 
@@ -88,6 +89,7 @@ Hecho:
 - [x] Cola visible: reordenar, quitar, vaciar y guardar como playlist
 - [x] Carátulas reales (MediaStore), widget y letras (incl. LRC)
 - [x] Velocidad/pitch, estadísticas, respaldo JSON
+- [x] Foco de audio, wake lock, botón de auriculares y re-resolución de URL vencida (4.5)
 
 Ideas siguientes (sin compromiso):
 - [ ] Cola persistente entre sesiones (restaurar al reabrir la app)

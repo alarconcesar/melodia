@@ -39,9 +39,36 @@ class MelodiaPlaybackService : MediaSessionService() {
     private val localBinder = LocalBinder()
 
     private val notifListener = object : Player.Listener {
-        override fun onIsPlayingChanged(v: Boolean) { updateNotification() }
+        override fun onIsPlayingChanged(v: Boolean) {
+            updateNotification()
+            updateEffectSession(v)
+        }
         override fun onMediaItemTransition(m: androidx.media3.common.MediaItem?, r: Int) { updateNotification() }
         override fun onPlaybackStateChanged(s: Int) { updateNotification() }
+    }
+
+    // ── Sesión de efectos de audio (ecualizadores externos, ReplayGain) ──
+    private var effectSessionOpen = false
+
+    private fun updateEffectSession(playing: Boolean) {
+        try {
+            val p = session?.player as? ExoPlayer ?: return
+            if (playing == effectSessionOpen) return
+            effectSessionOpen = playing
+            val action = if (playing)
+                android.media.audiofx.AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION
+            else
+                android.media.audiofx.AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION
+            val intent = Intent(action).apply {
+                putExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, p.audioSessionId)
+                putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, packageName)
+                putExtra(
+                    android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE,
+                    android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC
+                )
+            }
+            sendBroadcast(intent)
+        } catch (_: Exception) {}
     }
 
     override fun onCreate() {
@@ -58,6 +85,17 @@ class MelodiaPlaybackService : MediaSessionService() {
         )
         val player = ExoPlayer.Builder(this)
             .setHandleAudioBecomingNoisy(true)
+            // Foco de audio real: pausa/duck en llamadas y otras apps. Sin esto
+            // Melodia seguía sonando encima de todo.
+            .setAudioAttributes(
+                androidx.media3.common.AudioAttributes.Builder()
+                    .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                    .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                true
+            )
+            // Mantiene la CPU despierta para streams con la pantalla apagada
+            .setWakeMode(androidx.media3.common.C.WAKE_MODE_NETWORK)
             // Arranque rápido: suena con ~1s en buffer (ideal para streams)
             .setLoadControl(
                 androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -221,6 +259,7 @@ class MelodiaPlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        try { if (effectSessionOpen) updateEffectSession(false) } catch (_: Exception) {}
         try { session?.player?.removeListener(notifListener) } catch (_: Exception) {}
         session?.run {
             try { player.release() } catch (_: Exception) {}

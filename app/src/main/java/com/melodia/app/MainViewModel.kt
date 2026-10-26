@@ -117,6 +117,8 @@ class MainViewModel(
             }
         }
         viewModelScope.launch { lists.favorites().collect { f -> _favIds.value = f.map { it.songId }.toSet() } }
+        // URL de stream vencida o rechazada: re-resolver y continuar sin cortar
+        player.onStreamError = { pos -> refreshStreamAudio(pos) }
         // Sincronizar UI con el item real de ExoPlayer (next/prev/fin de tema)
         viewModelScope.launch {
             player.state.map { it.currentId }.distinctUntilChanged().collect { id ->
@@ -616,6 +618,31 @@ class MainViewModel(
                 _ytHasMore.value = false
             }
             _ytMoreLoading.value = false
+        }
+    }
+
+    private var refreshingStream = false
+
+    /**
+     * YouTube invalidó la URL de audio (403/404/410): se re-resuelve con
+     * [YtRepository.bestAudio] y se reemplaza en el player desde [positionMs],
+     * sin reiniciar el tema ni tocar la cola.
+     */
+    private fun refreshStreamAudio(positionMs: Long) {
+        val track = _currentTrack.value ?: return
+        if (refreshingStream) return
+        refreshingStream = true
+        viewModelScope.launch {
+            try {
+                val audio = withContext(Dispatchers.IO) {
+                    yt.bestAudio(track.url, !_dataSaver.value, force = true)
+                }
+                player.swapStream(audio.url, positionMs)
+            } catch (_: Exception) {
+                _ytError.value = "No se pudo recuperar el audio. Reintenta en un momento."
+            } finally {
+                refreshingStream = false
+            }
         }
     }
 

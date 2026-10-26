@@ -173,6 +173,10 @@ OuterTune/SimpMusic y sin técnicas distintas en el muestreo.
 
 ## Plan propuesto
 
+> **Estado (26-oct-2026):** Fase 0 implementada y publicada en 4.5 (foco de audio,
+> wake mode, MediaButtonReceiver, progreso interpolado, TTL real de la URL y
+> re-resolución ante 403/404/410). Fases 1-3 pendientes de decisión.
+
 ### Fase 0 — Quick wins (1-2 días, bajo riesgo)
 | Cambio | Esfuerzo | Referencia |
 |---|---|---|

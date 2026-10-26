@@ -26,7 +26,9 @@ data class PlayerState(
     val pitch: Float = 1f,
     val speed: Float = 1f,
     val crossfade: Boolean = false,
-    val crossfadeSecs: Int = 3
+    val crossfadeSecs: Int = 3,
+    /** elapsedRealtime() del momento en que se midió positionMs (para interpolar). */
+    val snapshotElapsedMs: Long = 0L
 )
 
 /** ID virtual del tema que suena desde Online (no existe en la biblioteca). */
@@ -42,6 +44,14 @@ class MusicPlayer(private val context: Context) {
     private var songMap: Map<Long, com.melodia.app.data.model.Song> = emptyMap()
     private var listener: Player.Listener? = null
     private var bound = false
+
+    /**
+     * URL de stream vencida o rechazada (403/404/410): el ViewModel re-resuelve
+     * el audio y llama a [swapStream] conservando la posición.
+     */
+    var onStreamError: ((positionMs: Long) -> Unit)? = null
+    private var streamRetries = 0
+    private val maxStreamRetries = 2
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -73,6 +83,20 @@ class MusicPlayer(private val context: Context) {
         }
             override fun onPlaybackStateChanged(s: Int) { updateState(); attachEq() }
             override fun onAudioSessionIdChanged(id: Int) { try { eq?.attach(id) } catch (_: Exception) {} }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                try {
+                    val p = exo ?: return
+                    val id = queueIds.getOrNull(p.currentMediaItemIndex) ?: return
+                    if (id != YT_STREAM_ID) return
+                    val code = httpCode(error)
+                    if (code == 403 || code == 404 || code == 410) {
+                        if (streamRetries < maxStreamRetries) {
+                            streamRetries++
+                            onStreamError?.invoke(p.currentPosition.coerceAtLeast(0))
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
         }.also { player.addListener(it) }
     }
 
@@ -102,6 +126,7 @@ class MusicPlayer(private val context: Context) {
         if (p == null) { pending = { play(ids, startIndex) }; return }
         try {
             queueIds = ids.toMutableList()
+            streamRetries = 0
             val items = ids.mapNotNull { id -> songMap[id]?.let { buildItem(it) } }
             if (items.isEmpty()) return
             try { p.volume = 1f } catch (_: Exception) {}
@@ -112,6 +137,20 @@ class MusicPlayer(private val context: Context) {
             updateState()
             attachEq()
         } catch (e: Exception) { Log.e("MusicPlayer", "play fail", e) }
+    }
+
+    /** Código HTTP del error, caminando la cadena de causas (ExoPlayer anida). */
+    private fun httpCode(error: Throwable): Int? {
+        var t: Throwable? = error
+        var depth = 0
+        while (t != null && depth < 6) {
+            if (t is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+                return t.responseCode
+            }
+            t = t.cause
+            depth++
+        }
+        return null
     }
 
     private fun buildItem(s: com.melodia.app.data.model.Song): MediaItem {
@@ -164,6 +203,7 @@ class MusicPlayer(private val context: Context) {
         if (p == null) { pending = { playStream(url, title, artist, artUrl) }; return }
         try {
             queueIds = mutableListOf(YT_STREAM_ID)
+            streamRetries = 0
             val item = MediaItem.Builder()
                 .setUri(url)
                 .setMediaId(YT_STREAM_ID.toString())
@@ -185,6 +225,23 @@ class MusicPlayer(private val context: Context) {
     }
 
     fun pauseOnly() { try { exo?.pause() } catch (_: Exception) {} }
+
+    /**
+     * Reemplaza la URL del stream actual conservando la posición y el estado
+     * (se usa cuando YouTube invalida la URL y devuelve 403 a mitad de tema).
+     */
+    fun swapStream(url: String, positionMs: Long) {
+        try {
+            val p = exo ?: return
+            val old = p.currentMediaItem ?: return
+            val playing = p.isPlaying
+            val item = old.buildUpon().setUri(url).build()
+            p.setMediaItem(item, positionMs.coerceAtLeast(0L))
+            p.prepare()
+            if (playing) p.play()
+            updateState()
+        } catch (e: Exception) { Log.e("MusicPlayer", "swapStream fail", e) }
+    }
 
     // ── Tono (pitch) y velocidad ──
     private var pitch = 1f
@@ -368,7 +425,8 @@ class MusicPlayer(private val context: Context) {
                 shuffle = p.shuffleModeEnabled, repeatMode = p.repeatMode,
                 currentIndex = p.currentMediaItemIndex,
                 currentId = queueIds.getOrNull(p.currentMediaItemIndex) ?: -1L,
-                pitch = pitch, speed = speed, crossfade = crossfade, crossfadeSecs = crossfadeSecs
+                pitch = pitch, speed = speed, crossfade = crossfade, crossfadeSecs = crossfadeSecs,
+                snapshotElapsedMs = android.os.SystemClock.elapsedRealtime()
             )
         } catch (_: Exception) {}
     }

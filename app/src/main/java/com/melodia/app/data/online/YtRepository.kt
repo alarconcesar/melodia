@@ -50,7 +50,8 @@ class YtRepository(private val context: Context) {
     // ── Paginación: se guarda el extractor y la página siguiente ──
     private var pager: SearchExtractor? = null
     private var next: Page? = null
-    private val audioCache = mutableMapOf<String, Pair<Long, YtAudio>>()
+    private data class CachedAudio(val audio: YtAudio, val expiresAt: Long)
+    private val audioCache = mutableMapOf<String, CachedAudio>()
 
     suspend fun search(query: String): List<YtTrack> = withContext(Dispatchers.IO) {
         ensure()
@@ -118,35 +119,41 @@ class YtRepository(private val context: Context) {
     }
 
     /** high=true: mejor bitrate (alta). false: bitrate modesto (estándar / ahorro de datos). */
-    suspend fun bestAudio(videoUrl: String, high: Boolean = true): YtAudio = withContext(Dispatchers.IO) {
-        ensure()
-        // Caché: las URLs de audio valen horas — re-escuchar es instantáneo
-        val cacheKey = "$videoUrl|${if (high) "h" else "s"}"
-        synchronized(audioCache) {
-            val hit = audioCache[cacheKey]
-            if (hit != null && System.currentTimeMillis() - hit.first < 5 * 60 * 60 * 1000L) {
-                return@withContext hit.second
+    suspend fun bestAudio(videoUrl: String, high: Boolean = true, force: Boolean = false): YtAudio =
+        withContext(Dispatchers.IO) {
+            ensure()
+            val cacheKey = "$videoUrl|${if (high) "h" else "s"}"
+            val now = System.currentTimeMillis()
+            if (!force) {
+                synchronized(audioCache) {
+                    val hit = audioCache[cacheKey]
+                    // Expiración real de la URL (expire=...), no un TTL a ciegas
+                    if (hit != null && now < hit.expiresAt) return@withContext hit.audio
+                    if (hit != null) audioCache.remove(cacheKey)
+                }
+            }
+            val ex = yt().getStreamExtractor(videoUrl)
+            ex.fetchPage()
+            val audios: List<AudioStream> = ex.audioStreams
+            require(audios.isNotEmpty()) { "Sin audio disponible" }
+            val ranked = audios.sortedByDescending { try { it.averageBitrate } catch (_: Exception) { 0 } }
+            val pool = if (high) ranked else ranked.filter {
+                try { it.averageBitrate <= 96000 } catch (_: Exception) { true }
+            }.ifEmpty { ranked.takeLast(2) }
+            val pick = pool.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true) }
+                ?: pool.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("opus", true) }
+                ?: pool.first()
+            val isMp4 = (try { pick.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true)
+            YtAudio(pick.content, if (isMp4) "m4a" else "webm", if (isMp4) "audio/mp4" else "audio/webm").also {
+                synchronized(audioCache) {
+                    audioCache[cacheKey] = CachedAudio(
+                        audio = it,
+                        expiresAt = StreamUrlExpiry.expiryEpochMs(it.url, System.currentTimeMillis())
+                    )
+                    while (audioCache.size > 30) audioCache.remove(audioCache.keys.first())
+                }
             }
         }
-        val ex = yt().getStreamExtractor(videoUrl)
-        ex.fetchPage()
-        val audios: List<AudioStream> = ex.audioStreams
-        require(audios.isNotEmpty()) { "Sin audio disponible" }
-        val ranked = audios.sortedByDescending { try { it.averageBitrate } catch (_: Exception) { 0 } }
-        val pool = if (high) ranked else ranked.filter {
-            try { it.averageBitrate <= 96000 } catch (_: Exception) { true }
-        }.ifEmpty { ranked.takeLast(2) }
-        val pick = pool.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true) }
-            ?: pool.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("opus", true) }
-            ?: pool.first()
-        val isMp4 = (try { pick.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true)
-        YtAudio(pick.content, if (isMp4) "m4a" else "webm", if (isMp4) "audio/mp4" else "audio/webm").also {
-            synchronized(audioCache) {
-                audioCache[cacheKey] = System.currentTimeMillis() to it
-                while (audioCache.size > 30) audioCache.remove(audioCache.keys.first())
-            }
-        }
-    }
 
     /** Resuelve el audio en segundo plano para que el play sea instantáneo. */
     suspend fun prefetchAudio(videoUrl: String, high: Boolean = true) {

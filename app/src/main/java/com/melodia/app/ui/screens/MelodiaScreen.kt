@@ -148,6 +148,7 @@ import coil.compose.AsyncImage
 import com.melodia.app.MainViewModel
 import com.melodia.app.player.YT_STREAM_ID
 import com.melodia.app.player.QueueOps
+import com.melodia.app.player.PlaybackClock
 import com.melodia.app.SafeMode
 import com.melodia.app.SortMode
 import com.melodia.app.data.model.Song
@@ -1334,6 +1335,61 @@ private fun fmtTotal(ms: Long): String {
     return if (m >= 60) "${m / 60} h ${m % 60} min" else "$m min"
 }
 
+/**
+ * Reloj de UI para interpolar la posición: tick de 100 ms solo mientras suena.
+ * No consulta al reproductor, así que no añade llamadas JNI.
+ */
+@Composable
+private fun playbackNow(playing: Boolean): Long {
+    val now = remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
+    LaunchedEffect(playing) {
+        while (playing) {
+            now.value = android.os.SystemClock.elapsedRealtime()
+            kotlinx.coroutines.delay(100)
+        }
+        now.value = android.os.SystemClock.elapsedRealtime()
+    }
+    return now.value
+}
+
+/**
+ * Barra de progreso aislada: el tick de 100 ms solo recompone este bloque,
+ * no toda la pantalla del reproductor.
+ */
+@Composable
+private fun PlaybackProgress(state: com.melodia.app.player.PlayerState, onSeek: (Float) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    var dragging by remember { mutableStateOf(false) }
+    var dragPos by remember { mutableStateOf(0f) }
+    val nowElapsed = playbackNow(state.isPlaying)
+    val livePos = PlaybackClock.positionMs(
+        positionMs = state.positionMs,
+        snapshotElapsedMs = state.snapshotElapsedMs,
+        nowElapsedMs = nowElapsed,
+        isPlaying = state.isPlaying,
+        durationMs = state.durationMs,
+        speed = state.speed
+    )
+    val basePos = if (dragging) dragPos else PlaybackClock.progress(livePos, state.durationMs)
+    val smoothPos by androidx.compose.animation.core.animateFloatAsState(
+        basePos.coerceIn(0f, 1f),
+        androidx.compose.animation.core.tween(180), label = "heroslider"
+    )
+    Slider(
+        value = smoothPos,
+        onValueChange = { dragging = true; dragPos = it },
+        onValueChangeFinished = { onSeek(dragPos); dragging = false }
+    )
+    Row(Modifier.fillMaxWidth()) {
+        Text(
+            fmt(if (dragging) (dragPos * state.durationMs).toLong() else livePos),
+            style = Ds.Sub, color = cs.onSurfaceVariant
+        )
+        Spacer(Modifier.weight(1f))
+        Text(fmt(state.durationMs), style = Ds.Sub, color = cs.onSurfaceVariant)
+    }
+}
+
 @Composable
 fun PlaylistDetail(
     name: String,
@@ -1599,23 +1655,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         // Espacio flexible: absorbe la altura sobrante y evita que se corten los controles
         Spacer(Modifier.weight(1f))
         Spacer(Modifier.height(6.dp))
-        var dragging by remember { mutableStateOf(false) }
-        var dragPos by remember { mutableStateOf(0f) }
-        val basePos = if (dragging) dragPos else state.progress
-        val smoothPos by androidx.compose.animation.core.animateFloatAsState(
-            basePos.coerceIn(0f, 1f),
-            androidx.compose.animation.core.tween(400), label = "heroslider"
-        )
-        Slider(
-            value = smoothPos,
-            onValueChange = { dragging = true; dragPos = it },
-            onValueChangeFinished = { vm.player.seekTo(dragPos); dragging = false }
-        )
-        Row(Modifier.fillMaxWidth()) {
-            Text(fmt(state.positionMs), style = Ds.Sub, color = cs.onSurfaceVariant)
-            Spacer(Modifier.weight(1f))
-            Text(fmt(state.durationMs), style = Ds.Sub, color = cs.onSurfaceVariant)
-        }
+        PlaybackProgress(state) { vm.player.seekTo(it) }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
             IconButton(onClick = { vm.player.toggleShuffle() }) {
