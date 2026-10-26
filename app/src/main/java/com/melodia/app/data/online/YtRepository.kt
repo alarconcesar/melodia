@@ -569,24 +569,13 @@ class YtRepository(private val context: Context) {
         }
 
     /**
-     * Artista y título presentables para una descarga.
+     * Artista de una descarga: el canal del video o, si vino vacío, "YouTube".
      *
-     * Los items de playlist suelen venir sin artista y con el canal dentro del
-     * título ("Jorge Drexler - Toco madera"). Se toma el prefijo como artista y
-     * se recorta del título; si no hay patrón, queda "YouTube".
+     * A propósito NO se deduce del título: "Amor - Remix" daría artista "Amor"
+     * y eso ensucia la biblioteca. Mejor un dato faltante y honesto.
      */
-    private fun artistaDe(track: YtTrack): String {
-        if (track.artist.isNotBlank()) return track.artist
-        val prefijo = track.title.substringBefore(" - ").trim()
-        return if (track.title.contains(" - ") && prefijo.length in 2..40) prefijo else "YouTube"
-    }
-
-    private fun tituloLimpio(track: YtTrack, artista: String): String {
-        val t = track.title
-        return if (artista != "YouTube" && t.startsWith("$artista - ", ignoreCase = true)) {
-            t.substringAfter(" - ").trim().ifBlank { t }
-        } else t
-    }
+    private fun artistaDe(track: YtTrack): String =
+        track.artist.trim().ifBlank { "YouTube" }
 
     /** Guarda la carátula en disco y devuelve su file:// (independiente de MediaStore). */
     private fun guardarPortada(bytes: ByteArray?, clave: String): String? {
@@ -692,7 +681,7 @@ class YtRepository(private val context: Context) {
             } catch (_: Exception) {}
         }
         val artista = artistaDe(track)
-        val titulo = tituloLimpio(track, artista)
+        val titulo = track.title
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Audio.Media.TITLE, titulo)

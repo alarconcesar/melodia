@@ -153,7 +153,6 @@ class MainViewModel(
                 _songs.value = list
                 _loaded.value = true
                 maybeRestoreQueue(list)
-                repairDownloads(list)
                 enrichArtwork(list)
             }
         }
@@ -269,42 +268,6 @@ class MainViewModel(
             }
         }
         return mejor
-    }
-
-    private var downloadsReparadas = false
-
-    /**
-     * Repara descargas viejas sin artista: las que llegaron de una playlist con
-     * el canal pegado al título ("Tema - Canal Oficial") y quedaron como
-     * "Desconocido". Se separa el sufijo, se guarda como artista y se limpia el
-     * título en MediaStore. Corre una sola vez por sesión.
-     */
-    private suspend fun repairDownloads(list: List<Song>) {
-        if (downloadsReparadas) return
-        downloadsReparadas = true
-        try {
-            withContext(Dispatchers.IO) {
-                var cambios = 0
-                for (s in list) {
-                    if (!s.dataPath.contains("/Melodia/")) continue
-                    if (s.artist.isNotBlank() && s.artist != "Desconocido") continue
-                    val corte = s.title.indexOf(" - ")
-                    if (corte <= 0) continue
-                    val posible = s.title.substring(corte + 3).trim()
-                    if (posible.isBlank() || posible.length > 40) continue
-                    val titulo = s.title.substring(0, corte).trim()
-                    if (titulo.isBlank()) continue
-                    if (repo.updateMetadata(s.id, titulo, posible, s.album.ifBlank { titulo })) cambios++
-                    // Copia propia: manda al leer y evita que vuelva a "Desconocido"
-                    val arte = try { artRepo.embedded(s) } catch (_: Exception) { null }
-                    val nombre = try { java.io.File(s.dataPath).name } catch (_: Exception) { "" }
-                    if (nombre.isNotBlank()) {
-                        repo.saveDownloadMeta(nombre, titulo, posible, titulo, arte)
-                    }
-                }
-                if (cambios > 0) withContext(Dispatchers.Main) { reload() }
-            }
-        } catch (_: Exception) {}
     }
 
     private var queueRestored = false
