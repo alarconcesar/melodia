@@ -28,6 +28,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -406,6 +407,46 @@ fun HeroCard(
 fun DsBackground() {
     val cs = MaterialTheme.colorScheme
     Box(Modifier.fillMaxSize().background(cs.background))
+}
+
+/**
+ * Estado vacío único de la app: icono en círculo tenue, título, subtítulo y una
+ * acción opcional. Antes cada pantalla inventaba el suyo (tres tamaños, tres
+ * grises distintos).
+ */
+@Composable
+fun EmptyState(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    action: String? = null,
+    onAction: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val cs = MaterialTheme.colorScheme
+    Column(
+        modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            Modifier.size(56.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center
+        ) { Icon(icon, null, Modifier.size(26.dp), tint = cs.primary) }
+        Spacer(Modifier.height(14.dp))
+        Text(title, style = Ds.Title, color = cs.onBackground, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(4.dp))
+        Text(subtitle, style = Ds.Sub, color = cs.onSurfaceVariant, textAlign = TextAlign.Center)
+        if (action != null && onAction != null) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                action,
+                style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                color = cs.primary,
+                modifier = Modifier.clip(CircleShape).clickable(onClick = onAction)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
+    }
 }
 
 // ── Barras de ecualizador animadas ───────────────────────────────

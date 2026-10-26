@@ -155,6 +155,7 @@ import com.melodia.app.SafeMode
 import com.melodia.app.SortMode
 import com.melodia.app.data.model.Song
 import com.melodia.app.ui.ds.DsBackground
+import com.melodia.app.ui.ds.EmptyState
 import com.melodia.app.ui.ds.HeroCard
 import com.melodia.app.ui.ds.HomeSkeleton
 import com.melodia.app.ui.ds.MelodiaPillNav
@@ -628,7 +629,7 @@ fun HomeTab(
 ) {
     val cs = MaterialTheme.colorScheme
     val current by vm.currentSong.collectAsState()
-    val state by vm.playerState.collectAsState()
+    val query by vm.query.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
     val loaded by vm.loaded.collectAsState()
     val ctx = LocalContext.current.applicationContext
@@ -702,7 +703,7 @@ fun HomeTab(
                 val mAlbums = albums.filter { it.name.contains(q, true) }.take(4)
                 val mPls = pls.filter { it.name.contains(q, true) }.take(4)
                 if (mArtists.isNotEmpty() || mAlbums.isNotEmpty() || mPls.isNotEmpty()) {
-                    Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
                         Text("Coincidencias", style = Ds.Title, color = cs.onBackground)
                         Spacer(Modifier.height(8.dp))
                         mArtists.forEach { a ->
@@ -734,7 +735,7 @@ fun HomeTab(
         item {
             val recent by vm.recentPlayed.collectAsState()
             if (recent.isNotEmpty()) {
-                Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
                     Text("Escuchado recientemente", style = Ds.Title, color = cs.onBackground)
                     Spacer(Modifier.height(8.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -768,7 +769,7 @@ fun HomeTab(
             val albums by vm.albums.collectAsState()
             val shown = remember(albums) { albums.sortedByDescending { it.count }.take(14) }
             if (shown.isNotEmpty()) {
-                Column(Modifier.padding(vertical = 4.dp)) {
+                Column(Modifier.padding(vertical = 10.dp)) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -813,9 +814,12 @@ fun HomeTab(
         item { SectionHeader("Tus temas", "Aleatorio", onAction = { vm.playShuffle() }) }
         if (songs.isEmpty()) {
             item {
-                Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text("Sin resultados", style = Ds.Body, color = cs.onSurfaceVariant)
-                }
+                EmptyState(
+                    icon = Icons.Default.Search,
+                    title = "Sin resultados",
+                    subtitle = if (query.isBlank()) "Tu biblioteca aún no tiene temas."
+                    else "Nada coincide con «$query». Prueba con otra palabra."
+                )
             }
         } else {
             items(songs, key = { it.id }) { s ->
@@ -1114,9 +1118,11 @@ fun PlaylistsTab(
             Spacer(Modifier.height(8.dp))
         }
         if (playlists.isEmpty()) item {
-            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                Text("Sin playlists — crea la primera", style = Ds.Body, color = cs.onSurfaceVariant)
-            }
+            EmptyState(
+                icon = Icons.Default.PlaylistPlay,
+                title = "Sin listas todavía",
+                subtitle = "Crea una arriba y arrastra temas desde su ficha."
+            )
         }
         items(playlists, key = { it.id }) { p ->
             var menu by remember { mutableStateOf(false) }
@@ -1424,13 +1430,12 @@ fun FavsTab(
 ) {
     val cs = MaterialTheme.colorScheme
     if (favSongs.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Favorite, null, Modifier.size(44.dp), tint = cs.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                Text("Sin favoritos", style = Ds.Body, color = cs.onSurfaceVariant)
-                Text("Toca el corazón de un tema", style = Ds.Sub, color = cs.onSurfaceVariant)
-            }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            EmptyState(
+                icon = Icons.Default.Favorite,
+                title = "Sin favoritos",
+                subtitle = "Toca el corazón de un tema o desliza la fila a la izquierda."
+            )
         }
     } else {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 200.dp)) {
@@ -1581,7 +1586,7 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
             // Sombra ambiental del acento: la carátula flota sobre el fondo
             Surface(
                 shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.size(artSize)
-                    .shadow(10.dp, Ds.HeroShape)
+                    
             ) {
                 SongArt(
                     albumId = s.albumId, size = artSize, shape = Ds.HeroShape,

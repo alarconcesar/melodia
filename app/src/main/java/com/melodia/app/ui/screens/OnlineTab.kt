@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.melodia.app.MainViewModel
 import com.melodia.app.data.online.YtTrack
+import com.melodia.app.ui.ds.EmptyState
 import com.melodia.app.ui.ds.MelodiaSpinner
 import com.melodia.app.ui.theme.Ds
 
@@ -189,14 +190,46 @@ fun OnlineTabContent(
     val kb = LocalSoftwareKeyboardController.current
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        // Cabecera: título + menú. Nada más compite con la búsqueda.
+        // Buscador + menú ⋮ en la misma línea: el título "Online" repetía lo que
+        // ya dice la pestaña seleccionada en la nav.
         Row(
-            Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 4.dp),
+            Modifier.fillMaxWidth().padding(top = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Online", style = Ds.Title, color = cs.onBackground, modifier = Modifier.weight(1f))
+            TextField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = { Text("Buscar en YouTube", style = Ds.Body) },
+                singleLine = true,
+                shape = RoundedCornerShape(Ds.RRow),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = cs.surface,
+                    unfocusedContainerColor = cs.surface,
+                    disabledContainerColor = cs.surface,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent
+                ),
+                leadingIcon = {
+                    IconButton(onClick = { kb?.hide(); onSearch() }, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.Search, "Buscar", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+                    }
+                },
+                trailingIcon = {
+                    when {
+                        loading -> Box(Modifier.padding(end = 10.dp)) { MelodiaSpinner(size = 16.dp, width = 2.dp) }
+                        query.isNotEmpty() -> IconButton(onClick = onClearQuery, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Close, "Limpiar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
+                        }
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { kb?.hide(); onSearch() }),
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(4.dp))
             Box {
-                IconButton(onClick = { menu = true }, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { menu = true }, modifier = Modifier.size(40.dp)) {
                     Icon(Icons.Default.MoreVert, "Opciones", Modifier.size(20.dp), tint = cs.onSurfaceVariant)
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -224,41 +257,6 @@ fun OnlineTabContent(
                 }
             }
         }
-
-        // Buscador: campo plano, lupa a la izquierda, limpiar a la derecha.
-        TextField(
-            value = query,
-            onValueChange = onQueryChange,
-            placeholder = { Text("Buscar en YouTube", style = Ds.Body) },
-            singleLine = true,
-            shape = RoundedCornerShape(Ds.RRow),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = cs.surface,
-                unfocusedContainerColor = cs.surface,
-                disabledContainerColor = cs.surface,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent
-            ),
-            leadingIcon = {
-                IconButton(onClick = { kb?.hide(); onSearch() }, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.Default.Search, "Buscar", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
-                }
-            },
-            trailingIcon = {
-                when {
-                    loading -> Box(Modifier.padding(end = 10.dp)) { MelodiaSpinner(size = 16.dp, width = 2.dp) }
-                    query.isNotEmpty() -> IconButton(onClick = onClearQuery, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Close, "Limpiar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
-                    }
-                }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { kb?.hide(); onSearch() }),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(Modifier.height(6.dp))
 
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
@@ -293,7 +291,13 @@ fun OnlineTabContent(
 
                 results.isEmpty() -> {
                     if (recent.isEmpty() && history.isEmpty()) {
-                        item { OnlineEmptyState() }
+                        item {
+                            EmptyState(
+                                icon = Icons.Default.Search,
+                                title = "Busca música en YouTube",
+                                subtitle = "Escribe una canción o un artista para empezar."
+                            )
+                        }
                     }
                     if (recent.isNotEmpty()) {
                         item {
@@ -398,27 +402,6 @@ fun OnlineTabContent(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun OnlineEmptyState() {
-    val cs = MaterialTheme.colorScheme
-    Column(
-        Modifier.fillMaxWidth().padding(vertical = 56.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            Modifier.size(56.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.10f)),
-            contentAlignment = Alignment.Center
-        ) { Icon(Icons.Default.Search, null, Modifier.size(26.dp), tint = cs.primary) }
-        Spacer(Modifier.height(14.dp))
-        Text("Busca música en YouTube", style = Ds.Title, color = cs.onBackground)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Escribe una canción o un artista para empezar",
-            style = Ds.Sub, color = cs.onSurfaceVariant
-        )
     }
 }
 

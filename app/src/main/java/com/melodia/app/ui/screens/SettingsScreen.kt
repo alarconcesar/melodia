@@ -388,7 +388,6 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         shape = Ds.CardShape, color = cs.surface,
         modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
-            .border(1.dp, cs.outline.copy(alpha = 0.5f), Ds.CardShape)
     ) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), content = content)
     }

@@ -149,3 +149,17 @@ Reglas nacidas de medir el jank, no de la intuición:
   en pausa (antes 500 ms siempre).
 - **Medición en la app.** Ajustes → Rendimiento muestra fps, % de frames lentos
   y el peor frame de los últimos 15 s (`perf/FrameMonitor`, Choreographer).
+
+## Pulido 5.2
+
+- **Un solo estado vacío** (`EmptyState` en `Components.kt`): icono en círculo al
+  10%, título, subtítulo y acción opcional. Favs, Listas, Inicio y Online lo
+  comparten; antes había tres tamaños y tres grises distintos.
+- **Inicio**: ritmo vertical uniforme (10dp por sección) y "Sin resultados"
+  ahora explica qué pasó y sugiere cambiar la palabra, en vez de una línea gris.
+- **Online**: fuera el título "Online" (repetía la pestaña ya seleccionada); el
+  menú ⋮ vive junto al buscador, en la misma fila. Se gana una línea de aire.
+- **Ajustes**: tarjetas sin borde hairline (el resto de la app ya no usa bordes).
+- **Reproductor**: carátula sin sombra; el fondo teñido ya la separa.
+- **Inicio** dejó de observar `playerState` sin usarlo (recomponía la pantalla
+  dos veces por segundo mientras sonaba algo).
