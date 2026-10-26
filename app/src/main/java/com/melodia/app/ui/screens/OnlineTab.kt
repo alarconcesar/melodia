@@ -114,7 +114,6 @@ fun OnlineTab(vm: MainViewModel) {
     val notice by vm.ytMsg.collectAsState()
 
     var dlPick by remember { mutableStateOf<YtTrack?>(null) }
-    var showDls by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.refreshDlHistory() }
 
@@ -139,7 +138,7 @@ fun OnlineTab(vm: MainViewModel) {
         onDownload = { dlPick = it },
         onDownloadAll = { vm.downloadAllYt() },
         onLoadMore = { vm.loadMoreYt() },
-        onOpenDownloads = { showDls = true },
+        onOpenDownloads = { vm.openDownloads() },
         onOpenImport = { vm.clearYtImport(); showImport = true },
         onToggleSaver = { vm.setDataSaver(!saver) },
         onToggleQuality = { vm.setYtQuality(!highQ) },
@@ -149,8 +148,7 @@ fun OnlineTab(vm: MainViewModel) {
         onOpenCollection = { vm.openYtCollection(it) }
     )
 
-    if (showDls) DownloadsSheet(vm, onDismiss = { showDls = false })
-    if (showImport) ImportPlaylistDialog(vm, onClose = { showImport = false }, onQueued = { showDls = true; showImport = false })
+    if (showImport) ImportPlaylistDialog(vm, onClose = { showImport = false }, onQueued = { vm.openDownloads(); showImport = false })
     dlPick?.let { track ->
         QualityDialog(
             track = track,
@@ -803,131 +801,6 @@ fun DownloadsButton(jobs: List<com.melodia.app.data.online.DlJob>, onClick: () -
                 Modifier.size(if (activos.isNotEmpty()) 15.dp else 20.dp),
                 tint = if (activos.isNotEmpty()) cs.primary else cs.onSurfaceVariant
             )
-        }
-    }
-}
-
-/** Descargas: cola con pausa/reintento + historial con calidad y fecha. */
-@Composable
-fun DownloadsSheet(vm: MainViewModel, onDismiss: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    val jobs by vm.dlJobs.collectAsState()
-    val hist by vm.dlHistory.collectAsState()
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Descargas", color = cs.onBackground) },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                if (jobs.isEmpty() && hist.isEmpty()) {
-                    Text("Aún no descargas nada — elige un tema y guárdalo en tu música", style = Ds.Body, color = cs.onSurfaceVariant)
-                }
-                if (jobs.isNotEmpty()) {
-                    Column(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
-                        jobs.forEach { j ->
-                            DlJobRow(
-                                job = j,
-                                onPause = { vm.pauseDl(j.track.id) },
-                                onResume = { vm.resumeDl(j.track.id) },
-                                onCancel = { vm.cancelDl(j.track.id) }
-                            )
-                        }
-                    }
-                }
-                if (hist.isNotEmpty()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp)
-                    ) {
-                        Text("Historial", style = Ds.Title, color = cs.onBackground, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { vm.clearDlHistory() }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Delete, "Borrar historial", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
-                        }
-                    }
-                    Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
-                        hist.forEach { r ->
-                            Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-                                Text(
-                                    r.title, style = Ds.Body, color = cs.onBackground,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    "${r.artist.ifBlank { "YouTube" }} · ${if (r.high) "Alta" else "Estándar"} · ${
-                                        try {
-                                            java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault()).format(java.util.Date(r.at))
-                                        } catch (_: Exception) { "" }
-                                    }",
-                                    style = Ds.Sub, color = cs.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } }
-    )
-}
-
-private fun mb(b: Long): String = "%.1f MB".format(b / 1048576f)
-
-/** Fila de descarga: progreso, pausa, reintento y cancelar. */
-@Composable
-private fun DlJobRow(
-    job: com.melodia.app.data.online.DlJob,
-    onPause: () -> Unit, onResume: () -> Unit, onCancel: () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    val st = job.status
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text(
-            job.track.title, style = Ds.Body, color = cs.onBackground,
-            maxLines = 1, overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            "${job.track.artist.ifBlank { "YouTube" }} · ${if (job.high) "Alta" else "Estándar"}" +
-                when (st) {
-                    com.melodia.app.data.online.DlStatus.QUEUED -> " · En cola"
-                    com.melodia.app.data.online.DlStatus.PAUSED ->
-                        if (job.total > 0) " · Pausada · ${mb(job.downloaded)}/${mb(job.total)}" else " · Pausada"
-                    com.melodia.app.data.online.DlStatus.ERROR -> " · ${job.error ?: "Falló"}"
-                    com.melodia.app.data.online.DlStatus.DONE -> " · Guardando…"
-                    else -> if (job.total > 0) " · ${mb(job.downloaded)}/${mb(job.total)}" else ""
-                },
-            style = Ds.Sub,
-            color = if (st == com.melodia.app.data.online.DlStatus.ERROR) cs.error else cs.onSurfaceVariant,
-            maxLines = 2, overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (st == com.melodia.app.data.online.DlStatus.ACTIVE ||
-                st == com.melodia.app.data.online.DlStatus.QUEUED ||
-                st == com.melodia.app.data.online.DlStatus.PAUSED
-            ) {
-                LinearProgressIndicator(
-                    progress = job.progress.coerceIn(0f, 1f),
-                    modifier = Modifier.weight(1f),
-                    color = cs.primary
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("${(job.progress * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
-                Spacer(Modifier.width(4.dp))
-            } else {
-                Spacer(Modifier.weight(1f))
-            }
-            when (st) {
-                com.melodia.app.data.online.DlStatus.ACTIVE,
-                com.melodia.app.data.online.DlStatus.QUEUED -> IconButton(onClick = onPause, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Pause, "Pausar", Modifier.size(18.dp), tint = cs.onBackground)
-                }
-                com.melodia.app.data.online.DlStatus.PAUSED,
-                com.melodia.app.data.online.DlStatus.ERROR -> IconButton(onClick = onResume, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.PlayArrow, "Reanudar", Modifier.size(18.dp), tint = cs.primary)
-                }
-                else -> {}
-            }
-            IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, "Quitar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
-            }
         }
     }
 }

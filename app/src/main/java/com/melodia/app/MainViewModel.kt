@@ -1004,6 +1004,30 @@ class MainViewModel(
         dl.enqueueAll(list, _ytHighQuality.value)
     }
 
+    // ── Pantalla de descargas (independiente, no modal) ──
+    private val _showDownloads = MutableStateFlow(false)
+    val showDownloads: StateFlow<Boolean> = _showDownloads
+    fun openDownloads() { _showDownloads.value = true }
+    fun closeDownloads() { _showDownloads.value = false }
+
+    /** Reanuda todo lo pausado o en error. */
+    fun resumeAllDl() {
+        dl.jobs.value.forEach { j ->
+            if (j.status == com.melodia.app.data.online.DlStatus.PAUSED ||
+                j.status == com.melodia.app.data.online.DlStatus.ERROR
+            ) dl.resume(j.track.id)
+        }
+    }
+
+    /** Pausa todo lo que está en cola o bajando. */
+    fun pauseAllDl() {
+        dl.jobs.value.forEach { j ->
+            if (j.status == com.melodia.app.data.online.DlStatus.ACTIVE ||
+                j.status == com.melodia.app.data.online.DlStatus.QUEUED
+            ) dl.pause(j.track.id)
+        }
+    }
+
     /** Descarga entera una playlist o álbum que salió en la búsqueda. */
     fun downloadYtCollection(col: com.melodia.app.data.online.YtSearchItem.Collection) {
         if (_busyYt.value != null) return

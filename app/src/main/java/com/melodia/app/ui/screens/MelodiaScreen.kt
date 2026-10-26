@@ -240,8 +240,8 @@ fun MelodiaScreen(vm: MainViewModel) {
     val selecting by vm.selecting.collectAsState()
     val selected by vm.selected.collectAsState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showDownloads by remember { mutableStateOf(false) }
     val dlJobs by vm.dlJobs.collectAsState()
+    val showDownloads by vm.showDownloads.collectAsState()
     val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
     ) { vm.clearSelection(); vm.reload() }
@@ -361,7 +361,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                     label = { Text("${sleepLeft}m") },
                     leadingIcon = { Icon(Icons.Default.Timer, null, Modifier.size(14.dp)) }
                 )
-                DownloadsButton(dlJobs, onClick = { showDownloads = true })
+                DownloadsButton(dlJobs, onClick = { vm.openDownloads() })
                 IconButton(onClick = { showSettings = true }) {
                     Icon(Icons.Default.Settings, "Ajustes", tint = cs.onSurfaceVariant)
                 }
@@ -521,6 +521,24 @@ fun MelodiaScreen(vm: MainViewModel) {
                 current?.let { s -> LyricsSheet(s, vm, onClose = { showLyrics = false }) }
             }
         }
+        // ── Descargas: pantalla propia, entra desde la derecha ──
+        if (showDownloads) BackHandler { vm.closeDownloads() }
+        AnimatedVisibility(
+            visible = showDownloads,
+            enter = slideInHorizontally(tween(300)) { it } + fadeIn(tween(180)),
+            exit = slideOutHorizontally(tween(240)) { it } + fadeOut(tween(160)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                Modifier.fillMaxSize().clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) {}
+            ) {
+                DownloadsScreen(vm, onClose = vm::closeDownloads)
+            }
+        }
+
         // ── Ajustes: pantalla propia, entra desde la derecha ──
         AnimatedVisibility(
             visible = showSettings,
@@ -570,8 +588,6 @@ fun MelodiaScreen(vm: MainViewModel) {
             }
         )
     }
-
-    if (showDownloads) DownloadsSheet(vm, onDismiss = { showDownloads = false })
 
     YtCollectionSheet(vm)
 
