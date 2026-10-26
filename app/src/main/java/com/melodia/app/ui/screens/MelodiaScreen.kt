@@ -385,7 +385,9 @@ fun MelodiaScreen(vm: MainViewModel) {
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
                 )
             }
-            if (folderSel != null || albumSel != null || artistSel != null) {
+            // Los filtros son de Explorar: en Inicio el chip sobraba (el contenido
+            // ya no está filtrado) y parecía que Inicio seguía en esa carpeta.
+            if (tab == 1 && (folderSel != null || albumSel != null || artistSel != null)) {
                 AssistChip(
                     onClick = { vm.clearFilters() },
                     label = { Text(folderSel?.substringAfterLast("/") ?: albumSel ?: artistSel ?: "", maxLines = 1) },
