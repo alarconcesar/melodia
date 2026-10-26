@@ -27,6 +27,9 @@ sin Hilt: arranque estable con DI manual.
 | 👉 Gestos | Deslizar una fila: derecha = encolar, izquierda = favorito |
 | ▶️ Player | Play/pause/next/prev, shuffle, repeat (off/all/one), seek con preview, MediaSession |
 | 🎧 Estabilidad | Foco de audio (pausa en llamadas), wake lock para streams, botón de auriculares, re-resolución automática si YouTube vence la URL |
+| ⏯️ Continuidad | La cola, el tema y la posición sobreviven al cierre; al reabrir queda en pausa, lista para seguir |
+| 🖼️ Carátulas | MediaStore y portada incrustada del archivo (offline); iTunes solo si no hay nada local |
+| 💿 Álbumes | Reproducción en orden de disco y pista (`ALBUM_ARTIST` para compilados) |
 
 ## 🧱 Stack (versiones fijadas y probadas)
 
@@ -90,8 +93,9 @@ Hecho:
 - [x] Carátulas reales (MediaStore), widget y letras (incl. LRC)
 - [x] Velocidad/pitch, estadísticas, respaldo JSON
 - [x] Foco de audio, wake lock, botón de auriculares y re-resolución de URL vencida (4.5)
+- [x] Cola persistente, reanudación del sistema, álbumes en orden y carátulas offline (4.6)
 
 Ideas siguientes (sin compromiso):
-- [ ] Cola persistente entre sesiones (restaurar al reabrir la app)
 - [ ] Android Auto (Car App Library)
-- [ ] Descargas en segundo plano con reintentos
+- [ ] Descargas en segundo plano con `DownloadService` de Media3
+- [ ] Biblioteca incremental (caché Room + ContentObserver)

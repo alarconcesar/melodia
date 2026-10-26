@@ -27,6 +27,7 @@ class AppContainer(context: Context) {
     val dlManager = DownloadManager(appContext, ytRepo)
     val lyricsRepo = LyricsRepository(appContext)
     val artRepo = ArtworkRepository(appContext)
+    val queueStore = com.melodia.app.player.QueueStore(appContext)
     val sleepTimer = SleepTimer { try { musicPlayer.fadePause() } catch (_: Exception) {} }
-    fun makeMainViewModel() = MainViewModel(musicPlayer, musicRepository, playlistRepo, statsRepo, sleepTimer, ytRepo, dlManager, lyricsRepo, artRepo)
+    fun makeMainViewModel() = MainViewModel(musicPlayer, musicRepository, playlistRepo, statsRepo, sleepTimer, ytRepo, dlManager, lyricsRepo, artRepo, queueStore)
 }

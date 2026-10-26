@@ -127,6 +127,7 @@ class MusicPlayer(private val context: Context) {
         try {
             queueIds = ids.toMutableList()
             streamRetries = 0
+            pendingRestore = null
             val items = ids.mapNotNull { id -> songMap[id]?.let { buildItem(it) } }
             if (items.isEmpty()) return
             try { p.volume = 1f } catch (_: Exception) {}
@@ -204,6 +205,7 @@ class MusicPlayer(private val context: Context) {
         try {
             queueIds = mutableListOf(YT_STREAM_ID)
             streamRetries = 0
+            pendingRestore = null
             val item = MediaItem.Builder()
                 .setUri(url)
                 .setMediaId(YT_STREAM_ID.toString())
@@ -225,6 +227,48 @@ class MusicPlayer(private val context: Context) {
     }
 
     fun pauseOnly() { try { exo?.pause() } catch (_: Exception) {} }
+
+    /**
+     * Deja la cola preparada para cuando el usuario le dé play (restauración al
+     * abrir la app). A propósito NO bindea el servicio: el arranque sigue siendo
+     * ligero y ExoPlayer se crea recién al primer play.
+     */
+    fun restore(
+        ids: List<Long>,
+        startIndex: Int,
+        positionMs: Long,
+        shuffle: Boolean = false,
+        repeatMode: Int = Player.REPEAT_MODE_OFF
+    ) {
+        pendingRestore = PendingRestore(ids, startIndex, positionMs, shuffle, repeatMode)
+    }
+
+    private data class PendingRestore(
+        val ids: List<Long>,
+        val index: Int,
+        val positionMs: Long,
+        val shuffle: Boolean,
+        val repeatMode: Int
+    )
+
+    private var pendingRestore: PendingRestore? = null
+
+    /** Aplica la cola restaurada antes de la primera reproducción. */
+    private fun applyPendingRestore(p: ExoPlayer) {
+        val r = pendingRestore ?: return
+        pendingRestore = null
+        try {
+            val items = r.ids.mapNotNull { id -> songMap[id]?.let { buildItem(it) } }
+            if (items.isEmpty()) return
+            queueIds = r.ids.toMutableList()
+            p.shuffleModeEnabled = r.shuffle
+            p.repeatMode = r.repeatMode
+            p.setMediaItems(items, r.index.coerceIn(0, items.size - 1), r.positionMs.coerceAtLeast(0L))
+            p.prepare()
+            p.playWhenReady = false
+            updateState()
+        } catch (e: Exception) { Log.e("MusicPlayer", "apply restore fail", e) }
+    }
 
     /**
      * Reemplaza la URL del stream actual conservando la posición y el estado
@@ -321,7 +365,14 @@ class MusicPlayer(private val context: Context) {
     }
 
     private fun attachEq() { try { exo?.let { eq?.attach(it.audioSessionId) } } catch (_: Exception) {} }
-    fun toggle() { ensureBound(); try { exo?.let { if (it.isPlaying) it.pause() else it.play() } } catch (_: Exception) {} }
+    fun toggle() {
+        ensureBound()
+        val p = exo ?: run { pending = { toggle() }; return }
+        try {
+            applyPendingRestore(p)
+            if (p.isPlaying) p.pause() else p.play()
+        } catch (_: Exception) {}
+    }
     fun next() { ensureBound(); jumpWithFade { try { exo?.seekToNextMediaItem() } catch (_: Exception) {} } }
     fun prev() { ensureBound(); jumpWithFade { try { exo?.seekToPreviousMediaItem() } catch (_: Exception) {} } }
 

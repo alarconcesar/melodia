@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
             this,
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return MainViewModel(c.musicPlayer, c.musicRepository, c.playlistRepo, c.statsRepo, c.sleepTimer, c.ytRepo, c.dlManager, c.lyricsRepo, c.artRepo) as T
+                    return MainViewModel(c.musicPlayer, c.musicRepository, c.playlistRepo, c.statsRepo, c.sleepTimer, c.ytRepo, c.dlManager, c.lyricsRepo, c.artRepo, c.queueStore) as T
                 }
             }
         )[MainViewModel::class.java]

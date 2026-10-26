@@ -106,9 +106,56 @@ class MelodiaPlaybackService : MediaSessionService() {
         player.addListener(notifListener)
         session = MediaSession.Builder(this, player)
             .setSessionActivity(contentIntent)
+            .setCallback(object : MediaSession.Callback {
+                /**
+                 * El sistema (Android Auto, Bluetooth, reinicio) pide reanudar:
+                 * se reconstruye la última cola guardada por el ViewModel.
+                 */
+                override fun onPlaybackResumption(
+                    mediaSession: MediaSession,
+                    controller: MediaSession.ControllerInfo
+                ): com.google.common.util.concurrent.ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+                    val restored = try { snapshotQueue() } catch (_: Exception) { null }
+                    return if (restored != null) {
+                        com.google.common.util.concurrent.Futures.immediateFuture(restored)
+                    } else {
+                        com.google.common.util.concurrent.Futures.immediateFailedFuture(
+                            IllegalStateException("Sin cola guardada")
+                        )
+                    }
+                }
+            })
             .build()
         // La notificación visible la publica updateNotification(); la de media3
         // queda como respaldo del sistema sin interferir.
+    }
+
+    private val queueStore by lazy { com.melodia.app.player.QueueStore(this) }
+
+    /** Cola persistida → MediaItems listos para que el sistema reanude. */
+    private fun snapshotQueue(): MediaSession.MediaItemsWithStartPosition? {
+        val snap = queueStore.load() ?: return null
+        val playable = snap.songs.filter { it.id != YT_STREAM_ID }
+        val items = playable.map { s ->
+            androidx.media3.common.MediaItem.Builder()
+                .setUri(s.dataPath)
+                .setMediaId(s.id.toString())
+                .setMediaMetadata(
+                    androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(s.title)
+                        .setArtist(s.artist.ifBlank { "Desconocido" })
+                        .setAlbumTitle(s.album)
+                        .build()
+                )
+                .build()
+        }
+        if (items.isEmpty()) return null
+        val idx = playable.indexOfFirst { it.id == snap.songs.getOrNull(snap.index)?.id }
+        return MediaSession.MediaItemsWithStartPosition(
+            items,
+            if (idx >= 0) idx else 0,
+            snap.positionMs
+        )
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

@@ -10,7 +10,7 @@ import java.net.URL
 import java.net.URLEncoder
 
 /** Carátulas de iTunes Search API (sin key) para temas sin arte local. */
-class ArtworkRepository(context: Context) {
+class ArtworkRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("melodia_art", Context.MODE_PRIVATE)
     private val mem = mutableMapOf<String, String?>()
 
@@ -67,5 +67,70 @@ class ArtworkRepository(context: Context) {
             Log.d("Artwork", "fetch fail: ${e.message}")
             null
         }
+    }
+
+    // ── Carátula embebida del archivo (offline) ─────────────────────
+    private val artDir = java.io.File(context.filesDir, "art").apply { mkdirs() }
+
+    /**
+     * Extrae la portada incrustada del audio a un JPEG local y devuelve su
+     * `file://`. Evita depender de iTunes (red) cuando el archivo ya trae arte.
+     * Cachea también el "no tiene" para no reintentar en cada arranque.
+     */
+    suspend fun embedded(song: com.melodia.app.data.model.Song): String? = withContext(Dispatchers.IO) {
+        val k = "emb:${song.id}:${song.dataPath.hashCode()}"
+        try {
+            if (prefs.contains(k)) return@withContext prefs.getString(k, null)?.ifBlank { null }
+            val out = java.io.File(artDir, "s${song.id}.jpg")
+            if (!out.exists()) {
+                val bmp = extractEmbedded(song.dataPath) ?: run {
+                    prefs.edit().putString(k, "").apply()
+                    return@withContext null
+                }
+                val scaled = scaleDown(bmp, 640)
+                out.outputStream().use { scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
+                if (scaled !== bmp) bmp.recycle()
+                trimCache()
+            }
+            val path = "file://${out.absolutePath}"
+            prefs.edit().putString(k, path).apply()
+            path
+        } catch (_: Exception) {
+            prefs.edit().putString(k, "").apply()
+            null
+        }
+    }
+
+    private fun extractEmbedded(path: String): android.graphics.Bitmap? {
+        if (path.isBlank()) return null
+        val r = android.media.MediaMetadataRetriever()
+        return try {
+            r.setDataSource(path)
+            val bytes = r.embeddedPicture ?: return null
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } catch (_: Exception) {
+            null
+        } finally {
+            try { r.release() } catch (_: Exception) {}
+        }
+    }
+
+    private fun scaleDown(bmp: android.graphics.Bitmap, max: Int): android.graphics.Bitmap {
+        val w = bmp.width
+        val h = bmp.height
+        if (w <= max && h <= max) return bmp
+        val ratio = max.toFloat() / maxOf(w, h)
+        return android.graphics.Bitmap.createScaledBitmap(
+            bmp, (w * ratio).toInt().coerceAtLeast(1), (h * ratio).toInt().coerceAtLeast(1), true
+        )
+    }
+
+    /** Tope de disco: ~600 portadas; se borran las más viejas. */
+    private fun trimCache() {
+        try {
+            val files = artDir.listFiles() ?: return
+            if (files.size <= 600) return
+            files.sortedBy { it.lastModified() }.take(files.size - 600).forEach { it.delete() }
+        } catch (_: Exception) {}
     }
 }

@@ -54,7 +54,7 @@ class MusicRepository(context: Context) {
         val minMs = _minSecs.value * 1000L
         val onlyFolder = _scanFolder.value
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val cols = arrayOf(
+        val cols = mutableListOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
@@ -62,10 +62,14 @@ class MusicRepository(context: Context) {
             MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATA,
-            MediaStore.Audio.Media.DATE_ADDED
+            MediaStore.Audio.Media.DATE_ADDED,
+            MediaStore.Audio.Media.TRACK
         )
+        // ALBUM_ARTIST existe desde Android 11; en versiones previas se usa el artista
+        val hasAlbumArtist = android.os.Build.VERSION.SDK_INT >= 30
+        if (hasAlbumArtist) cols.add(MediaStore.Audio.Media.ALBUM_ARTIST)
         try {
-            resolver.query(uri, cols, MediaStore.Audio.Media.IS_MUSIC + "!=0", null, MediaStore.Audio.Media.TITLE + " ASC")?.use { c ->
+            resolver.query(uri, cols.toTypedArray(), MediaStore.Audio.Media.IS_MUSIC + "!=0", null, MediaStore.Audio.Media.TITLE + " ASC")?.use { c ->
                 val iId = c.getColumnIndex(MediaStore.Audio.Media._ID)
                 val iTitle = c.getColumnIndex(MediaStore.Audio.Media.TITLE)
                 val iArtist = c.getColumnIndex(MediaStore.Audio.Media.ARTIST)
@@ -74,6 +78,8 @@ class MusicRepository(context: Context) {
                 val iDur = c.getColumnIndex(MediaStore.Audio.Media.DURATION)
                 val iData = c.getColumnIndex(MediaStore.Audio.Media.DATA)
                 val iAdded = c.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
+                val iTrack = c.getColumnIndex(MediaStore.Audio.Media.TRACK)
+                val iAlbumArtist = if (hasAlbumArtist) c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ARTIST) else -1
                 while (c.moveToNext()) {
                     val dur = if (iDur >= 0) c.getLong(iDur) else 0L
                     if (dur < minMs) continue
@@ -87,6 +93,17 @@ class MusicRepository(context: Context) {
                     if (artist.isBlank() || artist == "<unknown>") artist = "Desconocido"
                     var album = if (iAlbum >= 0) c.getString(iAlbum) ?: "" else ""
                     if (album == "<unknown>") album = ""
+                    // TRACK viene como disc*1000 + pista cuando hay varios discos
+                    val rawTrack = if (iTrack >= 0) c.getInt(iTrack) else 0
+                    val disc = if (rawTrack > 1000) rawTrack / 1000 else 1
+                    val track = when {
+                        rawTrack <= 0 -> 0
+                        rawTrack > 1000 -> rawTrack % 1000
+                        else -> rawTrack
+                    }
+                    val albumArtist = if (iAlbumArtist >= 0) {
+                        (c.getString(iAlbumArtist) ?: "").takeUnless { it.isBlank() || it == "<unknown>" } ?: artist
+                    } else artist
                     songs.add(
                         Song(
                             id = if (iId >= 0) c.getLong(iId) else 0L,
@@ -96,7 +113,10 @@ class MusicRepository(context: Context) {
                             albumId = if (iAlbumId >= 0) c.getLong(iAlbumId) else 0L,
                             durationMs = dur,
                             dataPath = if (iData >= 0) c.getString(iData) ?: "" else "",
-                            dateAdded = if (iAdded >= 0) c.getLong(iAdded) else 0L
+                            dateAdded = if (iAdded >= 0) c.getLong(iAdded) else 0L,
+                            trackNumber = track,
+                            discNumber = if (rawTrack > 0) disc else 0,
+                            albumArtist = albumArtist
                         )
                     )
                 }

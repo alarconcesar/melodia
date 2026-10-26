@@ -33,7 +33,8 @@ class MainViewModel(
     private val yt: YtRepository,
     private val dl: DownloadManager,
     private val lyricsRepo: LyricsRepository,
-    private val artRepo: com.melodia.app.data.art.ArtworkRepository
+    private val artRepo: com.melodia.app.data.art.ArtworkRepository,
+    private val queueStore: com.melodia.app.player.QueueStore
 ) : ViewModel() {
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs
@@ -65,11 +66,15 @@ class MainViewModel(
         if (al != null) out = out.filter { (it.album.ifBlank { "Sin álbum" }) == al }
         if (ar != null) out = out.filter { (it.artist.ifBlank { "Desconocido" }) == ar }
         if (q.isNotBlank()) out = out.filter { it.title.contains(q, true) || it.artist.contains(q, true) || it.album.contains(q, true) }
-        when (s) {
-            SortMode.TITLE -> out.sortedBy { it.title.lowercase() }
-            SortMode.ARTIST -> out.sortedBy { it.artist.lowercase() }
-            SortMode.RECENT -> out.sortedByDescending { it.dateAdded }
-            SortMode.LONGEST -> out.sortedByDescending { it.durationMs }
+        when {
+            // Viendo un álbum: manda el orden del disco, no el alfabético
+            al != null -> out.sortedWith(AlbumTrackOrder)
+            else -> when (s) {
+                SortMode.TITLE -> out.sortedBy { it.title.lowercase() }
+                SortMode.ARTIST -> out.sortedBy { it.artist.lowercase() }
+                SortMode.RECENT -> out.sortedByDescending { it.dateAdded }
+                SortMode.LONGEST -> out.sortedByDescending { it.durationMs }
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -107,18 +112,54 @@ class MainViewModel(
     private val _dlHistory = MutableStateFlow<List<YtRepository.DlRecord>>(emptyList())
     val dlHistory: StateFlow<List<YtRepository.DlRecord>> = _dlHistory
 
+    // La restauración de cola corre desde el init: estos estados deben existir
+    // ANTES o el constructor revienta con NPE (mismo bug que la 4.3).
+    private val _queue = MutableStateFlow<List<Song>>(emptyList())
+    val queueSongs: StateFlow<List<Song>> = _queue
+
     init {
         viewModelScope.launch {
             _reload.flatMapLatest { repo.loadAllSongs() }.collect { list ->
                 player.setQueue(list)
                 _songs.value = list
                 _loaded.value = true
+                maybeRestoreQueue(list)
                 enrichArtwork(list)
             }
         }
         viewModelScope.launch { lists.favorites().collect { f -> _favIds.value = f.map { it.songId }.toSet() } }
         // URL de stream vencida o rechazada: re-resolver y continuar sin cortar
         player.onStreamError = { pos -> refreshStreamAudio(pos) }
+        // Persistir la cola: la lista (JSON) solo cuando cambia su composición;
+        // índice/shuffle/repeat como claves sueltas para no reescribir 5k temas
+        // en cada cambio de pista.
+        viewModelScope.launch {
+            _queue.map { q -> q.map { it.id } }.distinctUntilChanged().collect {
+                val q = _queue.value
+                if (q.isNotEmpty()) queueStore.saveSongs(q)
+            }
+        }
+        viewModelScope.launch {
+            combine(_queue, player.state) { q, st -> Triple(q.firstOrNull { it.id == st.currentId }?.id ?: -1L, st.shuffle, st.repeatMode) }
+                .distinctUntilChanged()
+                .collect { (currentId, shuffle, repeat) ->
+                    val q = _queue.value
+                    if (q.isEmpty()) return@collect
+                    val idx = q.indexOfFirst { it.id == currentId }.takeIf { it >= 0 } ?: 0
+                    queueStore.saveState(idx, player.state.value.positionMs, shuffle, repeat)
+                }
+        }
+        // Posición cada 5 s (clave suelta: no reescribe toda la cola)
+        viewModelScope.launch {
+            var last = 0L
+            player.state.collect { st ->
+                val now = System.currentTimeMillis()
+                if (now - last > 5_000 && _queue.value.isNotEmpty()) {
+                    last = now
+                    queueStore.savePosition(st.positionMs)
+                }
+            }
+        }
         // Sincronizar UI con el item real de ExoPlayer (next/prev/fin de tema)
         viewModelScope.launch {
             player.state.map { it.currentId }.distinctUntilChanged().collect { id ->
@@ -162,6 +203,35 @@ class MainViewModel(
             // Precalienta la caché de letra con la clave del tema ya guardado
             viewModelScope.launch { delayWarmLyric(track) }
         }
+    }
+
+    private var queueRestored = false
+
+    /**
+     * Al abrir la app deja la última cola preparada y en pausa (no arranca sola).
+     * Los temas que ya no están en la biblioteca se descartan y el índice se
+     * recoloca sobre el mismo tema actual.
+     */
+    private fun maybeRestoreQueue(library: List<Song>) {
+        if (queueRestored) return
+        // Sin biblioteca (permiso denegado, MediaStore aún cargando) no se toca
+        // el snapshot: se reintenta en la próxima carga.
+        if (library.isEmpty()) return
+        queueRestored = true
+        if (_queue.value.isNotEmpty()) return
+        val snapshot = queueStore.load()
+        val plan = com.melodia.app.player.QueueRestore.plan(snapshot, library)
+        if (plan == null) {
+            if (snapshot != null) queueStore.clear()
+            return
+        }
+        _queue.value = plan.songs
+        _currentId.value = plan.songs[plan.index].id
+        player.restore(
+            plan.songs.map { it.id }, plan.index, plan.positionMs,
+            shuffle = snapshot?.shuffle ?: false,
+            repeatMode = snapshot?.repeatMode ?: 0
+        )
     }
 
     /** Busca el tema recién descargado y deja su letra lista sin internet. */
@@ -224,9 +294,6 @@ class MainViewModel(
     fun openPl(pid: Long?) { _openPlaylist.value = pid }
 
     // ── Cola de reproducción visible ──
-    private val _queue = MutableStateFlow<List<Song>>(emptyList())
-    val queueSongs: StateFlow<List<Song>> = _queue
-
     private fun emitPlay(list: List<Song>, idx: Int) {
         if (list.isEmpty()) return
         _queue.value = list
@@ -314,7 +381,7 @@ class MainViewModel(
     private fun artistSongs(name: String) =
         songs.value.filter { (it.artist.ifBlank { "Desconocido" }) == name }
     private fun albumSongs(name: String) =
-        songs.value.filter { (it.album.ifBlank { "Sin álbum" }) == name }
+        songs.value.filter { (it.album.ifBlank { "Sin álbum" }) == name }.sortedWith(AlbumTrackOrder)
     fun playArtist(name: String) {
         val l = artistSongs(name)
         if (l.isNotEmpty()) emitPlay(l, 0)
@@ -493,6 +560,11 @@ class MainViewModel(
     // ── Carátulas online para temas sin arte ──
     private var artJob: kotlinx.coroutines.Job? = null
 
+    /** Clave para compartir una portada entre los temas del mismo álbum. */
+    private fun albumKey(s: Song): String =
+        if (s.album.isBlank()) "id:${s.id}"
+        else "a:${s.album.lowercase()}|${s.artist.lowercase()}"
+
     private fun enrichArtwork(list: List<Song>) {
         artJob?.cancel()
         artJob = viewModelScope.launch {
@@ -504,6 +576,24 @@ class MainViewModel(
                 }.toMap()
                 if (cached.isNotEmpty()) {
                     _songs.value = _songs.value.map { s -> cached[s.id]?.let { s.copy(artUrl = it) } ?: s }
+                }
+                // 1.5) carátula embebida en el archivo (offline, sin red)
+                val found = mutableMapOf<String, String>()
+                var emb = 0
+                for (s in list) {
+                    if (emb >= 80) break
+                    val cur = _songs.value.find { it.id == s.id } ?: continue
+                    if (cur.albumId > 0 || !cur.artUrl.isNullOrBlank()) continue
+                    val group = albumKey(cur)
+                    if (found.containsKey(group)) continue
+                    val local = try { artRepo.embedded(cur) } catch (_: Exception) { null }
+                    if (local != null) found[group] = local
+                    emb++
+                }
+                if (found.isNotEmpty()) {
+                    _songs.value = _songs.value.map { s ->
+                        found[albumKey(s)]?.let { s.copy(artUrl = it) } ?: s
+                    }
                 }
                 // 2) busca en red lo que falte (máx. 50 por carga, con pausa)
                 var n = 0
