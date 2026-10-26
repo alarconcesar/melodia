@@ -7,6 +7,10 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.InfoItem.InfoType
 import org.schabi.newpipe.extractor.NewPipe
@@ -17,8 +21,14 @@ import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
 import java.io.File
+import java.io.FileInputStream
+import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 data class YtTrack(
     val id: String,
@@ -234,63 +244,183 @@ class YtRepository(private val context: Context) {
         } catch (_: Exception) {}
     }
 
+    private companion object {
+        const val UA =
+            "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
+    }
+
     /** Descarga el audio a Música/Melodia y devuelve su Uri de MediaStore. */
-    suspend fun download(track: YtTrack, onProgress: (Float) -> Unit, high: Boolean = true): Uri = withContext(Dispatchers.IO) {
-        val audio = bestAudio(track.url, high)
-        val fileName = sanitize("${track.title} - ${track.artist.ifBlank { "YouTube" }}") + "." + audio.ext
-        val resolver = context.contentResolver
-        if (Build.VERSION.SDK_INT < 29) {
+    suspend fun download(track: YtTrack, onProgress: (Float) -> Unit, high: Boolean = true): Uri =
+        withContext(Dispatchers.IO) {
+            val audio = bestAudio(track.url, high)
+            val fileName = sanitize("${track.title} - ${track.artist.ifBlank { "YouTube" }}") + "." + audio.ext
+            val resolver = context.contentResolver
+            if (Build.VERSION.SDK_INT < 29) {
+                try {
+                    File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Melodia").mkdirs()
+                } catch (_: Exception) {}
+            }
+            val values = ContentValues().apply {
+                put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
+                put(MediaStore.Audio.Media.TITLE, track.title)
+                put(MediaStore.Audio.Media.ARTIST, track.artist.ifBlank { "YouTube" })
+                put(MediaStore.Audio.Media.MIME_TYPE, audio.mime)
+                if (Build.VERSION.SDK_INT >= 29) {
+                    put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/Melodia")
+                    put(MediaStore.Audio.Media.IS_PENDING, 1)
+                }
+            }
+            val uri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+                ?: error("No se pudo crear el archivo")
+            val tmp = File(context.cacheDir, "melodia-${System.nanoTime()}.part")
             try {
-                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Melodia").mkdirs()
-            } catch (_: Exception) {}
-        }
-        val values = ContentValues().apply {
-            put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
-            put(MediaStore.Audio.Media.TITLE, track.title)
-            put(MediaStore.Audio.Media.ARTIST, track.artist.ifBlank { "YouTube" })
-            put(MediaStore.Audio.Media.MIME_TYPE, audio.mime)
-            if (Build.VERSION.SDK_INT >= 29) {
-                put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/Melodia")
-                put(MediaStore.Audio.Media.IS_PENDING, 1)
+                fetchToFile(audio.url, tmp, onProgress)
+                resolver.openOutputStream(uri)?.use { out ->
+                    FileInputStream(tmp).use { inp -> inp.copyTo(out, 64 * 1024) }
+                } ?: error("Sin salida")
+                if (Build.VERSION.SDK_INT >= 29) {
+                    values.clear()
+                    values.put(MediaStore.Audio.Media.IS_PENDING, 0)
+                    resolver.update(uri, values, null, null)
+                }
+                onProgress(1f)
+                uri
+            } catch (e: Exception) {
+                try { resolver.delete(uri, null, null) } catch (_: Exception) {}
+                throw e
+            } finally {
+                try { tmp.delete() } catch (_: Exception) {}
             }
         }
-        val uri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
-            ?: error("No se pudo crear el archivo")
+
+    private fun openConn(url: String, range: String? = null): HttpURLConnection {
+        val c = URL(url).openConnection() as HttpURLConnection
+        c.setRequestProperty("User-Agent", UA)
+        if (range != null) c.setRequestProperty("Range", range)
+        c.connectTimeout = 20_000
+        c.readTimeout = 30_000
+        return c
+    }
+
+    /** Tamaño total del archivo, leído del Content-Range de una petición de 1 byte. */
+    @androidx.annotation.VisibleForTesting
+    internal fun contentLength(url: String): Long = try {
+        val c = openConn(url, "bytes=0-0")
+        c.connect()
+        val total = c.getHeaderField("Content-Range")?.substringAfterLast('/')?.toLongOrNull() ?: -1L
+        c.disconnect()
+        total
+    } catch (_: Exception) { -1L }
+
+    /**
+     * Baja el archivo a disco en trozos paralelos con `Range`.
+     *
+     * YouTube limita cada conexión: medido desde el VPS, una sola conexión daba
+     * 32 KB/s para un m4a de 3,3 MB, mientras la misma descarga en 4 trozos daba
+     * ~5,8 MB/s. El cuello de botella no era la red del equipo.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal suspend fun fetchToFile(url: String, dest: File, onProgress: (Float) -> Unit) {
+        val total = contentLength(url)
+        if (total <= 0L) {
+            streamToFile(url, dest, -1L, onProgress)
+            return
+        }
         try {
-            val conn = URL(audio.url).openConnection() as HttpURLConnection
-            conn.setRequestProperty(
-                "User-Agent",
-                "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
-            )
-            conn.connectTimeout = 20_000
-            conn.readTimeout = 30_000
-            conn.connect()
-            val total = conn.contentLengthLong.takeIf { it > 0 }
-            resolver.openOutputStream(uri)?.use { out ->
-                conn.inputStream.use { inp ->
+            val parts = if (total > 1_500_000L) 4 else 2
+            val chunk = total / parts
+            RandomAccessFile(dest, "rw").use { raf ->
+                raf.setLength(total)
+                val ch = raf.channel
+                val done = AtomicLong(0)
+                val lastEmit = AtomicLong(0)
+                val onBytes: (Long) -> Unit = { n ->
+                    val d = done.addAndGet(n)
+                    val now = System.nanoTime()
+                    if (now - lastEmit.get() > 120_000_000L) {
+                        lastEmit.set(now)
+                        onProgress((d.toFloat() / total).coerceIn(0f, 1f))
+                    }
+                }
+                coroutineScope {
+                    (0 until parts).map { i ->
+                        val from = i * chunk
+                        val to = if (i == parts - 1) total - 1 else from + chunk - 1
+                        async { downloadRange(url, ch, from, to, onBytes) }
+                    }.awaitAll()
+                }
+                onProgress(1f)
+            }
+        } catch (e: Exception) {
+            // El servidor no respetó Range o falló un trozo: una sola conexión.
+            try { dest.delete() } catch (_: Exception) {}
+            streamToFile(url, dest, total, onProgress)
+        }
+    }
+
+    private suspend fun downloadRange(
+        url: String,
+        ch: FileChannel,
+        from: Long,
+        to: Long,
+        onBytes: (Long) -> Unit
+    ) = withContext(Dispatchers.IO) {
+        var attempt = 0
+        while (true) {
+            try {
+                val c = openConn(url, "bytes=$from-$to")
+                if (c.responseCode != HttpURLConnection.HTTP_PARTIAL) {
+                    c.disconnect()
+                    error("El servidor no aceptó Range")
+                }
+                c.inputStream.use { inp ->
                     val buf = ByteArray(64 * 1024)
-                    var read = 0L
+                    var pos = from
+                    while (pos <= to) {
+                        val want = minOf(buf.size.toLong(), to - pos + 1).toInt()
+                        val n = inp.read(buf, 0, want)
+                        if (n <= 0) break
+                        ch.write(ByteBuffer.wrap(buf, 0, n), pos)
+                        pos += n
+                        onBytes(n.toLong())
+                    }
+                }
+                c.disconnect()
+                return@withContext
+            } catch (e: Exception) {
+                attempt++
+                if (attempt >= 3) throw e
+                delay(400L * attempt)
+            }
+        }
+    }
+
+    private suspend fun streamToFile(url: String, dest: File, total: Long, onProgress: (Float) -> Unit) =
+        withContext(Dispatchers.IO) {
+            val c = openConn(url)
+            c.connect()
+            val len = if (total > 0) total else c.contentLengthLong
+            var read = 0L
+            var lastEmit = 0L
+            dest.outputStream().use { out ->
+                c.inputStream.use { inp ->
+                    val buf = ByteArray(64 * 1024)
                     while (true) {
                         val n = inp.read(buf)
                         if (n < 0) break
                         out.write(buf, 0, n)
                         read += n
-                        if (total != null) onProgress((read.toFloat() / total).coerceIn(0f, 1f))
+                        val now = System.nanoTime()
+                        if (len > 0 && now - lastEmit > 120_000_000L) {
+                            lastEmit = now
+                            onProgress((read.toFloat() / len).coerceIn(0f, 1f))
+                        }
                     }
                 }
-            } ?: error("Sin salida")
-            if (Build.VERSION.SDK_INT >= 29) {
-                values.clear()
-                values.put(MediaStore.Audio.Media.IS_PENDING, 0)
-                resolver.update(uri, values, null, null)
             }
-            onProgress(1f)
-            uri
-        } catch (e: Exception) {
-            try { resolver.delete(uri, null, null) } catch (_: Exception) {}
-            throw e
+            c.disconnect()
+            if (len > 0) onProgress(1f)
         }
-    }
 
     /** Trae los temas de una playlist de YouTube (título + hasta 100 temas, varias páginas). */
     suspend fun playlistTracks(url: String): Pair<String, List<YtTrack>> = withContext(Dispatchers.IO) {
