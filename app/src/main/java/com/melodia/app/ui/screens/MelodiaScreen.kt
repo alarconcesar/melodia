@@ -67,6 +67,7 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
@@ -110,6 +111,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
@@ -236,6 +238,12 @@ fun MelodiaScreen(vm: MainViewModel) {
     val openSongs by vm.openPlaylistSongs.collectAsState()
     val allLinks by vm.allPlaylistSongs.collectAsState()
     val sleepLeft by vm.sleep.minsLeft.collectAsState()
+    val selecting by vm.selecting.collectAsState()
+    val selected by vm.selected.collectAsState()
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { vm.clearSelection(); vm.reload() }
     var showPlayer by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
@@ -357,7 +365,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                 }
             }
             // ── Search: solo donde filtra (Inicio / Explorar), el resto gana espacio ──
-            AnimatedVisibility(visible = tab <= 1 || query.isNotBlank()) {
+            AnimatedVisibility(visible = !selecting && (tab <= 1 || query.isNotBlank())) {
                 OutlinedTextField(
                     value = query, onValueChange = vm::setQuery,
                     placeholder = { Text("Buscar temas, álbumes, artistas", style = Ds.Body, maxLines = 1) },
@@ -381,10 +389,42 @@ fun MelodiaScreen(vm: MainViewModel) {
                     modifier = Modifier.padding(start = 20.dp)
                 )
             }
+            // ── Barra de selección múltiple ──
+            if (selecting) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 6.dp, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${selected.size} ${if (selected.size == 1) "seleccionado" else "seleccionados"}",
+                        style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "Todo", style = Ds.Sub, color = cs.primary,
+                        modifier = Modifier.clickable { vm.selectAll(songs.map { it.id }) }.padding(6.dp)
+                    )
+                    Text(
+                        "Borrar", style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                        color = if (selected.isEmpty()) cs.onSurfaceVariant else cs.error,
+                        modifier = Modifier.clickable(enabled = selected.isNotEmpty()) {
+                            showDeleteConfirm = true
+                        }.padding(6.dp)
+                    )
+                    Text(
+                        "Cancelar", style = Ds.Sub, color = cs.onSurfaceVariant,
+                        modifier = Modifier.clickable { vm.clearSelection() }.padding(6.dp)
+                    )
+                }
+            }
+
             // ── Content: sin blur en vivo (Haze re-blurea en cada frame de scroll) ──
             Box(Modifier.weight(1f)) {
                 // Sin transición entre pestañas: animar dos pantallas completas
                 // cuesta frames justo cuando el usuario acaba de tocar.
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.melodia.app.ui.ds.LocalSelection provides
+                        com.melodia.app.ui.ds.SelectionState(selecting, selected, vm::toggleSelected)
+                ) {
                 androidx.compose.runtime.key(tab) {
                 val t = tab
                 when (t) {
@@ -417,6 +457,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                         onPlayAt = { vm.playFavAt(it) }, onFav = { vm.toggleFav(it) }, onAdd = { showInfo = it },
                         onQueue = { s -> vm.queueEnd(s.id) { ok -> toast(appCtx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
                     else -> OnlineTab(vm)
+                }
                 }
                 }
             }
@@ -503,6 +544,29 @@ fun MelodiaScreen(vm: MainViewModel) {
                 )
             }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Borrar ${selected.size} ${if (selected.size == 1) "tema" else "temas"}") },
+            text = {
+                Text("Se quitan del dispositivo y de la biblioteca de Melodia. No se puede deshacer.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    vm.deleteSelected { sender ->
+                        deleteLauncher.launch(
+                            androidx.activity.result.IntentSenderRequest.Builder(sender).build()
+                        )
+                    }
+                }) { Text("Borrar", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancelar") }
+            }
+        )
     }
 
     YtCollectionSheet(vm)
@@ -2519,98 +2583,140 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
     }
     val folder = try { java.io.File(song.dataPath).parent?.substringAfterLast("/") ?: "—" } catch (_: Exception) { "—" }
     val added = try {
-        java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(song.dateAdded * 1000))
+        java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
+            .format(java.util.Date(song.dateAdded * 1000))
     } catch (_: Exception) { "—" }
+    fun compartir() {
+        try {
+            val f = java.io.File(song.dataPath)
+            if (f.exists()) {
+                val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.provider", f)
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "audio/*"
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                ctx.startActivity(android.content.Intent.createChooser(send, "Compartir"))
+            }
+        } catch (_: Exception) {}
+    }
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text("Info del tema", color = cs.onBackground) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SongArt(
-                        albumId = song.albumId, size = 52.dp,
-                        shape = RoundedCornerShape(Ds.RRow), artUrl = song.artUrl, iconSize = 26.dp
+        title = {
+            // Cabecera real del tema: arte, título y artista · álbum.
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                SongArt(
+                    albumId = song.albumId, size = 52.dp,
+                    shape = RoundedCornerShape(Ds.RRow), artUrl = song.artUrl, iconSize = 24.dp
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        song.title, style = Ds.Title, color = cs.onBackground,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(song.title, style = Ds.Body, color = cs.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(song.artist, style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        listOf(song.artist.ifBlank { "Desconocido" }, song.album.ifBlank { "—" })
+                            .joinToString(" · "),
+                        style = Ds.Sub, color = cs.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                InfoRow("Duración", fmt(song.durationMs))
+                InfoRow("Carpeta", folder)
+                InfoRow("Agregado", added)
+                Spacer(Modifier.height(6.dp))
+                Text("Ruta", style = Ds.Micro, color = cs.onSurfaceVariant)
+                Text(
+                    song.dataPath.ifBlank { "—" }, style = Ds.Sub, color = cs.onSurfaceVariant,
+                    maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onPlay,
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Reproducir", maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = onAdd,
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.PlaylistAdd, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("A lista", maxLines = 1)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                InfoRow("Duración", fmt(song.durationMs))
-                InfoRow("Álbum", song.album.ifBlank { "—" })
-                InfoRow("Carpeta", folder)
-                InfoRow("Agregado", added)
-                Text("Ruta", style = Ds.Micro, color = cs.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
-                Text(song.dataPath.ifBlank { "—" }, style = Ds.Sub, color = cs.onBackground)
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    FilledTonalButton(onClick = onPlay, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Reproducir")
-                    }
-                    OutlinedButton(onClick = onAdd, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.PlaylistAdd, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("A lista")
-                    }
-                    IconButton(onClick = onFav) {
-                        Icon(if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (isFav) cs.primary else cs.onSurfaceVariant)
-                    }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    InfoAction(
+                        icon = if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        label = "Favorito",
+                        active = isFav,
+                        onClick = onFav
+                    )
                     if (song.id != YT_STREAM_ID) {
-                        IconButton(onClick = { showEdit = true }) {
-                            Icon(Icons.Default.Edit, "Editar datos", tint = cs.onSurfaceVariant)
-                        }
-                        IconButton(onClick = {
-                            try {
-                                val f = java.io.File(song.dataPath)
-                                if (f.exists()) {
-                                    val uri = androidx.core.content.FileProvider.getUriForFile(
-                                        ctx, "${ctx.packageName}.provider", f
-                                    )
-                                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                        type = "audio/*"
-                                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    ctx.startActivity(android.content.Intent.createChooser(send, "Compartir"))
-                                }
-                            } catch (_: Exception) {}
-                        }) {
-                            Icon(Icons.Default.Share, "Compartir", tint = cs.onSurfaceVariant)
+                        InfoAction(Icons.Default.Edit, "Editar") { showEdit = true }
+                        InfoAction(Icons.Default.Share, "Compartir") { compartir() }
+                        InfoAction(Icons.Default.Checklist, "Elegir") {
+                            vm.startSelection(song.id)
+                            onClose()
                         }
                     }
                 }
                 if (song.id != YT_STREAM_ID) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = {
                                 vm.queueNext(song.id) { ok ->
                                     android.widget.Toast.makeText(
-                                        ctx,
-                                        if (ok) "Sonará a continuación" else "No se pudo agregar",
+                                        ctx, if (ok) "Sonará a continuación" else "No se pudo agregar",
                                         android.widget.Toast.LENGTH_SHORT
                                     ).show()
                                 }
                                 onClose()
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
                         ) {
-                            Icon(Icons.Default.QueueMusic, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Siguiente")
+                            Icon(Icons.Default.QueueMusic, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Siguiente", maxLines = 1)
                         }
                         OutlinedButton(
                             onClick = {
                                 vm.queueEnd(song.id) { ok ->
                                     android.widget.Toast.makeText(
-                                        ctx,
-                                        if (ok) "Agregado al final" else "No se pudo agregar",
+                                        ctx, if (ok) "Agregado al final" else "No se pudo agregar",
                                         android.widget.Toast.LENGTH_SHORT
                                     ).show()
                                 }
                                 onClose()
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
                         ) {
-                            Icon(Icons.Default.LowPriority, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Al final")
+                            Icon(Icons.Default.LowPriority, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Al final", maxLines = 1)
                         }
                     }
                 }
@@ -2618,6 +2724,30 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
         },
         confirmButton = { TextButton(onClick = onClose) { Text("Cerrar") } }
     )
+}
+
+/** Acción de la ficha: icono con etiqueta corta debajo, ancho fijo. */
+@Composable
+private fun InfoAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    active: Boolean = false,
+    onClick: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(68.dp).clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick).padding(vertical = 8.dp)
+    ) {
+        Icon(icon, null, Modifier.size(20.dp), tint = if (active) cs.primary else cs.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label, style = Ds.Sub,
+            color = if (active) cs.primary else cs.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
 }
 
 @Composable

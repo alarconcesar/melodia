@@ -1,6 +1,9 @@
 package com.melodia.app.data
 
+import android.content.ContentUris
 import android.content.Context
+import android.content.IntentSender
+import android.os.Build
 import android.provider.MediaStore
 import com.melodia.app.data.model.Song
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +45,23 @@ class MusicRepository(context: Context) {
             }
             resolver.update(uri, cv, null, null) > 0
         } catch (_: Exception) { false }
+    }
+
+    /**
+     * Borra audios del dispositivo. En Android 10+ los archivos de otras apps
+     * exigen confirmación del sistema: si hace falta, devuelve su IntentSender.
+     */
+    suspend fun deleteSongs(ids: List<Long>): IntentSender? = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext null
+        val uris = ids.map { ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }
+        try {
+            uris.forEach { resolver.delete(it, null, null) }
+            null
+        } catch (e: Exception) {
+            if (Build.VERSION.SDK_INT >= 30) {
+                try { MediaStore.createDeleteRequest(resolver, uris).intentSender } catch (_: Exception) { null }
+            } else null
+        }
     }
 
     fun loadAllSongs(): Flow<List<Song>> = flow {

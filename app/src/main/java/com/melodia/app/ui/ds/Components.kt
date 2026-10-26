@@ -53,6 +53,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
@@ -104,6 +106,15 @@ fun songArtModel(albumId: Long, artUrl: String?): Any? = remember(albumId, artUr
         MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, albumId
     ) else null
 }
+
+/** Selección múltiple compartida: la barra vive en la raíz y las filas la leen. */
+data class SelectionState(
+    val selecting: Boolean = false,
+    val selected: Set<Long> = emptySet(),
+    val toggle: (Long) -> Unit = {}
+)
+
+val LocalSelection = androidx.compose.runtime.staticCompositionLocalOf { SelectionState() }
 
 // ── Carátula real del álbum (MediaStore) con fallback a icono ─────
 // El icono va DETRÁS: si la imagen carga lo tapa; si no hay arte, se ve el icono.
@@ -229,6 +240,10 @@ fun TrackRow(
     onLongPress: () -> Unit,
     onQueue: (() -> Unit)? = null
 ) {
+    val selection = LocalSelection.current
+    val selecting = selection.selecting
+    val selected = selection.selected.contains(s.id)
+    val onSelectToggle = { selection.toggle(s.id) }
     val cs = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     val rowCtx = LocalContext.current.applicationContext
@@ -276,7 +291,7 @@ fun TrackRow(
             modifier = Modifier.fillMaxWidth()
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
                 .then(
-                    if (safeGestures) Modifier else Modifier.pointerInput(Unit) {
+                    if (safeGestures || selecting) Modifier else Modifier.pointerInput(Unit) {
                         // Dirección bloqueada al primer movimiento: si el gesto es
                         // vertical se abandona y la lista scrollea. Con `draggable`
                         // un scroll diagonal abría la franja sin querer.
@@ -314,7 +329,10 @@ fun TrackRow(
                         }
                     }
                 )
-                .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+                .combinedClickable(
+                    onClick = { if (selecting) onSelectToggle() else onTap() },
+                    onLongClick = { if (selecting) onSelectToggle() else onLongPress() }
+                )
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -333,9 +351,17 @@ fun TrackRow(
                 style = Ds.Sub, color = cs.onSurfaceVariant
             )
         }
-        if (isFav) {
-            // Solo se marca lo que es favorito, y ahora el corazón quita: antes era
-            // un icono decorativo y en Favs había que deslizar para sacar un tema.
+        if (selecting) {
+            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                    if (selected) "Seleccionado" else "Sin seleccionar",
+                    tint = if (selected) cs.primary else cs.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        } else if (isFav) {
+            // Solo se marca lo que es favorito, y el corazón quita.
             Box(
                 Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onFav),
                 contentAlignment = Alignment.Center

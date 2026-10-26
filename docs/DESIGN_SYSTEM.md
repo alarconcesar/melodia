@@ -189,3 +189,20 @@ el texto tiene 2+ caracteres y dejas de teclear 650 ms, busca también en YouTub
   pestaña y dispara la búsqueda completa con paginación.
 - La búsqueda rápida (`searchFirstPage`) **no toca el paginador** de Online:
   comprobado con sonda real (Online conserva su página 2 después).
+
+## Ficha del tema y selección múltiple (6.2)
+
+- **Info del tema** se rehizo: cabecera con arte + título + artista · álbum,
+  metadatos cortos (duración, carpeta, agregado), ruta en gris, dos botones
+  primarios de 44dp ("Reproducir", "A lista"), fila de acciones con icono y
+  etiqueta (Favorito · Editar · Compartir · Elegir) y "Siguiente"/"Al final".
+  Los botones van con alto fijo: antes `weight` dentro del scroll los estiraba
+  a media pantalla y partía el texto ("Siguien / te").
+- **Selección múltiple**: `LocalSelection` (CompositionLocal) comparte
+  `selecting/selected/toggle` con cualquier lista; `TrackRow` muestra check en
+  vez de corazón y el toque marca en vez de reproducir. La barra vive en la
+  raíz ("N seleccionados · Todo · Borrar · Cancelar") y reemplaza al buscador.
+- Borrado: `MusicRepository.deleteSongs` intenta borrar directo; si el archivo
+  es de otra app (Android 10+) devuelve el `IntentSender` de
+  `MediaStore.createDeleteRequest` y la raíz lo lanza con
+  `StartIntentSenderForResult`.

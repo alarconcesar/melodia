@@ -6,6 +6,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.melodia.app.data.model.Song
+import com.melodia.app.ui.ds.LocalSelection
+import com.melodia.app.ui.ds.SelectionState
 import com.melodia.app.ui.screens.FavsTab
 import com.melodia.app.ui.theme.MelodiaTheme
 import org.junit.Assert.assertEquals
@@ -59,6 +61,28 @@ class FavsTabTest {
         rule.onAllNodesWithContentDescription("Quitar de favoritos")[0].performClick()
         rule.waitForIdle()
         assertTrue("no se llamó onFav", quitado != null)
+    }
+
+    @Test
+    fun enModoSeleccionElTapNoReproduce() {
+        var indice = -1
+        rule.setContent {
+            MelodiaTheme {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalSelection provides SelectionState(selecting = true, selected = setOf(1L), toggle = {})
+                ) {
+                    FavsTab(
+                        favSongs = listOf(song(1, "Primera"), song(2, "Segunda")),
+                        currentId = null, playing = false, favs = setOf(1L, 2L),
+                        onPlayAt = { indice = it }, onFav = {}, onAdd = {}
+                    )
+                }
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithText("Segunda").performClick()
+        rule.waitForIdle()
+        assert(indice == -1) { "en selección no debe reproducir, índice=$indice" }
     }
 
     @Test

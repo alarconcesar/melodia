@@ -500,6 +500,47 @@ class MainViewModel(
 
     fun toggleFav(id: Long) { viewModelScope.launch { lists.toggleFav(id, _favIds.value.contains(id)) } }
     fun createPlaylist(name: String, onDone: (Long) -> Unit = {}) { viewModelScope.launch { val id = lists.createPlaylist(name); onDone(id) } }
+    // ── Selección múltiple (borrar varios temas) ──
+    private val _selecting = MutableStateFlow(false)
+    val selecting: StateFlow<Boolean> = _selecting
+    private val _selected = MutableStateFlow<Set<Long>>(emptySet())
+    val selected: StateFlow<Set<Long>> = _selected
+
+    fun startSelection(id: Long? = null) {
+        _selecting.value = true
+        if (id != null && id != YT_STREAM_ID) _selected.value = _selected.value + id
+    }
+
+    fun toggleSelected(id: Long) {
+        if (id == YT_STREAM_ID) return
+        val cur = _selected.value
+        _selected.value = if (cur.contains(id)) cur - id else cur + id
+    }
+
+    fun selectAll(ids: List<Long>) {
+        _selected.value = ids.filter { it != YT_STREAM_ID }.toSet()
+    }
+
+    fun clearSelection() {
+        _selecting.value = false
+        _selected.value = emptySet()
+    }
+
+    /** Borra los temas marcados; si el sistema pide confirmación, la entrega. */
+    fun deleteSelected(onNeedsConfirm: (android.content.IntentSender) -> Unit = {}) {
+        val ids = _selected.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            val sender = withContext(Dispatchers.IO) { repo.deleteSongs(ids) }
+            if (sender != null) {
+                onNeedsConfirm(sender)
+            } else {
+                clearSelection()
+                reload()
+            }
+        }
+    }
+
     fun deletePlaylist(id: Long) { viewModelScope.launch { lists.deletePlaylist(id); if (_openPlaylist.value == id) _openPlaylist.value = null } }
     fun renamePlaylist(id: Long, name: String) { viewModelScope.launch { lists.rename(id, name) } }
     fun togglePinPlaylist(id: Long) { viewModelScope.launch { lists.togglePin(id) } }
