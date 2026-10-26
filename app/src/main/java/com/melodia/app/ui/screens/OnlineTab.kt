@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -359,7 +360,7 @@ fun OnlineTabContent(
                         }
                         item {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                items(history, key = { "h-${it.id}" }) { track ->
+                                itemsIndexed(history, key = { i, t -> "h-$i-${t.id}" }) { _, track ->
                                     Column(Modifier.width(124.dp).clickable { onPlay(track) }) {
                                         OnlineThumb(track, 124.dp)
                                         Spacer(Modifier.height(6.dp))
@@ -397,7 +398,7 @@ fun OnlineTabContent(
                             )
                         }
                     }
-                    items(items, key = { it.key }) { item ->
+                    itemsIndexed(items, key = { i, item -> "${item.key}-$i" }) { _, item ->
                         when (item) {
                             is YtSearchItem.Track -> YtRowFlat(
                                 track = item.track,
@@ -674,6 +675,44 @@ private fun QualityOption(title: String, subtitle: String, selected: Boolean, on
 }
 
 /**
+ * Lista de temas de una playlist/álbum. La clave incluye el índice porque una
+ * lista de YouTube puede repetir el mismo video y LazyColumn no admite claves
+ * duplicadas (crash "Key ... was already used").
+ */
+@Composable
+fun YtPreviewList(
+    tracks: List<YtTrack>,
+    onPlay: (YtTrack) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cs = MaterialTheme.colorScheme
+    LazyColumn(modifier.fillMaxWidth()) {
+        itemsIndexed(tracks, key = { i, t -> "pv-$i-${t.id}" }) { _, t ->
+            Row(
+                Modifier.fillMaxWidth().clickable { onPlay(t) }.padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OnlineThumb(t, 40.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        t.title, style = Ds.Body, color = cs.onBackground,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        t.artist.ifBlank { "YouTube" } +
+                            if (t.durationSec > 0) " · ${fmtDur(t.durationSec)}" else "",
+                        style = Ds.Sub, color = cs.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp), tint = cs.primary)
+            }
+        }
+    }
+}
+
+/**
  * Vista previa de una playlist/álbum de YouTube: se abren sus temas para
  * escuchar uno o descargar la lista entera. Antes tocar la fila descargaba
  * directamente y no había forma de ver qué contenía.
@@ -708,33 +747,10 @@ fun YtCollectionSheet(vm: MainViewModel) {
                         MelodiaSpinner(size = 24.dp, width = 2.dp)
                     }
                     p.error != null -> Text(p.error, style = Ds.Body, color = cs.error)
-                    else -> LazyColumn(Modifier.fillMaxWidth()) {
-                        items(p.tracks, key = { "pv-${it.id}" }) { t ->
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    vm.closeYtPreview()
-                                    vm.playYt(t)
-                                }.padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OnlineThumb(t, 40.dp)
-                                Spacer(Modifier.width(10.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        t.title, style = Ds.Body, color = cs.onBackground,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        t.artist.ifBlank { "YouTube" } +
-                                            if (t.durationSec > 0) " · ${fmtDur(t.durationSec)}" else "",
-                                        style = Ds.Sub, color = cs.onSurfaceVariant,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp), tint = cs.primary)
-                            }
-                        }
-                    }
+                    else -> YtPreviewList(
+                        tracks = p.tracks,
+                        onPlay = { t -> vm.closeYtPreview(); vm.playYt(t) }
+                    )
                 }
             }
         },

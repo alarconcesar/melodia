@@ -820,7 +820,7 @@ fun HomeTab(
                     Text("Escuchado recientemente", style = Ds.Title, color = cs.onBackground)
                     Spacer(Modifier.height(8.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(recent, key = { it.id }) { s ->
+                        itemsIndexed(recent, key = { i, s -> "rec-$i-${s.id}" }) { _, s ->
                             Column(
                                 Modifier.width(132.dp).clickable { vm.playById(s.id) }
                             ) {
@@ -866,7 +866,7 @@ fun HomeTab(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(horizontal = 20.dp)
                     ) {
-                        items(shown, key = { "${it.name}|${it.artist}" }) { a ->
+                        itemsIndexed(shown, key = { i, a -> "al-$i-${a.name}|${a.artist}" }) { _, a ->
                             Column(
                                 Modifier.width(138.dp).clickable {
                                     vm.setQuery(""); vm.setAlbum(a.name); onTab(1)
@@ -931,7 +931,7 @@ fun HomeTab(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
                     )
                 }
-                else -> items(homeYt.take(8), key = { "h-${it.key}" }) { item ->
+                else -> itemsIndexed(homeYt.take(8), key = { i, it -> "h-$i-${it.key}" }) { _, item ->
                     when (item) {
                         is com.melodia.app.data.online.YtSearchItem.Track -> YtRowFlat(
                             track = item.track,
@@ -1559,7 +1559,7 @@ fun PlaylistDetail(
                 Text("Sin temas — mantén presionada una canción para agregarla", style = Ds.Body, color = cs.onSurfaceVariant)
             }
         }
-        itemsIndexed(songs, key = { _, e -> "${e.playlistId}-${e.songId}" }) { idx, e ->
+        itemsIndexed(songs, key = { idx0, e -> "pl-$idx0-${e.playlistId}-${e.songId}" }) { idx, e ->
             var menu by remember { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth().clickable { onPlay(idx) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("${idx + 1}", style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.width(28.dp))
