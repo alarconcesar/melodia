@@ -21,21 +21,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -77,10 +81,18 @@ private fun fmtDur(sec: Long): String {
     else "$m:${s.toString().padStart(2, '0')}"
 }
 
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
+/**
+ * Online · rediseño minimal (4.8).
+ *
+ * Una sola cosa por pantalla: buscar. El resto (descargas, importar, calidad,
+ * ahorro de datos) vive en el menú ⋮; los resultados son filas planas, no
+ * tarjetas dentro de tarjetas.
+ *
+ * El contenido vive en [OnlineTabContent], sin ViewModel, para poder componerlo
+ * en tests JVM sin Room ni servicio de audio.
+ */
 @Composable
 fun OnlineTab(vm: MainViewModel) {
-    val cs = MaterialTheme.colorScheme
     val query by vm.ytQuery.collectAsState()
     val results by vm.ytResults.collectAsState()
     val loading by vm.ytLoading.collectAsState()
@@ -94,245 +106,242 @@ fun OnlineTab(vm: MainViewModel) {
     val moreLoading by vm.ytMoreLoading.collectAsState()
     val highQ by vm.ytHighQuality.collectAsState()
     val saver by vm.dataSaver.collectAsState()
-    val dlHist by vm.dlHistory.collectAsState()
+
     var dlPick by remember { mutableStateOf<YtTrack?>(null) }
     var showDls by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
-    var importUrl by remember { mutableStateOf("") }
-    val importState by vm.ytImport.collectAsState()
     LaunchedEffect(Unit) { vm.refreshDlHistory() }
+
+    OnlineTabContent(
+        query = query,
+        results = results,
+        loading = loading,
+        error = error,
+        errorRetry = errorRetry,
+        dlProgress = dl,
+        busyId = busy,
+        recent = recent,
+        history = history,
+        hasMore = hasMore,
+        moreLoading = moreLoading,
+        saver = saver,
+        highQ = highQ,
+        onQueryChange = vm::setYtQuery,
+        onSearch = { vm.searchYt() },
+        onClearQuery = { vm.setYtQuery("") },
+        onPlay = { vm.playYt(it) },
+        onDownload = { dlPick = it },
+        onDownloadAll = { vm.downloadAllYt() },
+        onLoadMore = { vm.loadMoreYt() },
+        onOpenDownloads = { showDls = true },
+        onOpenImport = { vm.clearYtImport(); showImport = true },
+        onToggleSaver = { vm.setDataSaver(!saver) },
+        onToggleQuality = { vm.setYtQuality(!highQ) }
+    )
+
     if (showDls) DownloadsSheet(vm, onDismiss = { showDls = false })
+    if (showImport) ImportPlaylistDialog(vm, onClose = { showImport = false }, onQueued = { showDls = true; showImport = false })
     dlPick?.let { track ->
-        AlertDialog(
-            onDismissRequest = { dlPick = null },
-            title = { Text("Calidad de descarga", color = cs.onBackground) },
-            text = {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(track.title, style = Ds.Body, color = cs.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    ToggleChip(
-                        selected = highQ, text = "Alta — mejor sonido, archivo grande",
-                        icon = Icons.Default.Download,
-                        onClick = { vm.setYtQuality(true); vm.downloadYt(track, true); dlPick = null }
-                    )
-                    ToggleChip(
-                        selected = !highQ, text = "Estándar — liviana, ahorra espacio",
-                        icon = Icons.Default.Savings,
-                        onClick = { vm.setYtQuality(false); vm.downloadYt(track, false); dlPick = null }
-                    )
-                }
+        QualityDialog(
+            track = track,
+            highQ = highQ,
+            onPick = { high ->
+                vm.setYtQuality(high)
+                vm.downloadYt(track, high)
+                dlPick = null
             },
-            confirmButton = { TextButton(onClick = { dlPick = null }) { Text("Cancelar") } }
+            onDismiss = { dlPick = null }
         )
     }
+}
+
+/** Contenido sin ViewModel: todo entra por parámetros (testeable en JVM). */
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
+@Composable
+fun OnlineTabContent(
+    query: String,
+    results: List<YtTrack>,
+    loading: Boolean,
+    error: String?,
+    errorRetry: Boolean,
+    dlProgress: Map<String, Float>,
+    busyId: String?,
+    recent: List<String>,
+    history: List<YtTrack>,
+    hasMore: Boolean,
+    moreLoading: Boolean,
+    saver: Boolean,
+    highQ: Boolean,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onClearQuery: () -> Unit,
+    onPlay: (YtTrack) -> Unit,
+    onDownload: (YtTrack) -> Unit,
+    onDownloadAll: () -> Unit,
+    onLoadMore: () -> Unit,
+    onOpenDownloads: () -> Unit,
+    onOpenImport: () -> Unit,
+    onToggleSaver: () -> Unit,
+    onToggleQuality: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    var menu by remember { mutableStateOf(false) }
     val kb = LocalSoftwareKeyboardController.current
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Spacer(Modifier.height(28.dp))
-        Text("Online", style = Ds.Display, color = cs.onBackground)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Busca en YouTube, escucha al instante o guarda en tu música",
-            style = Ds.Body, color = cs.onSurfaceVariant
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ToggleChip(
-                selected = saver, text = "Ahorro de datos",
-                icon = Icons.Default.Savings, onClick = { vm.setDataSaver(!saver) }
-            )
-            Spacer(Modifier.width(8.dp))
-            ToggleChip(
-                selected = false,
-                text = if (dlHist.isEmpty() && dl.values.isEmpty()) "Descargas" else "Descargas · ${dl.size + dlHist.size}",
-                icon = Icons.Default.History, onClick = { showDls = true }
-            )
+        // Cabecera: título + menú. Nada más compite con la búsqueda.
+        Row(
+            Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Online", style = Ds.Title, color = cs.onBackground, modifier = Modifier.weight(1f))
+            Box {
+                IconButton(onClick = { menu = true }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.MoreVert, "Opciones", Modifier.size(20.dp), tint = cs.onSurfaceVariant)
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Descargas") },
+                        leadingIcon = { Icon(Icons.Default.Download, null) },
+                        onClick = { menu = false; onOpenDownloads() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Importar playlist") },
+                        leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) },
+                        onClick = { menu = false; onOpenImport() }
+                    )
+                    Divider()
+                    DropdownMenuItem(
+                        text = { Text("Ahorro de datos") },
+                        trailingIcon = { if (saver) Icon(Icons.Default.Check, null) },
+                        onClick = { onToggleSaver() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Calidad alta") },
+                        trailingIcon = { if (highQ) Icon(Icons.Default.Check, null) },
+                        onClick = { onToggleQuality() }
+                    )
+                }
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        // Importar playlist de YouTube pegando su link
-        ToggleChip(
-            selected = showImport, text = "Importar playlist",
-            icon = Icons.Default.PlaylistAdd,
-            onClick = { showImport = !showImport; vm.clearYtImport() }
-        )
-        if (showImport) {
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextField(
-                    value = importUrl, onValueChange = { importUrl = it; vm.clearYtImport() },
-                    placeholder = { Text("Pega el link de la playlist…", style = Ds.Body) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { kb?.hide(); vm.importYtPlaylist(importUrl) }),
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                Surface(shape = RoundedCornerShape(14.dp), color = cs.primary, modifier = Modifier.size(52.dp)) {
-                    Box(
-                        Modifier.clickable(enabled = importState != "…") { kb?.hide(); vm.importYtPlaylist(importUrl) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (importState == "…") MelodiaSpinner(size = 22.dp, width = 2.dp, color = cs.surface)
-                        else Icon(Icons.Default.Download, null, tint = cs.surface)
+
+        // Buscador: campo plano, lupa a la izquierda, limpiar a la derecha.
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = { Text("Buscar en YouTube", style = Ds.Body) },
+            singleLine = true,
+            shape = RoundedCornerShape(Ds.RRow),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = cs.surface,
+                unfocusedContainerColor = cs.surface,
+                disabledContainerColor = cs.surface,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
+            ),
+            leadingIcon = {
+                IconButton(onClick = { kb?.hide(); onSearch() }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.Search, "Buscar", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+                }
+            },
+            trailingIcon = {
+                when {
+                    loading -> Box(Modifier.padding(end = 10.dp)) { MelodiaSpinner(size = 16.dp, width = 2.dp) }
+                    query.isNotEmpty() -> IconButton(onClick = onClearQuery, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Close, "Limpiar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
                     }
                 }
-            }
-            val imp = importState
-            if (imp != null && imp != "…") {
-                Spacer(Modifier.height(6.dp))
-                if (imp.startsWith("OK|")) {
-                    val parts = imp.split("|")
-                    Text(
-                        "«${parts.getOrNull(2) ?: "Playlist"}»: ${parts.getOrNull(1) ?: "?"} temas encolados",
-                        style = Ds.Body, color = cs.primary
-                    )
-                    LaunchedEffect(imp) { showDls = true }
-                } else {
-                    Text(imp, style = Ds.Body, color = cs.error)
-                }
-            }
-        }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { kb?.hide(); onSearch() }),
+            modifier = Modifier.fillMaxWidth()
+        )
+
         Spacer(Modifier.height(6.dp))
-        Spacer(Modifier.height(14.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextField(
-                value = query,
-                onValueChange = { vm.setYtQuery(it) },
-                placeholder = { Text("Canción, artista…") },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { kb?.hide(); vm.searchYt() }),
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(Modifier.width(8.dp))
-            Surface(shape = RoundedCornerShape(16.dp), color = cs.primary, modifier = Modifier.size(52.dp)) {
-                Box(Modifier.clickable(enabled = !loading) { kb?.hide(); vm.searchYt() }, contentAlignment = Alignment.Center) {
-                    if (loading) MelodiaSpinner(size = 22.dp, width = 2.dp, color = cs.surface)
-                    else Icon(Icons.Default.Search, null, tint = cs.surface)
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        when {
-            loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                MelodiaSpinner()
-            }
-            error != null && results.isEmpty() -> Column(Modifier.padding(vertical = 16.dp)) {
-                Text(
-                    error ?: "", style = Ds.Body,
-                    color = if (errorRetry) cs.error else cs.onSurfaceVariant
-                )
-                if (errorRetry) {
-                    Spacer(Modifier.height(10.dp))
-                    Surface(
-                        shape = RoundedCornerShape(12.dp), color = cs.primary,
-                        modifier = Modifier.clickable { vm.searchYt() }
-                    ) {
-                        Text(
-                            "Reintentar", style = Ds.Body, color = cs.surface,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
-                        )
+
+        LazyColumn(
+            Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 200.dp)
+        ) {
+            when {
+                loading && results.isEmpty() -> item {
+                    Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
+                        MelodiaSpinner()
                     }
-                } else {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Cambia las palabras y toca la lupa.", style = Ds.Sub,
-                        color = cs.onSurfaceVariant
-                    )
                 }
-            }
-            results.isEmpty() -> {
-                if (recent.isEmpty() && history.isEmpty()) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp)
-                    ) {
-                        Box(
-                            Modifier.size(72.dp).clip(RoundedCornerShape(22.dp))
-                                .background(cs.primary.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Search, null, Modifier.size(32.dp), tint = cs.primary)
+
+                error != null && results.isEmpty() -> item {
+                    Column(Modifier.padding(top = 24.dp)) {
+                        Text(
+                            error, style = Ds.Body,
+                            color = if (errorRetry) cs.error else cs.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        if (errorRetry) {
+                            Text(
+                                "Reintentar",
+                                style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                                color = cs.primary,
+                                modifier = Modifier.clickable { onSearch() }.padding(vertical = 4.dp)
+                            )
+                        } else {
+                            Text("Cambia las palabras y busca de nuevo.", style = Ds.Sub, color = cs.onSurfaceVariant)
                         }
-                        Spacer(Modifier.height(14.dp))
-                        Text("Busca música en YouTube", style = Ds.Title, color = cs.onBackground)
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Escribe una canción o un artista para empezar",
-                            style = Ds.Body, color = cs.onSurfaceVariant
-                        )
                     }
                 }
-                if (recent.isNotEmpty()) {
-                    Text("Recientes", style = Ds.Sub, color = cs.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        recent.forEach { term ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = cs.surfaceVariant,
-                                modifier = Modifier.clickable {
-                                    vm.setYtQuery(term); vm.searchYt(term)
-                                }
+
+                results.isEmpty() -> {
+                    if (recent.isEmpty() && history.isEmpty()) {
+                        item { OnlineEmptyState() }
+                    }
+                    if (recent.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Recientes", style = Ds.Sub, color = cs.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 18.dp, bottom = 8.dp)
+                            )
+                        }
+                        item {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    term, style = Ds.Body, color = cs.onBackground,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                                )
+                                recent.forEach { term ->
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = cs.surfaceVariant,
+                                        modifier = Modifier.clickable { onQueryChange(term); onSearch() }
+                                    ) {
+                                        Text(
+                                            term, style = Ds.Sub, color = cs.onBackground,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
-                }
-                if (history.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("Escuchado online", style = Ds.Sub, color = cs.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(history, key = { "h-${it.id}" }) { track ->
-                            Surface(
-                                shape = RoundedCornerShape(14.dp), color = cs.surface,
-                                modifier = Modifier.width(190.dp).clickable { vm.playYt(track) }
-                            ) {
-                                Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    if (track.thumbUrl != null) {
-                                        AsyncImage(
-                                            model = track.thumbUrl, contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
-                                        )
-                                    } else {
-                                        Box(
-                                            Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
-                                                .background(cs.surfaceVariant),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Default.MusicNote, null, tint = cs.onSurfaceVariant, modifier = Modifier.size(22.dp))
-                                        }
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                    Column(Modifier.weight(1f)) {
+                    if (history.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Escuchado online", style = Ds.Sub, color = cs.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 20.dp, bottom = 10.dp)
+                            )
+                        }
+                        item {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                items(history, key = { "h-${it.id}" }) { track ->
+                                    Column(Modifier.width(124.dp).clickable { onPlay(track) }) {
+                                        OnlineThumb(track, 124.dp)
+                                        Spacer(Modifier.height(6.dp))
                                         Text(
                                             track.title, style = Ds.Body, color = cs.onBackground,
-                                            maxLines = 2, overflow = TextOverflow.Ellipsis
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            track.artist.ifBlank { "YouTube" } +
-                                                if (track.durationSec > 0) " · ${fmtDur(track.durationSec)}" else "",
-                                            style = Ds.Sub,
+                                            track.artist.ifBlank { "YouTube" }, style = Ds.Sub,
                                             color = cs.onSurfaceVariant,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis
                                         )
@@ -342,70 +351,252 @@ fun OnlineTab(vm: MainViewModel) {
                         }
                     }
                 }
-            }
-            else -> {
-                error?.let {
-                    Text(it, style = Ds.Sub, color = cs.error, modifier = Modifier.padding(bottom = 6.dp))
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "${results.size} ${if (results.size == 1) "resultado" else "resultados"}",
-                        style = Ds.Sub, color = cs.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(12.dp), color = cs.surfaceVariant,
-                        modifier = Modifier.clickable { vm.downloadAllYt() }
-                    ) {
+
+                else -> {
+                    item {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                            Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Download, null, Modifier.size(16.dp), tint = cs.primary)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Descargar todo", style = Ds.Body, color = cs.primary)
+                            Text(
+                                "${results.size} ${if (results.size == 1) "resultado" else "resultados"}",
+                                style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "Descargar todo",
+                                style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                                color = cs.primary,
+                                modifier = Modifier.clickable { onDownloadAll() }.padding(4.dp)
+                            )
                         }
                     }
-                }
-                Spacer(Modifier.height(8.dp))
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.padding(bottom = 200.dp)
-                ) {
                     items(results, key = { it.id }) { track ->
-                        YtRow(
+                        YtRowFlat(
                             track = track,
-                            progress = dl[track.id],
-                            busy = busy == track.id,
-                            onPlay = { vm.playYt(track) },
-                            onDownload = { dlPick = track }
+                            progress = dlProgress[track.id],
+                            busy = busyId == track.id,
+                            onPlay = { onPlay(track) },
+                            onDownload = { onDownload(track) }
                         )
                     }
                     if (hasMore || moreLoading) {
                         item {
-                            Box(
-                                Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
+                            Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
                                 if (moreLoading) {
-                                    MelodiaSpinner(size = 28.dp, width = 3.dp)
+                                    MelodiaSpinner(size = 24.dp, width = 2.dp)
                                 } else {
-                                    Surface(
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = cs.surfaceVariant,
-                                        modifier = Modifier.clickable { vm.loadMoreYt() }
-                                    ) {
-                                        Text(
-                                            "Ver más", style = Ds.Body, color = cs.primary,
-                                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
-                                        )
-                                    }
+                                    Text(
+                                        "Ver más",
+                                        style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                                        color = cs.primary,
+                                        modifier = Modifier.clickable { onLoadMore() }.padding(8.dp)
+                                    )
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OnlineEmptyState() {
+    val cs = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 56.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            Modifier.size(56.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center
+        ) { Icon(Icons.Default.Search, null, Modifier.size(26.dp), tint = cs.primary) }
+        Spacer(Modifier.height(14.dp))
+        Text("Busca música en YouTube", style = Ds.Title, color = cs.onBackground)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Escribe una canción o un artista para empezar",
+            style = Ds.Sub, color = cs.onSurfaceVariant
+        )
+    }
+}
+
+/** Fila plana de resultado: arte, título, artista · duración y descarga. */
+@Composable
+private fun YtRowFlat(
+    track: YtTrack,
+    progress: Float?,
+    busy: Boolean,
+    onPlay: () -> Unit,
+    onDownload: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(vertical = 5.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OnlineThumb(track, 48.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    track.title, style = Ds.Body, color = cs.onBackground,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    track.artist.ifBlank { "YouTube" } +
+                        if (track.durationSec > 0) " · ${fmtDur(track.durationSec)}" else "",
+                    style = Ds.Sub, color = cs.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+            when {
+                busy -> Box(Modifier.padding(horizontal = 8.dp)) { MelodiaSpinner(size = 20.dp, width = 2.dp) }
+                progress == null -> IconButton(onClick = onDownload, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Download, "Descargar", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+                }
+            }
+        }
+        if (progress != null) {
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = progress.coerceIn(0f, 1f),
+                color = cs.primary,
+                modifier = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(2.dp))
+            )
+        }
+    }
+}
+
+/** Miniatura con duración discreta abajo a la derecha. */
+@Composable
+private fun OnlineThumb(track: YtTrack, size: androidx.compose.ui.unit.Dp) {
+    val cs = MaterialTheme.colorScheme
+    Box(Modifier.size(size).clip(RoundedCornerShape(Ds.RCard))) {
+        if (track.thumbUrl != null) {
+            AsyncImage(
+                model = track.thumbUrl, contentDescription = null,
+                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(Modifier.fillMaxSize().background(cs.surfaceVariant), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.MusicNote, null, Modifier.size(20.dp), tint = cs.onSurfaceVariant)
+            }
+        }
+        if (track.durationSec > 0 && size > 60.dp) {
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(5.dp)
+                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
+            ) {
+                Text(fmtDur(track.durationSec), color = Color.White, style = Ds.Sub.copy(fontSize = 10.sp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportPlaylistDialog(vm: MainViewModel, onClose: () -> Unit, onQueued: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val importState by vm.ytImport.collectAsState()
+    var url by remember { mutableStateOf("") }
+    val busy = importState == "…"
+    val ok = importState?.startsWith("OK|") == true
+    LaunchedEffect(ok) { if (ok) onQueued() }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onClose() },
+        title = { Text("Importar playlist", color = cs.onBackground) },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                Text(
+                    "Pega el link de una playlist de YouTube y se encola entera.",
+                    style = Ds.Sub, color = cs.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                TextField(
+                    value = url,
+                    onValueChange = { url = it; vm.clearYtImport() },
+                    placeholder = { Text("https://youtube.com/playlist?list=…", style = Ds.Sub) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(Ds.RRow),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = cs.surfaceVariant,
+                        unfocusedContainerColor = cs.surfaceVariant,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                val imp = importState
+                if (imp != null && imp != "…") {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (ok) {
+                            val parts = imp.split("|")
+                            "«${parts.getOrNull(2) ?: "Playlist"}»: ${parts.getOrNull(1) ?: "?"} temas en cola"
+                        } else imp,
+                        style = Ds.Sub,
+                        color = if (ok) cs.primary else cs.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { vm.importYtPlaylist(url) },
+                enabled = url.isNotBlank() && !busy
+            ) { Text(if (busy) "Importando…" else "Importar") }
+        },
+        dismissButton = { TextButton(onClick = onClose, enabled = !busy) { Text("Cancelar") } }
+    )
+}
+
+@Composable
+private fun QualityDialog(
+    track: YtTrack,
+    highQ: Boolean,
+    onPick: (Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Calidad de descarga", color = cs.onBackground) },
+        text = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    track.title, style = Ds.Body, color = cs.onBackground,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                )
+                QualityOption(
+                    title = "Alta", subtitle = "Mejor sonido, archivo más grande",
+                    selected = highQ, onClick = { onPick(true) }
+                )
+                QualityOption(
+                    title = "Estándar", subtitle = "Liviana, ahorra espacio",
+                    selected = !highQ, onClick = { onPick(false) }
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
+}
+
+@Composable
+private fun QualityOption(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(Ds.RRow),
+        color = if (selected) cs.primary.copy(alpha = 0.12f) else cs.surfaceVariant,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = Ds.Body, color = if (selected) cs.primary else cs.onBackground)
+                Text(subtitle, style = Ds.Sub, color = cs.onSurfaceVariant)
+            }
+            if (selected) Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = cs.primary)
         }
     }
 }
@@ -530,86 +721,6 @@ private fun DlJobRow(
             }
             IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Close, "Quitar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun YtRow(
-    track: YtTrack,
-    progress: Float?,
-    busy: Boolean,
-    onPlay: () -> Unit,
-    onDownload: () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(16.dp), color = cs.surface, tonalElevation = 2.dp) {
-        Column(Modifier.fillMaxWidth().padding(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (track.thumbUrl != null) {
-                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(10.dp))) {
-                        AsyncImage(
-                            model = track.thumbUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        if (track.durationSec > 0) {
-                            Box(
-                                Modifier.align(Alignment.BottomEnd).padding(4.dp)
-                                    .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(5.dp))
-                                    .padding(horizontal = 5.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    fmtDur(track.durationSec), color = Color.White,
-                                    style = Ds.Sub.copy(fontSize = 10.sp)
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Box(
-                        Modifier.size(56.dp).clip(RoundedCornerShape(10.dp))
-                            .background(cs.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.MusicNote, null, tint = cs.onSurfaceVariant)
-                    }
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        track.title, style = Ds.Body, color = cs.onBackground,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        "${track.artist.ifBlank { "YouTube" }} · ${fmtDur(track.durationSec)}",
-                        style = Ds.Sub, color = cs.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
-                }
-                if (busy) {
-                    MelodiaSpinner(size = 24.dp, width = 2.dp)
-                } else {
-                    IconButton(onClick = onPlay) {
-                        Icon(Icons.Default.PlayArrow, "Escuchar", tint = cs.primary, modifier = Modifier.size(28.dp))
-                    }
-                }
-                if (progress == null) {
-                    IconButton(onClick = onDownload) {
-                        Icon(Icons.Default.Download, "Descargar", tint = cs.onSurfaceVariant)
-                    }
-                }
-            }
-            if (progress != null) {
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = progress.coerceIn(0f, 1f),
-                    color = cs.primary,
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
-                )
             }
         }
     }

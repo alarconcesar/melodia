@@ -112,3 +112,18 @@ información ni acción, sobra**.
 - Chips: sin borde, radio 10dp, texto 12sp.
 - Empty state: un icono, una acción primaria y un link discreto.
 
+## 🌐 Online (rediseño 4.8)
+
+La pestaña tenía tres filas de chips antes de llegar al buscador. Ahora:
+
+- **Una jerarquía**: título + ⋮, buscador, resultados. Nada más.
+- El menú ⋮ concentra Descargas, Importar playlist, Ahorro de datos y Calidad
+  alta (con check). Los ajustes no compiten con la búsqueda.
+- Buscador único: lupa a la izquierda (también busca), limpiar a la derecha,
+  spinner embebido mientras carga. Sin botón cuadrado aparte.
+- Resultados como **filas planas** (arte 48dp, título 1 línea, artista ·
+  duración, descarga fantasma) en vez de tarjetas dentro de tarjetas.
+- Cabecera de resultados: conteo + "Descargar todo" como texto.
+- Importar playlist y calidad pasan a diálogos; el estado vacío es una línea.
+
+

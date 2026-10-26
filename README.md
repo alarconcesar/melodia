@@ -30,6 +30,7 @@ sin Hilt: arranque estable con DI manual.
 | ⏯️ Continuidad | La cola, el tema y la posición sobreviven al cierre; al reabrir queda en pausa, lista para seguir |
 | 🖼️ Carátulas | MediaStore y portada incrustada del archivo (offline); iTunes solo si no hay nada local |
 | 💿 Álbumes | Reproducción en orden de disco y pista (`ALBUM_ARTIST` para compilados) |
+| 🌐 Online | Buscar en YouTube, escuchar, descargar (alta/estándar) e importar playlists; descargas y ajustes en el menú ⋮ |
 
 ## 🧱 Stack (versiones fijadas y probadas)
 
