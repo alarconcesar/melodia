@@ -6,6 +6,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -264,8 +266,6 @@ fun MelodiaScreen(vm: MainViewModel) {
     var renameId by remember { mutableStateOf<Long?>(null) }
     // Áreas de las barras flotantes para el blur (Haze)
     // Alto real de la barra inferior: el miniplayer se apoya justo encima (sin taparla)
-    var navHeight by remember { mutableStateOf(0.dp) }
-    val dens = LocalDensity.current
 
     // ── Reporte del último crash (si la app se cerró sola) ──
     val appCtx = LocalContext.current.applicationContext
@@ -420,34 +420,32 @@ fun MelodiaScreen(vm: MainViewModel) {
                 }
             }
         } // fin Column principal
-        // ── Pill nav overlay: la lista pasa por debajo con blur ──
-        Box(
+        // ── Barra inferior: miniplayer y nav apilados en la misma columna ──
+        // Antes el miniplayer se posicionaba con un padding calculado del alto de
+        // la nav y se solapaba con ella. Apilados, el orden es el del layout.
+        Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 10.dp)
-                .onGloballyPositioned {
-                    navHeight = with(dens) { it.size.height.toDp() }
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AnimatedVisibility(
+                visible = current != null && !showPlayer,
+                enter = slideInVertically { it } + fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                exit = slideOutVertically { it } + fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
+            ) {
+                current?.let { s ->
+                    Box(Modifier.padding(bottom = 10.dp)) {
+                        MiniPlayerHost(
+                            vm = vm,
+                            song = s,
+                            isFav = s.id != YT_STREAM_ID && favIds.contains(s.id),
+                            onOpen = { showPlayer = true }
+                        )
+                    }
                 }
-        ) {
-            MelodiaPillNav(
-                tab = tab, onTab = { tab = it }
-            )
-        }
-        // ── MiniPlayer flotante ──
-        AnimatedVisibility(
-            visible = current != null && !showPlayer,
-            enter = slideInVertically { it }, exit = slideOutVertically { it },
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            current?.let { s ->
-                MiniPlayerHost(
-                    vm = vm,
-                    song = s,
-                    isFav = s.id != YT_STREAM_ID && favIds.contains(s.id),
-                    bottomPadding = (if (navHeight > 0.dp) navHeight else 100.dp) + 10.dp,
-                    onOpen = { showPlayer = true }
-                )
             }
+            MelodiaPillNav(tab = tab, onTab = { tab = it })
         }
         // ── Now Playing (consume todos los toques: nada pasa a la lista) ──
         AnimatedVisibility(
@@ -1309,11 +1307,10 @@ private fun MiniPlayerHost(
     vm: MainViewModel,
     song: Song,
     isFav: Boolean,
-    bottomPadding: androidx.compose.ui.unit.Dp,
     onOpen: () -> Unit
 ) {
     val st by vm.playerState.collectAsState()
-    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = bottomPadding)) {
+    Box(Modifier.fillMaxWidth()) {
         MiniPlayerDs(
             title = song.title, artist = song.artist, albumId = song.albumId, artUrl = song.artUrl,
             playing = st.isPlaying, progress = st.progress, isFav = isFav,

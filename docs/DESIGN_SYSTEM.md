@@ -49,9 +49,11 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
 - **MelodiaPillNav** — barra flotante translúcida (78%) + borde + sombra,
   5 tabs fijos (layout estable, sin saltos). **Sin punto indicador**: el
   estado seleccionado ya lo dicen el fondo pill + acento + escala del icono.
-- **MiniPlayerDs** — flotante, apoyado **justo encima** de la nav: su margen
-  inferior se calcula del alto real de la nav (`onGloballyPositioned`), nunca
-  la tapa ni en gestos ni en navegación de 3 botones.
+- **MiniPlayerDs** — flotante, **apilado con la nav en una misma columna**
+  (`Column` anclada abajo): miniplayer, 10dp de aire y la pill-nav. Antes su
+  margen se calculaba midiendo la nav con `onGloballyPositioned` y en algunos
+  estados se solapaban; apilados el orden lo garantiza el layout. Al aparecer,
+  el mini crece con `expandVertically` en vez de saltar encima de la nav.
 - **NowPlaying** (rediseño 5.3) — `BoxWithConstraints`: la carátula escala con
   la pantalla (`min(ancho−56dp, alto×0.34)` clamp 170–330dp), plana y sin sombra,
   con fondo teñido a 160 px + degradado. Columna: barra superior (cerrar ·
