@@ -241,6 +241,8 @@ fun MelodiaScreen(vm: MainViewModel) {
     val selecting by vm.selecting.collectAsState()
     val selected by vm.selected.collectAsState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDownloads by remember { mutableStateOf(false) }
+    val dlJobs by vm.dlJobs.collectAsState()
     val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
     ) { vm.clearSelection(); vm.reload() }
@@ -360,6 +362,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                     label = { Text("${sleepLeft}m") },
                     leadingIcon = { Icon(Icons.Default.Timer, null, Modifier.size(14.dp)) }
                 )
+                DownloadsButton(dlJobs, onClick = { showDownloads = true })
                 IconButton(onClick = { showSettings = true }) {
                     Icon(Icons.Default.Settings, "Ajustes", tint = cs.onSurfaceVariant)
                 }
@@ -568,6 +571,8 @@ fun MelodiaScreen(vm: MainViewModel) {
             }
         )
     }
+
+    if (showDownloads) DownloadsSheet(vm, onDismiss = { showDownloads = false })
 
     YtCollectionSheet(vm)
 

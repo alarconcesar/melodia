@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -762,6 +763,48 @@ fun YtCollectionSheet(vm: MainViewModel) {
         },
         dismissButton = { TextButton(onClick = { vm.closeYtPreview() }) { Text("Cerrar") } }
     )
+}
+
+/**
+ * Botón de descargas de la barra superior: anillo con el progreso agregado de
+ * todo lo que está bajando y acceso a la hoja con la cola completa.
+ */
+@Composable
+fun DownloadsButton(jobs: List<com.melodia.app.data.online.DlJob>, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val activos = jobs.filter {
+        it.status == com.melodia.app.data.online.DlStatus.ACTIVE ||
+            it.status == com.melodia.app.data.online.DlStatus.QUEUED ||
+            it.status == com.melodia.app.data.online.DlStatus.PAUSED
+    }
+    val totalBytes = activos.sumOf { it.total }
+    val doneBytes = activos.sumOf { it.downloaded }
+    val progreso = when {
+        activos.isEmpty() -> 0f
+        totalBytes > 0L -> (doneBytes.toFloat() / totalBytes).coerceIn(0f, 1f)
+        else -> activos.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
+    }
+    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+        if (activos.isNotEmpty()) {
+            CircularProgressIndicator(
+                progress = progreso,
+                modifier = Modifier.size(28.dp),
+                color = cs.primary,
+                trackColor = cs.onSurfaceVariant.copy(alpha = 0.22f),
+                strokeWidth = 2.dp
+            )
+        }
+        Box(
+            Modifier.size(34.dp).clip(CircleShape).clickable(onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Download, "Descargas",
+                Modifier.size(if (activos.isNotEmpty()) 15.dp else 20.dp),
+                tint = if (activos.isNotEmpty()) cs.primary else cs.onSurfaceVariant
+            )
+        }
+    }
 }
 
 /** Descargas: cola con pausa/reintento + historial con calidad y fecha. */
