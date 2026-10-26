@@ -1,11 +1,14 @@
 package com.melodia.app
 
 import android.app.Application
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.memory.MemoryCache
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 
-class MelodiaApp : Application() {
+class MelodiaApp : Application(), ImageLoaderFactory {
     lateinit var appContainer: AppContainer
         private set
 
@@ -17,6 +20,16 @@ class MelodiaApp : Application() {
         const val CRASH_FILE = "last_crash.txt"
     }
 
+    /**
+     * Coil afinado para listas con cientos de carátulas: RGB_565 basta para arte
+     * sin transparencia, decodifica más rápido y presiona menos el GC.
+     */
+    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        .allowRgb565(true)
+        .crossfade(false)
+        .memoryCache { MemoryCache.Builder(this).maxSizePercent(0.20).build() }
+        .build()
+
     override fun onCreate() {
         super.onCreate()
         // Atrapa cualquier crash y lo guarda para mostrarlo al reabrir
@@ -24,7 +37,7 @@ class MelodiaApp : Application() {
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             val sw = java.io.StringWriter()
             try { e.printStackTrace(java.io.PrintWriter(sw)) } catch (_: Exception) {}
-            val trace = "Hilo: ${'$'}{t.name}\n${'$'}sw"
+            val trace = "Hilo: ${t.name}\n$sw"
             try {
                 openFileOutput(CRASH_FILE, MODE_PRIVATE).use { it.write(trace.toByteArray()) }
             } catch (_: Exception) {}
@@ -58,7 +71,7 @@ class MelodiaApp : Application() {
         try {
             appContainer = AppContainer(this)
         } catch (t: Throwable) {
-            containerError = "Fallo al preparar la app:\n${'$'}{t.stackTraceToString()}"
+            containerError = "Fallo al preparar la app:\n${t.stackTraceToString()}"
         }
     }
 }

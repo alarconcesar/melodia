@@ -573,51 +573,68 @@ class MainViewModel(
         if (s.album.isBlank()) "id:${s.id}"
         else "a:${s.album.lowercase()}|${s.artist.lowercase()}"
 
+    /**
+     * Carátulas que faltan: caché local, luego incrustadas en el archivo y al
+     * final búsqueda en red. Todo corre en IO: antes el bucle llamaba a
+     * MediaMetadataRetriever en el hilo principal y clavaba frames de 300 ms.
+     */
     private fun enrichArtwork(list: List<Song>) {
         artJob?.cancel()
         artJob = viewModelScope.launch {
-            try {
-                // 1) aplica caché al instante (sin red)
-                val cached = list.mapNotNull { s ->
-                    if (s.albumId > 0 || !s.artUrl.isNullOrBlank()) return@mapNotNull null
-                    artRepo.cached(s.artist, s.title)?.let { s.id to it }
-                }.toMap()
-                if (cached.isNotEmpty()) {
-                    _songs.value = _songs.value.map { s -> cached[s.id]?.let { s.copy(artUrl = it) } ?: s }
-                }
-                // 1.5) carátula embebida en el archivo (offline, sin red)
-                val found = mutableMapOf<String, String>()
-                var emb = 0
-                for (s in list) {
-                    if (emb >= 80) break
-                    val cur = _songs.value.find { it.id == s.id } ?: continue
-                    if (cur.albumId > 0 || !cur.artUrl.isNullOrBlank()) continue
-                    val group = albumKey(cur)
-                    if (found.containsKey(group)) continue
-                    val local = try { artRepo.embedded(cur) } catch (_: Exception) { null }
-                    if (local != null) found[group] = local
-                    emb++
-                }
-                if (found.isNotEmpty()) {
-                    _songs.value = _songs.value.map { s ->
-                        found[albumKey(s)]?.let { s.copy(artUrl = it) } ?: s
+            withContext(Dispatchers.IO) {
+                try {
+                    var actual = list.associateBy { it.id }
+
+                    // 1) caché local, al instante
+                    val cached = list.mapNotNull { s ->
+                        if (s.albumId > 0 || !s.artUrl.isNullOrBlank()) return@mapNotNull null
+                        artRepo.cached(s.artist, s.title)?.let { s.id to it }
+                    }.toMap()
+                    if (cached.isNotEmpty()) {
+                        val upd = _songs.value.map { s -> cached[s.id]?.let { s.copy(artUrl = it) } ?: s }
+                        _songs.value = upd
+                        actual = upd.associateBy { it.id }
                     }
-                }
-                // 2) busca en red lo que falte (máx. 50 por carga, con pausa)
-                var n = 0
-                for (s in list) {
-                    if (n >= 50) break
-                    val cur = _songs.value.find { it.id == s.id } ?: continue
-                    if (cur.albumId > 0 || !cur.artUrl.isNullOrBlank()) continue
-                    if (cur.artist.isBlank() || cur.artist == "Desconocido") continue
-                    val url = try { artRepo.fetch(cur.artist, cur.title) } catch (_: Exception) { null }
-                    if (!url.isNullOrBlank()) {
-                        _songs.value = _songs.value.map { x -> if (x.id == s.id) x.copy(artUrl = url) else x }
+
+                    // 2) carátula incrustada en el archivo (máx. 80 grupos de álbum)
+                    val found = mutableMapOf<String, String>()
+                    var emb = 0
+                    for (s in list) {
+                        if (emb >= 80) break
+                        val cur = actual[s.id] ?: continue
+                        if (cur.albumId > 0 || !cur.artUrl.isNullOrBlank()) continue
+                        val group = albumKey(cur)
+                        if (found.containsKey(group)) continue
+                        val local = try { artRepo.embedded(cur) } catch (_: Exception) { null }
+                        if (local != null) found[group] = local
+                        emb++
                     }
-                    n++
-                    kotlinx.coroutines.delay(250)
-                }
-            } catch (_: Exception) {}
+                    if (found.isNotEmpty()) {
+                        val upd = _songs.value.map { s ->
+                            found[albumKey(s)]?.let { s.copy(artUrl = it) } ?: s
+                        }
+                        _songs.value = upd
+                        actual = upd.associateBy { it.id }
+                    }
+
+                    // 3) red, solo lo que sigue sin arte (máx. 50 por carga)
+                    var n = 0
+                    for (s in list) {
+                        if (n >= 50) break
+                        val cur = actual[s.id] ?: continue
+                        if (cur.albumId > 0 || !cur.artUrl.isNullOrBlank()) continue
+                        if (cur.artist.isBlank() || cur.artist == "Desconocido") continue
+                        val url = try { artRepo.fetch(cur.artist, cur.title) } catch (_: Exception) { null }
+                        if (!url.isNullOrBlank()) {
+                            val upd = _songs.value.map { x -> if (x.id == s.id) x.copy(artUrl = url) else x }
+                            _songs.value = upd
+                            actual = actual + (s.id to s.copy(artUrl = url))
+                        }
+                        n++
+                        kotlinx.coroutines.delay(250)
+                    }
+                } catch (_: Exception) {}
+            }
         }
     }
 

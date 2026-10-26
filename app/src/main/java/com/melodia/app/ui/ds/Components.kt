@@ -115,6 +115,13 @@ fun SongArt(
 ) {
     val cs = MaterialTheme.colorScheme
     val model = songArtModel(albumId, artUrl)
+    // Pedir la imagen al tamaño exacto de la fila (no al de la pantalla) y sin
+    // filtrado caro: al scrollear se decodifican muchas carátulas por segundo.
+    val ctx = LocalContext.current
+    val px = with(LocalDensity.current) { size.roundToPx() }
+    val req = remember(model, px) {
+        model?.let { coil.request.ImageRequest.Builder(ctx).data(it).size(px).build() }
+    }
     Box(
         modifier = modifier.size(size).clip(shape)
             .background(if (active) cs.primary.copy(alpha = 0.16f) else cs.surfaceVariant),
@@ -128,10 +135,11 @@ fun SongArt(
                 tint = cs.onSurfaceVariant,
                 modifier = Modifier.size(iconSize)
             )
-            if (model != null) {
+            if (req != null) {
                 AsyncImage(
-                    model = model, contentDescription = null,
+                    model = req, contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    filterQuality = androidx.compose.ui.graphics.FilterQuality.Low,
                     modifier = Modifier.fillMaxSize()
                 )
             }
