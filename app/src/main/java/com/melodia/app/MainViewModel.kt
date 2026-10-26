@@ -202,6 +202,9 @@ class MainViewModel(
             val art = try {
                 track.thumbUrl?.let { withContext(Dispatchers.IO) { yt.fetchBytes(it) } }
             } catch (_: Exception) { null }
+            // Además de incrustarla en el m4a, queda como carátula local del
+            // tema: si el etiquetado falla, la biblioteca igual muestra la suya.
+            try { withContext(Dispatchers.IO) { artRepo.saveLocal(track.artist, track.title, art) } } catch (_: Exception) {}
             withContext(Dispatchers.IO) { yt.storeDownload(track, high, audio, part, lyricText, art, null) }
             try {
                 yt.pushDlHistory(track, high)
@@ -627,7 +630,9 @@ class MainViewModel(
 
                     // 1) caché local, al instante
                     val cached = list.mapNotNull { s ->
-                        if (s.albumId > 0 || !s.artUrl.isNullOrBlank()) return@mapNotNull null
+                        if (!s.artUrl.isNullOrBlank()) return@mapNotNull null
+                        val esDescarga = s.dataPath.contains("/Melodia/")
+                        if (s.albumId > 0 && !esDescarga) return@mapNotNull null
                         artRepo.cached(s.artist, s.title)?.let { s.id to it }
                     }.toMap()
                     if (cached.isNotEmpty()) {
@@ -640,10 +645,16 @@ class MainViewModel(
                     val found = mutableMapOf<String, String>()
                     var emb = 0
                     for (s in list) {
-                        if (emb >= 80) break
+                        if (emb >= 200) break
                         val cur = actual[s.id] ?: continue
-                        if (cur.albumId > 0 || !cur.artUrl.isNullOrBlank()) continue
-                        val group = albumKey(cur)
+                        if (!cur.artUrl.isNullOrBlank()) continue
+                        // Descargas de Melodia: cada archivo lleva su propia
+                        // carátula incrustada. Antes se saltaban por tener
+                        // albumId, así que todas compartían la portada del álbum
+                        // "<unknown>" (la de la primera canción).
+                        val esDescarga = cur.dataPath.contains("/Melodia/")
+                        if (!esDescarga && cur.albumId > 0) continue
+                        val group = if (esDescarga) "s:${cur.id}" else albumKey(cur)
                         if (found.containsKey(group)) continue
                         val local = try { artRepo.embedded(cur) } catch (_: Exception) { null }
                         if (local != null) found[group] = local

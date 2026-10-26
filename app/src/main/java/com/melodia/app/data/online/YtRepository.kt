@@ -320,6 +320,12 @@ class YtRepository(private val context: Context) {
                 put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
                 put(MediaStore.Audio.Media.TITLE, track.title)
                 put(MediaStore.Audio.Media.ARTIST, track.artist.ifBlank { "YouTube" })
+                // Álbum propio por descarga: si queda vacío, MediaStore agrupa
+                // todos los temas en "<unknown>" y comparten la misma portada.
+                put(MediaStore.Audio.Media.ALBUM, track.title)
+                if (Build.VERSION.SDK_INT >= 30) {
+                    put(MediaStore.Audio.Media.ALBUM_ARTIST, track.artist.ifBlank { "YouTube" })
+                }
                 put(MediaStore.Audio.Media.MIME_TYPE, audio.mime)
                 if (Build.VERSION.SDK_INT >= 29) {
                     put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/Melodia")
@@ -531,6 +537,10 @@ class YtRepository(private val context: Context) {
             put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Audio.Media.TITLE, track.title)
             put(MediaStore.Audio.Media.ARTIST, track.artist.ifBlank { "YouTube" })
+            put(MediaStore.Audio.Media.ALBUM, track.title)
+            if (Build.VERSION.SDK_INT >= 30) {
+                put(MediaStore.Audio.Media.ALBUM_ARTIST, track.artist.ifBlank { "YouTube" })
+            }
             put(MediaStore.Audio.Media.MIME_TYPE, audio.mime)
             if (Build.VERSION.SDK_INT >= 29) {
                 put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/Melodia")
@@ -551,7 +561,7 @@ class YtRepository(private val context: Context) {
                         ?: error("sin lectura")
                     val tagged = Mp4Tagger.tag(
                         raw, track.title, track.artist.ifBlank { "YouTube" },
-                        null, lyrics, artBytes, artMime
+                        track.title, lyrics, artBytes, artMime
                     )
                     resolver.openOutputStream(uri)?.use { it.write(tagged) }
                         ?: error("sin escritura")

@@ -69,6 +69,32 @@ class ArtworkRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Guarda la miniatura de una descarga como carátula local del tema.
+     * Queda en la misma caché que [cached] (clave artista|título), así el
+     * escaneo de biblioteca la encuentra sin depender del etiquetado del m4a.
+     */
+    suspend fun saveLocal(artist: String, title: String, bytes: ByteArray?): String? =
+        withContext(Dispatchers.IO) {
+            if (bytes == null || bytes.isEmpty()) return@withContext null
+            val k = key(artist, title)
+            try {
+                val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    ?: return@withContext null
+                val scaled = scaleDown(bmp, 640)
+                val out = java.io.File(artDir, "dl-${k.hashCode()}.jpg")
+                out.outputStream().use { scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
+                if (scaled !== bmp) bmp.recycle()
+                val path = "file://${out.absolutePath}"
+                mem[k] = path
+                prefs.edit().putString(k, path).apply()
+                trimCache()
+                path
+            } catch (_: Exception) {
+                null
+            }
+        }
+
     // ── Carátula embebida del archivo (offline) ─────────────────────
     private val artDir = java.io.File(context.filesDir, "art").apply { mkdirs() }
 
