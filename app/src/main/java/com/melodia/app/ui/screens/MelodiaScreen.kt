@@ -158,7 +158,6 @@ import com.melodia.app.ui.ds.HomeSkeleton
 import com.melodia.app.ui.ds.MelodiaPillNav
 import com.melodia.app.ui.ds.MicroLabel
 import com.melodia.app.ui.ds.MiniPlayerDs
-import com.melodia.app.ui.ds.QuickCard
 import com.melodia.app.ui.ds.SectionHeader
 import com.melodia.app.ui.ds.SongArt
 import com.melodia.app.ui.ds.TrackRow
@@ -214,7 +213,6 @@ fun MelodiaScreen(vm: MainViewModel) {
     val artists by vm.artists.collectAsState()
     val playlists by vm.playlists.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
-    val dlHist by vm.dlHistory.collectAsState()
     LaunchedEffect(Unit) { vm.refreshDlHistory() }
     val favIds by vm.favIds.collectAsState()
     val sort by vm.sort.collectAsState()
@@ -317,16 +315,11 @@ fun MelodiaScreen(vm: MainViewModel) {
     Box(Modifier.fillMaxSize().background(cs.background)) {
         DsBackground()
         Column(Modifier.fillMaxSize()) {
-            // ── Top bar DS compacta: menos cromo, más música ──
+            // ── Top bar DS compacta: sin logo, solo saludo + nombre ──
             Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 10.dp, top = 10.dp, bottom = 2.dp),
+                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 10.dp, top = 12.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    Modifier.size(34.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.MusicNote, null, tint = cs.primary, modifier = Modifier.size(18.dp)) }
-                Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(greeting(), style = Ds.Micro, color = cs.onSurfaceVariant)
                     Text("Melodia", style = Ds.Title, color = cs.onBackground)
@@ -337,7 +330,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                     leadingIcon = { Icon(Icons.Default.Timer, null, Modifier.size(14.dp)) }
                 )
                 IconButton(onClick = { showSettings = true }) {
-                    Icon(Icons.Default.Settings, "Ajustes", tint = cs.onBackground)
+                    Icon(Icons.Default.Settings, "Ajustes", tint = cs.onSurfaceVariant)
                 }
             }
             // ── Search: solo donde filtra (Inicio / Explorar), el resto gana espacio ──
@@ -347,8 +340,14 @@ fun MelodiaScreen(vm: MainViewModel) {
                     placeholder = { Text("Buscar temas, álbumes, artistas", style = Ds.Body, maxLines = 1) },
                     leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
                     trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { vm.setQuery("") }) { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) } },
-                    singleLine = true, shape = RoundedCornerShape(Ds.RChip),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)
+                    singleLine = true, shape = RoundedCornerShape(Ds.RRow),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = cs.primary.copy(alpha = 0.45f),
+                        unfocusedContainerColor = cs.surface,
+                        focusedContainerColor = cs.surface
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
                 )
             }
             if (folderSel != null || albumSel != null || artistSel != null) {
@@ -437,14 +436,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                 }
         ) {
             MelodiaPillNav(
-                tab = tab, onTab = { tab = it },
-                badges = listOf(
-                    if (all.isNotEmpty()) "${all.size}" else " ",
-                    " ",
-                    if (playlists.isNotEmpty()) "${playlists.size}" else " ",
-                    if (favSongs.isNotEmpty()) "${favSongs.size}" else " ",
-                    if (dlHist.isNotEmpty()) "${dlHist.size}" else " "
-                )
+                tab = tab, onTab = { tab = it }
             )
         }
         // ── MiniPlayer flotante ──
@@ -673,9 +665,9 @@ fun HomeTab(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(Modifier.padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
-                    Modifier.size(92.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.12f)),
+                    Modifier.size(72.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.10f)),
                     contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.MusicNote, null, Modifier.size(42.dp), tint = cs.primary) }
+                ) { Icon(Icons.Default.MusicNote, null, Modifier.size(34.dp), tint = cs.primary) }
                 Spacer(Modifier.height(18.dp))
                 Text("Tu biblioteca está vacía", style = Ds.Title, color = cs.onBackground)
                 Spacer(Modifier.height(6.dp))
@@ -693,22 +685,10 @@ fun HomeTab(
                         modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
                     )
                 }
-                Spacer(Modifier.height(10.dp))
-                Surface(
-                    shape = CircleShape, color = cs.surface,
-                    modifier = Modifier
-                        .border(1.dp, cs.outline.copy(alpha = 0.6f), CircleShape)
-                        .clickable { openAppSettings(ctx) }
-                ) {
-                    Text(
-                        "Abrir ajustes de la app", style = Ds.Sub, color = cs.onBackground,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    "¿Tu música está en una carpeta concreta? Elige la carpeta desde Biblioteca, en el menú de arriba.",
-                    style = Ds.Sub, color = cs.onSurfaceVariant, textAlign = TextAlign.Center
+                    "Abrir ajustes de la app", style = Ds.Sub, color = cs.onSurfaceVariant,
+                    modifier = Modifier.clickable { openAppSettings(ctx) }.padding(10.dp)
                 )
             }
         }
@@ -726,28 +706,6 @@ fun HomeTab(
                         onPlay = { if (current != null) vm.player.toggle() else vm.playShuffle() },
                         onOpen = { if (current != null) onOpenPlayer() else vm.playShuffle() }
                     )
-                }
-            }
-        }
-        item {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.weight(1f)) {
-                        QuickCard("Favoritos", "${favSongs.size}", Icons.Default.Favorite) { onTab(3) }
-                    }
-                    Box(Modifier.weight(1f)) {
-                        QuickCard("Aleatorio", "Mezclar todo", Icons.Default.Shuffle) { vm.playShuffle() }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.weight(1f)) {
-                        QuickCard("Recientes", "Agregados", Icons.Default.History) { vm.setSort(SortMode.RECENT) }
-                    }
-                    Box(Modifier.weight(1f)) {
-                        val artists by vm.artists.collectAsState()
-                        QuickCard("Artistas", "${artists.size}", Icons.Default.Person) { onTab(1) }
-                    }
                 }
             }
         }
@@ -796,30 +754,26 @@ fun HomeTab(
                 Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
                     Text("Escuchado recientemente", style = Ds.Title, color = cs.onBackground)
                     Spacer(Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(recent, key = { it.id }) { s ->
-                            Surface(
-                                shape = RoundedCornerShape(14.dp), color = cs.surface,
-                                modifier = Modifier.width(150.dp).clickable { vm.playById(s.id) }
+                            Column(
+                                Modifier.width(132.dp).clickable { vm.playById(s.id) }
                             ) {
-                                Column(Modifier.padding(8.dp)) {
-                                    SongArt(
-                                        albumId = s.albumId, size = 134.dp,
-                                        shape = RoundedCornerShape(10.dp),
-                                        artUrl = s.artUrl, iconSize = 28.dp,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    Spacer(Modifier.height(6.dp))
-                                    Text(
-                                        s.title, style = Ds.Body, color = cs.onBackground,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        s.artist.ifBlank { "Desconocido" }, style = Ds.Sub,
-                                        color = cs.onSurfaceVariant,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                                SongArt(
+                                    albumId = s.albumId, size = 132.dp,
+                                    shape = RoundedCornerShape(Ds.RCard),
+                                    artUrl = s.artUrl, iconSize = 28.dp
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    s.title, style = Ds.Body, color = cs.onBackground,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    s.artist.ifBlank { "Desconocido" }, style = Ds.Sub,
+                                    color = cs.onSurfaceVariant,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
                     }
@@ -873,7 +827,7 @@ fun HomeTab(
                 }
             }
         }
-        item { SectionHeader("Tus temas", "${songs.size}") }
+        item { SectionHeader("Tus temas", "Aleatorio", onAction = { vm.playShuffle() }) }
         if (songs.isEmpty()) {
             item {
                 Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
@@ -965,14 +919,13 @@ fun ExploreTab(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    ToggleChip(selected = seg == 0, text = "Carpetas", icon = Icons.Default.Folder) { seg = 0 }
-                    ToggleChip(selected = seg == 1, text = "Artistas", icon = Icons.Default.Person) { seg = 1 }
-                    ToggleChip(selected = seg == 2, text = "Álbumes", icon = Icons.Default.Album) { seg = 2 }
+                    ToggleChip(selected = seg == 0, text = "Carpetas") { seg = 0 }
+                    ToggleChip(selected = seg == 1, text = "Artistas") { seg = 1 }
+                    ToggleChip(selected = seg == 2, text = "Álbumes") { seg = 2 }
                 }
             }
             when (seg) {
                 0 -> {
-                    item { SectionHeader("Carpetas", "${folders.size}") }
                     items(folders) { f ->
                         Row(
                             Modifier.fillMaxWidth().clickable { vm.setFolder(f.path) }.padding(horizontal = 20.dp, vertical = 9.dp),
@@ -984,12 +937,10 @@ fun ExploreTab(
                                 Text(f.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
                                 Text("${f.count} temas", style = Ds.Sub, color = cs.onSurfaceVariant)
                             }
-                            Icon(Icons.Default.ChevronRight, null, tint = cs.onSurfaceVariant)
                         }
                     }
                 }
                 1 -> {
-                    item { SectionHeader("Artistas", "${artists.size}") }
                     items(artists) { ar ->
                         val artId = remember(all, ar.name) {
                             all.firstOrNull { (it.artist.ifBlank { "Desconocido" }) == ar.name }?.albumId ?: 0L
@@ -1008,12 +959,10 @@ fun ExploreTab(
                                 Text(ar.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
                                 Text("${ar.count} temas", style = Ds.Sub, color = cs.onSurfaceVariant)
                             }
-                            Icon(Icons.Default.ChevronRight, null, tint = cs.onSurfaceVariant)
                         }
                     }
                 }
                 else -> {
-                    item { SectionHeader("Álbumes", "${albums.size}") }
                     items(albums) { a ->
                         Row(
                             Modifier.fillMaxWidth().clickable { albumDetail = a.name }.padding(horizontal = 20.dp, vertical = 7.dp),
@@ -1029,7 +978,6 @@ fun ExploreTab(
                                 Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
                                 Text("${a.artist} · ${a.count}", style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                            Icon(Icons.Default.ChevronRight, null, tint = cs.onSurfaceVariant)
                         }
                     }
                 }
@@ -1544,7 +1492,6 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         val dlProg = if (isStream) curTrack?.let { dlMap[it.id] } else null
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
             Box(Modifier.fillMaxWidth()) {
-                MicroLabel("Ahora suena", Modifier.align(Alignment.Center))
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1641,15 +1588,11 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         Text(s.title, style = if (autoMode) Ds.Display.copy(fontSize = 26.sp) else Ds.Display, color = cs.onBackground, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE))
         Text("${s.artist} · ${s.album.ifBlank { "Sencillo" }}", style = Ds.Body, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(8.dp))
-        Surface(
-            shape = RoundedCornerShape(14.dp), color = cs.surfaceVariant,
-            modifier = Modifier.clickable { onLyrics() }
-        ) {
-            Text(
-                "Ver letra", style = Ds.Body, color = cs.primary,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
-            )
-        }
+        Text(
+            "Ver letra", style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+            color = cs.primary,
+            modifier = Modifier.clickable { onLyrics() }.padding(vertical = 4.dp, horizontal = 2.dp)
+        )
         }
         }
         // Espacio flexible: absorbe la altura sobrante y evita que se corten los controles
@@ -2014,23 +1957,28 @@ fun CrossfadeSheet(vm: MainViewModel, onDismiss: () -> Unit) {
 @Composable
 fun ToggleChip(
     selected: Boolean, text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
     Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) cs.primary.copy(alpha = 0.16f) else cs.surfaceVariant,
-        border = if (selected) androidx.compose.foundation.BorderStroke(1.dp, cs.primary) else null,
+        shape = RoundedCornerShape(10.dp),
+        color = if (selected) cs.primary.copy(alpha = 0.14f) else cs.surfaceVariant,
         modifier = Modifier.clickable(onClick = onClick)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
         ) {
-            Icon(icon, null, Modifier.size(16.dp), tint = if (selected) cs.primary else cs.onSurfaceVariant)
-            Spacer(Modifier.width(6.dp))
-            Text(text, style = Ds.Body, color = if (selected) cs.primary else cs.onBackground)
+            if (icon != null) {
+                Icon(icon, null, Modifier.size(15.dp), tint = if (selected) cs.primary else cs.onSurfaceVariant)
+                Spacer(Modifier.width(6.dp))
+            }
+            Text(
+                text,
+                style = if (selected) Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium) else Ds.Sub,
+                color = if (selected) cs.primary else cs.onBackground
+            )
         }
     }
 }

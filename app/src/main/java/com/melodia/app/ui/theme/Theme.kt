@@ -26,25 +26,25 @@ object Ds {
     val GreenDeep = Color(0xFF0E9F52)
     val Heart = Color(0xFF2EE56B)
 
-    // Radios
-    val RHero = 28.dp
-    val RCard = 20.dp
-    val RRow = 16.dp
-    val RChip = 14.dp
+    // Radios: dos familias y listo (card / fila). Menos variantes = más calma.
+    val RHero = 24.dp
+    val RCard = 16.dp
+    val RRow = 12.dp
+    val RChip = 12.dp
 
     // Alturas / tamaños
-    val ArtRow = 56.dp
+    val ArtRow = 52.dp
     val ArtHero = 96.dp
     val PlayFab = 56.dp
-    val PlayHero = 72.dp
+    val PlayHero = 64.dp
 
     // Tipo (todos los Text del sistema usan estos estilos + color explícito)
     // Titulares tight (-0.5/-0.25): se sienten más premium que el tracking neutro
-    val Display = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold, lineHeight = 32.sp, letterSpacing = (-0.5).sp)
-    val Title = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.25).sp)
+    val Display = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.SemiBold, lineHeight = 30.sp, letterSpacing = (-0.5).sp)
+    val Title = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp)
     val Body = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)
     val Sub = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Normal)
-    val Micro = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium)
+    val Micro = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
     val HeroShape = RoundedCornerShape(RHero)
     val CardShape = RoundedCornerShape(RCard)
     val RowShape = RoundedCornerShape(RRow)
@@ -70,14 +70,14 @@ private fun darkScheme(accent: Color) = darkColorScheme(
     onSecondaryContainer = blend(accent, Color.White, 0.30f),
     tertiary = accent,
     onTertiary = Color(0xFF06110A),
-    background = Color(0xFF0A0D0B),
-    onBackground = Color(0xFFF2F5F2),
-    surface = Color(0xFF131715),
-    onSurface = Color(0xFFF2F5F2),
-    surfaceVariant = Color(0xFF1B211E),
-    onSurfaceVariant = Color(0xFF9AA5A0),
-    outline = Color(0xFF2A332D),
-    outlineVariant = Color(0xFF1E2621),
+    background = Color(0xFF0A0B0A),
+    onBackground = Color(0xFFF2F4F2),
+    surface = Color(0xFF131413),
+    onSurface = Color(0xFFF2F4F2),
+    surfaceVariant = Color(0xFF1A1B1A),
+    onSurfaceVariant = Color(0xFFA0A5A0),
+    outline = Color(0xFF262826),
+    outlineVariant = Color(0xFF1D1F1D),
     scrim = Color.Black,
     error = Color(0xFFF2B8B5),
     onError = Color(0xFF601410),

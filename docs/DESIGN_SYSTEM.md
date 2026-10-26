@@ -10,12 +10,12 @@ verde neón, pill-nav flotante, titulares grandes + secundarios atenuados).
 
 | Token | Dark | Light |
 |---|---|---|
-| `background` | `#0A0D0B` | `#F4F6F4` |
-| `surface` (cards) | `#131715` | `#FFFFFF` |
-| `surfaceVariant` (elevada) | `#1B211E` | `#E8ECE8` |
-| `onBackground` / `onSurface` | `#F2F5F2` | `#10140F` |
-| `onSurfaceVariant` (secundario) | `#9AA5A0` | `#5F6B62` |
-| `outline` (bordes cristal) | `#2A332D` | `#D8DED8` |
+| `background` | `#0A0B0A` | `#F4F6F4` |
+| `surface` (cards) | `#131413` | `#FFFFFF` |
+| `surfaceVariant` (elevada) | `#1A1B1A` | `#E8ECE8` |
+| `onBackground` / `onSurface` | `#F2F4F2` | `#10140F` |
+| `onSurfaceVariant` (secundario) | `#A0A5A0` | `#5F6B62` |
+| `outline` (bordes cristal) | `#262826` | `#D8DED8` |
 | `primary` (acento) | `#2EE56B` | `#0E9F52` |
 | `onPrimary` | `#06110A` | `#FFFFFF` |
 | Favorito | verde acento (un solo ♥ por fila) | igual |
@@ -35,7 +35,7 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
 
 ## ⭕ Radios
 
-`RHero 28dp` · `RCard 20dp` · `RRow 16dp` · `RChip 14dp` · pill = `CircleShape`.
+`RHero 24dp` · `RCard 16dp` · `RRow 12dp` · chip `10dp` · pill = `CircleShape`.
 
 ## 🧩 Componentes
 
@@ -92,3 +92,23 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
    nunca tapan contenido.
 5. Overlays full-screen consumen toques (`clickable` sin indicación)
    para que nada atraviese a la lista.
+
+## ✂️ Pase minimal (4.7)
+
+El objetivo fue sacar cromo, no apagar la app. Regla: **si un elemento no da
+información ni acción, sobra**.
+
+- Fondo plano: sin glows ni degradados ambientales. El aire y la tipografía
+  hacen el trabajo; el vidrio se reserva a la nav y al miniplayer.
+- Nav: sin borde ni contadores (los números bajo cada pestaña eran ruido).
+  Icono 20dp, etiqueta 12sp, selección por color + escala 1.06 con `tween`
+  (sin rebote).
+- Filas: el corazón solo aparece si el tema es favorito. Deslizar a la
+  izquierda sigue marcando y el long-press abre la ficha.
+- Home: fuera las 4 QuickCards (duplicaban pestañas). Quedan hero, escuchado
+  recientemente, álbumes y temas.
+- HeroCard: sin borde ni "toca para escuchar"; título, subtítulo y FAB.
+- Buscador: campo plano (contenedor `surface`, sin caja); borde solo al enfocar.
+- Chips: sin borde, radio 10dp, texto 12sp.
+- Empty state: un icono, una acción primaria y un link discreto.
+

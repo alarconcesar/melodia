@@ -296,11 +296,11 @@ fun TrackRow(
                 style = Ds.Sub, color = cs.onSurfaceVariant
             )
         }
-        IconButton(onClick = onFav, modifier = Modifier.size(40.dp)) {
+        if (isFav) {
+            // Solo se marca lo que es favorito: el corazón vacío en cada fila era ruido.
             Icon(
-                if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null,
-                tint = if (isFav) cs.primary else cs.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+                Icons.Default.Favorite, null,
+                tint = cs.primary, modifier = Modifier.padding(end = 4.dp).size(18.dp)
             )
         }
         }
@@ -325,14 +325,9 @@ fun SkeletonBlock(modifier: Modifier = Modifier, shape: Shape = RoundedCornerSha
 fun HomeSkeleton(modifier: Modifier = Modifier) {
     Column(modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
         SkeletonBlock(Modifier.fillMaxWidth().height(150.dp), Ds.HeroShape)
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SkeletonBlock(Modifier.weight(1f).height(92.dp), Ds.CardShape)
-            SkeletonBlock(Modifier.weight(1f).height(92.dp), Ds.CardShape)
-        }
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(24.dp))
         SkeletonBlock(Modifier.width(150.dp).height(18.dp), RoundedCornerShape(6.dp))
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
         repeat(5) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -350,33 +345,7 @@ fun HomeSkeleton(modifier: Modifier = Modifier) {
     }
 }
 
-// ── QuickCard DS (grid 2 col) ────────────────────────────────────
-@Composable
-fun QuickCard(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    Surface(
-        shape = Ds.CardShape, color = cs.surface,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
-            .border(1.dp, cs.outline.copy(alpha = 0.45f), Ds.CardShape)
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape)
-                        .background(cs.primary.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center
-                ) { Icon(icon, null, tint = cs.primary, modifier = Modifier.size(20.dp)) }
-                Spacer(Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, null, tint = cs.onSurfaceVariant, modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.height(14.dp))
-            Text(title, style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, style = Ds.Title, color = cs.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-// ── HeroCard DS · seguir escuchando ──────────────────────────────
+// ── HeroCard DS · seguir escuchando (sin borde ni texto de relleno) ──
 @Composable
 fun HeroCard(
     label: String,
@@ -387,68 +356,35 @@ fun HeroCard(
     onOpen: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    Surface(shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)
-        .border(1.dp, cs.outline.copy(alpha = 0.4f), Ds.HeroShape)) {
-        Column(modifier = Modifier.padding(20.dp)) {
+    Surface(shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             MicroLabel(label)
             Spacer(Modifier.height(6.dp))
             Text(title, style = Ds.Display, color = cs.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, style = Ds.Body, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = CircleShape, color = cs.primary,
-                    modifier = Modifier.size(Ds.PlayHero).clickable(onClick = onPlay)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null,
-                            tint = cs.surface, modifier = Modifier.size(34.dp)
-                        )
-                    }
+            Spacer(Modifier.height(2.dp))
+            Text(subtitle, style = Ds.Sub, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(14.dp))
+            Surface(
+                shape = CircleShape, color = cs.primary,
+                modifier = Modifier.size(Ds.PlayHero).clickable(onClick = onPlay)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null,
+                        tint = cs.surface, modifier = Modifier.size(30.dp)
+                    )
                 }
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    if (playing) "Sonando ahora" else "Toca para escuchar",
-                    style = Ds.Sub, color = cs.onSurfaceVariant
-                )
             }
         }
     }
 }
 
-// ── Fondo DS · degradado + glow ambiental ─────────────────────────
+// ── Fondo DS · plano, sin glows ───────────────────────────────────
+// El minimalismo vive del espacio y la tipografía, no de luces de fondo.
 @Composable
 fun DsBackground() {
     val cs = MaterialTheme.colorScheme
-    Box(
-        Modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(cs.surface, cs.surface, cs.background)))
-    )
-    Canvas(Modifier.fillMaxSize()) {
-        val w = size.width
-        val green = cs.primary
-        // Glow superior: degradado radial que se funde a transparente (sin borde duro)
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(green.copy(alpha = 0.14f), green.copy(alpha = 0.05f), Color.Transparent),
-                center = androidx.compose.ui.geometry.Offset(w * 0.5f, -w * 0.3f),
-                radius = w * 0.95f
-            ),
-            radius = w * 0.95f,
-            center = androidx.compose.ui.geometry.Offset(w * 0.5f, -w * 0.3f)
-        )
-        // Glow inferior sutil
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(green.copy(alpha = 0.06f), Color.Transparent),
-                center = androidx.compose.ui.geometry.Offset(w * 0.5f, size.height + w * 0.2f),
-                radius = w
-            ),
-            radius = w,
-            center = androidx.compose.ui.geometry.Offset(w * 0.5f, size.height + w * 0.2f)
-        )
-    }
+    Box(Modifier.fillMaxSize().background(cs.background))
 }
 
 // ── Barras de ecualizador animadas ───────────────────────────────
@@ -469,9 +405,9 @@ fun EqBars(color: Color, modifier: Modifier = Modifier) {
     }
 }
 
-// ── PillNav DS · barra flotante ──────────────────────────────────
+// ── PillNav DS · barra flotante, sin borde ni contadores ──────────
 @Composable
-fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier, badges: List<String> = emptyList()) {
+fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier) {
     val cs = MaterialTheme.colorScheme
     val items = listOf(
         Triple("Inicio", Icons.Default.Home, 0),
@@ -481,10 +417,9 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
         Triple("Online", Icons.Default.Download, 4)
     )
     Surface(
-        shape = CircleShape, color = cs.surface.copy(alpha = 0.78f),
-        tonalElevation = 4.dp, shadowElevation = 12.dp,
+        shape = CircleShape, color = cs.surface.copy(alpha = 0.86f),
+        tonalElevation = 0.dp, shadowElevation = 6.dp,
         modifier = modifier.fillMaxWidth()
-            .border(1.dp, cs.outline.copy(alpha = 0.6f), CircleShape)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
@@ -495,39 +430,32 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
                 val sel = tab == idx
                 // Layout fijo: mismo tamaño siempre (sin saltos)
                 val pillBg by animateColorAsState(
-                    if (sel) cs.primary.copy(alpha = 0.16f) else Color.Transparent,
-                    tween(250), label = "pill"
+                    if (sel) cs.primary.copy(alpha = 0.12f) else Color.Transparent,
+                    tween(200), label = "pill"
                 )
                 Box(
                     modifier = Modifier.weight(1f).clip(CircleShape)
                         .background(pillBg)
                         .clickable { onTab(idx) }
-                        .padding(vertical = 7.dp),
+                        .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // Cambio de color y un pelo de escala; sin rebote.
                         val tabScale by animateFloatAsState(
-                            if (sel) 1.14f else 1f,
-                            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                            label = "tab"
+                            if (sel) 1.06f else 1f,
+                            tween(180), label = "tab"
                         )
                         Icon(
                             icon, null,
                             tint = if (sel) cs.primary else cs.onSurfaceVariant,
-                            modifier = Modifier.size(21.dp).graphicsLayer { scaleX = tabScale; scaleY = tabScale }
+                            modifier = Modifier.size(20.dp).graphicsLayer { scaleX = tabScale; scaleY = tabScale }
                         )
+                        Spacer(Modifier.height(3.dp))
                         Text(
                             label,
                             style = if (sel) Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium) else Ds.Sub,
                             color = if (sel) cs.primary else cs.onSurfaceVariant
-                        )
-                        // Contador vivo con altura fija (sin saltos de layout)
-                        Text(
-                            badges.getOrNull(idx) ?: " ",
-                            style = Ds.Sub.copy(fontSize = 9.sp),
-                            color = cs.onSurfaceVariant.copy(alpha = 0.75f),
-                            maxLines = 1,
-                            modifier = Modifier.height(11.dp)
                         )
                     }
                 }
@@ -553,10 +481,9 @@ fun MiniPlayerDs(
 ) {
     val cs = MaterialTheme.colorScheme
     Surface(
-        shape = Ds.CardShape, color = cs.surfaceVariant.copy(alpha = 0.85f),
-        tonalElevation = 2.dp, shadowElevation = 10.dp,
+        shape = Ds.CardShape, color = cs.surfaceVariant.copy(alpha = 0.9f),
+        tonalElevation = 0.dp, shadowElevation = 6.dp,
         modifier = modifier.fillMaxWidth().clickable(onClick = onOpen)
-            .border(1.dp, cs.outline.copy(alpha = 0.55f), Ds.CardShape)
     ) {
         Column {
             Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -568,10 +495,10 @@ fun MiniPlayerDs(
                     Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
                     Text(artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Sub, color = cs.onSurfaceVariant)
                 }
-                IconButton(onClick = onToggleFav, modifier = Modifier.size(40.dp)) {
+                if (isFav) {
                     Icon(
-                        if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null,
-                        tint = if (isFav) cs.primary else cs.onSurfaceVariant, modifier = Modifier.size(20.dp)
+                        Icons.Default.Favorite, null,
+                        tint = cs.primary, modifier = Modifier.padding(horizontal = 10.dp).size(18.dp)
                     )
                 }
                 Surface(shape = CircleShape, color = cs.primary, modifier = Modifier.size(44.dp).then(pressClick(onToggle))) {
