@@ -435,7 +435,7 @@ fun OnlineTabContent(
 
 /** Fila plana de resultado: arte, título, artista · duración y descarga. */
 @Composable
-private fun YtRowFlat(
+fun YtRowFlat(
     track: YtTrack,
     progress: Float?,
     busy: Boolean,
@@ -479,7 +479,7 @@ private fun YtRowFlat(
 
 /** Playlist o álbum: se descarga entero (es lo que se busca al buscar en YT). */
 @Composable
-private fun YtCollectionRow(
+fun YtCollectionRow(
     item: YtSearchItem.Collection,
     busy: Boolean,
     onDownload: () -> Unit

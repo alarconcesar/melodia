@@ -86,15 +86,38 @@ class YtRepository(private val context: Context) {
 
     /** Ejecuta la búsqueda y deja listo el paginador. filters=null → índice general. */
     private fun fetchPage(query: String, filters: List<String>?): List<YtSearchItem> {
+        val (ex, items) = extract(query, filters)
+        pager = ex
+        next = try { ex.initialPage.nextPage } catch (_: Exception) { null }
+        return items
+    }
+
+    /**
+     * Búsqueda de una sola página, sin tocar el paginador: la usa la barra de
+     * Inicio para no romper el "Ver más" de la pestaña Online.
+     */
+    suspend fun searchFirstPage(query: String): List<YtSearchItem> = withContext(Dispatchers.IO) {
+        ensure()
+        val general = try {
+            extract(query, null).second
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            if (t !is SearchExtractor.NothingFoundException) throw t
+            emptyList()
+        }
+        if (general.isNotEmpty()) general
+        else extract(query, listOf(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS)).second
+    }
+
+    private fun extract(
+        query: String,
+        filters: List<String>?
+    ): Pair<SearchExtractor, List<YtSearchItem>> {
         val service = yt()
         val ex = if (filters == null) service.getSearchExtractor(query)
         else service.getSearchExtractor(service.searchQHFactory.fromQuery(query, filters, ""))
         ex.fetchPage()
-        val page = ex.initialPage
-        val items = mapItems(page.items)
-        pager = ex
-        next = try { page.nextPage } catch (_: Exception) { null }
-        return items
+        return ex to mapItems(ex.initialPage.items)
     }
 
     /** Devuelve true si hay más páginas por cargar. */

@@ -177,3 +177,15 @@ Reglas nacidas de medir el jank, no de la intuición:
 - **Reproductor**: carátula sin sombra; el fondo teñido ya la separa.
 - **Inicio** dejó de observar `playerState` sin usarlo (recomponía la pantalla
   dos veces por segundo mientras sonaba algo).
+
+## Búsqueda global con YouTube (5.9)
+
+La barra de la cabecera (Inicio/Explorar) filtra la biblioteca al instante y, si
+el texto tiene 2+ caracteres y dejas de teclear 650 ms, busca también en YouTube:
+
+- Resultados locales primero (`Coincidencias`, `Tus temas`).
+- Debajo, sección **"En YouTube"** con hasta 8 resultados mixtos (temas y
+  playlists/álbumes) y acción "Ver en Online", que lleva la consulta a esa
+  pestaña y dispara la búsqueda completa con paginación.
+- La búsqueda rápida (`searchFirstPage`) **no toca el paginador** de Online:
+  comprobado con sonda real (Online conserva su página 2 después).

@@ -165,6 +165,7 @@ import com.melodia.app.ui.ds.EmptyState
 import com.melodia.app.ui.ds.HeroCard
 import com.melodia.app.ui.ds.HomeSkeleton
 import com.melodia.app.ui.ds.MelodiaPillNav
+import com.melodia.app.ui.ds.MelodiaSpinner
 import com.melodia.app.ui.ds.MicroLabel
 import com.melodia.app.ui.ds.MiniPlayerDs
 import com.melodia.app.ui.ds.SectionHeader
@@ -632,7 +633,18 @@ fun HomeTab(
     val cs = MaterialTheme.colorScheme
     val current by vm.currentSong.collectAsState()
     val query by vm.query.collectAsState()
+    val homeYt by vm.homeYt.collectAsState()
+    val homeYtLoading by vm.homeYtLoading.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
+    // La biblioteca filtra al instante; YouTube espera a que deje de teclear.
+    LaunchedEffect(query) {
+        if (query.isBlank()) {
+            vm.clearHomeYt()
+        } else {
+            kotlinx.coroutines.delay(650)
+            vm.searchHomeYt(query)
+        }
+    }
     val loaded by vm.loaded.collectAsState()
     val ctx = LocalContext.current.applicationContext
     val safeExtras2 = remember { SafeMode.isOn(ctx, SafeMode.NO_EXTRAS) }
@@ -828,6 +840,46 @@ fun HomeTab(
                 TrackRow(s, s.id == currentId && playing, favs.contains(s.id),
                     onTap = { vm.playSong(s.id) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) },
                     onQueue = { vm.queueEnd(s.id) { ok -> toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
+            }
+        }
+        // ── YouTube: lo que no está en tu biblioteca, sin cambiar de pestaña ──
+        if (query.isNotBlank()) {
+            item {
+                SectionHeader("En YouTube", "Ver en Online", onAction = {
+                    vm.setYtQuery(query)
+                    onTab(4)
+                    vm.searchYt(query)
+                })
+            }
+            when {
+                homeYtLoading && homeYt.isEmpty() -> item {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                        MelodiaSpinner(size = 22.dp, width = 2.dp)
+                    }
+                }
+                homeYt.isEmpty() -> item {
+                    Text(
+                        "Sin resultados en YouTube para «$query»",
+                        style = Ds.Sub, color = cs.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                    )
+                }
+                else -> items(homeYt.take(8), key = { "h-${it.key}" }) { item ->
+                    when (item) {
+                        is com.melodia.app.data.online.YtSearchItem.Track -> YtRowFlat(
+                            track = item.track,
+                            progress = null,
+                            busy = false,
+                            onPlay = { vm.playYt(item.track) },
+                            onDownload = { vm.downloadYt(item.track) }
+                        )
+                        is com.melodia.app.data.online.YtSearchItem.Collection -> YtCollectionRow(
+                            item = item,
+                            busy = false,
+                            onDownload = { vm.downloadYtCollection(item) }
+                        )
+                    }
+                }
             }
         }
     }

@@ -293,6 +293,41 @@ class MainViewModel(
     }
 
     fun setQuery(q: String) { _query.value = q }
+
+    // ── Búsqueda rápida de YouTube desde la barra de Inicio ──
+    // Una sola página y sin tocar el paginador de la pestaña Online.
+    private val _homeYt = MutableStateFlow<List<com.melodia.app.data.online.YtSearchItem>>(emptyList())
+    val homeYt: StateFlow<List<com.melodia.app.data.online.YtSearchItem>> = _homeYt
+    private val _homeYtLoading = MutableStateFlow(false)
+    val homeYtLoading: StateFlow<Boolean> = _homeYtLoading
+    private var homeYtJob: kotlinx.coroutines.Job? = null
+
+    fun searchHomeYt(q: String = _query.value) {
+        val query = q.trim()
+        homeYtJob?.cancel()
+        if (query.length < 2) {
+            _homeYt.value = emptyList()
+            _homeYtLoading.value = false
+            return
+        }
+        homeYtJob = viewModelScope.launch {
+            _homeYtLoading.value = true
+            try {
+                _homeYt.value = withContext(Dispatchers.IO) { yt.searchFirstPage(query) }
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                _homeYt.value = emptyList()
+            } finally {
+                _homeYtLoading.value = false
+            }
+        }
+    }
+
+    fun clearHomeYt() {
+        homeYtJob?.cancel()
+        _homeYt.value = emptyList()
+        _homeYtLoading.value = false
+    }
     fun setSort(s: SortMode) { _sort.value = s }
     fun setFolder(p: String?) { _folder.value = p; _album.value = null; _artistF2(null) }
     fun setAlbum(a: String?) { _album.value = a; _folder.value = null; _artistF2(null) }
