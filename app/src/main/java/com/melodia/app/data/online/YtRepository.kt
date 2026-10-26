@@ -568,6 +568,61 @@ class YtRepository(private val context: Context) {
             if (len > 0) onProgress(1f)
         }
 
+    /**
+     * Artista y título presentables para una descarga.
+     *
+     * Los items de playlist suelen venir sin artista y con el canal dentro del
+     * título ("Jorge Drexler - Toco madera"). Se toma el prefijo como artista y
+     * se recorta del título; si no hay patrón, queda "YouTube".
+     */
+    private fun artistaDe(track: YtTrack): String {
+        if (track.artist.isNotBlank()) return track.artist
+        val prefijo = track.title.substringBefore(" - ").trim()
+        return if (track.title.contains(" - ") && prefijo.length in 2..40) prefijo else "YouTube"
+    }
+
+    private fun tituloLimpio(track: YtTrack, artista: String): String {
+        val t = track.title
+        return if (artista != "YouTube" && t.startsWith("$artista - ", ignoreCase = true)) {
+            t.substringAfter(" - ").trim().ifBlank { t }
+        } else t
+    }
+
+    /** Guarda la carátula en disco y devuelve su file:// (independiente de MediaStore). */
+    private fun guardarPortada(bytes: ByteArray?, clave: String): String? {
+        if (bytes == null || bytes.isEmpty()) return null
+        return try {
+            val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+            val lado = 640
+            val escala = minOf(1f, lado.toFloat() / maxOf(bmp.width, bmp.height).coerceAtLeast(1))
+            val out = if (escala < 1f) android.graphics.Bitmap.createScaledBitmap(
+                bmp, (bmp.width * escala).toInt().coerceAtLeast(1),
+                (bmp.height * escala).toInt().coerceAtLeast(1), true
+            ) else bmp
+            val dir = File(context.filesDir, "dlart").apply { mkdirs() }
+            val f = File(dir, "${clave.hashCode()}.jpg")
+            f.outputStream().use { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+            if (out !== bmp) bmp.recycle()
+            "file://${f.absolutePath}"
+        } catch (_: Exception) { null }
+    }
+
+    /** Deja la copia propia de metadatos que manda al leer la biblioteca. */
+    private fun guardarMeta(fileName: String, track: YtTrack, artista: String, titulo: String, artBytes: ByteArray?) {
+        try {
+            val meta = com.melodia.app.data.DownloadMetaStore(context)
+            meta.put(
+                fileName,
+                com.melodia.app.data.DownloadMetaStore.Meta(
+                    title = titulo,
+                    artist = artista,
+                    album = titulo,
+                    artPath = guardarPortada(artBytes, fileName)
+                )
+            )
+        } catch (_: Exception) {}
+    }
+
     /** Trae los temas de una playlist de YouTube (título + hasta 100 temas, varias páginas). */
     suspend fun playlistTracks(url: String): Pair<String, List<YtTrack>> = withContext(Dispatchers.IO) {
         ensure()
@@ -636,13 +691,15 @@ class YtRepository(private val context: Context) {
                 File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Melodia").mkdirs()
             } catch (_: Exception) {}
         }
+        val artista = artistaDe(track)
+        val titulo = tituloLimpio(track, artista)
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
-            put(MediaStore.Audio.Media.TITLE, track.title)
-            put(MediaStore.Audio.Media.ARTIST, track.artist.ifBlank { "YouTube" })
-            put(MediaStore.Audio.Media.ALBUM, track.title)
+            put(MediaStore.Audio.Media.TITLE, titulo)
+            put(MediaStore.Audio.Media.ARTIST, artista)
+            put(MediaStore.Audio.Media.ALBUM, titulo)
             if (Build.VERSION.SDK_INT >= 30) {
-                put(MediaStore.Audio.Media.ALBUM_ARTIST, track.artist.ifBlank { "YouTube" })
+                put(MediaStore.Audio.Media.ALBUM_ARTIST, artista)
             }
             put(MediaStore.Audio.Media.MIME_TYPE, audio.mime)
             if (Build.VERSION.SDK_INT >= 29) {
@@ -663,8 +720,7 @@ class YtRepository(private val context: Context) {
                         ?.takeIf { it.size in 16..60_000_000 }
                         ?: error("sin lectura")
                     val tagged = Mp4Tagger.tag(
-                        raw, track.title, track.artist.ifBlank { "YouTube" },
-                        track.title, lyrics, artBytes, artMime
+                        raw, titulo, artista, titulo, lyrics, artBytes, artMime
                     )
                     resolver.openOutputStream(uri)?.use { it.write(tagged) }
                         ?: error("sin escritura")
@@ -675,6 +731,7 @@ class YtRepository(private val context: Context) {
                 values.put(MediaStore.Audio.Media.IS_PENDING, 0)
                 resolver.update(uri, values, null, null)
             }
+            guardarMeta(fileName, track, artista, titulo, artBytes)
             uri
         } catch (e: Exception) {
             try { resolver.delete(uri, null, null) } catch (_: Exception) {}

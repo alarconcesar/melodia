@@ -288,13 +288,19 @@ class MainViewModel(
                 for (s in list) {
                     if (!s.dataPath.contains("/Melodia/")) continue
                     if (s.artist.isNotBlank() && s.artist != "Desconocido") continue
-                    val corte = s.title.lastIndexOf(" - ")
+                    val corte = s.title.indexOf(" - ")
                     if (corte <= 0) continue
                     val posible = s.title.substring(corte + 3).trim()
                     if (posible.isBlank() || posible.length > 40) continue
                     val titulo = s.title.substring(0, corte).trim()
                     if (titulo.isBlank()) continue
                     if (repo.updateMetadata(s.id, titulo, posible, s.album.ifBlank { titulo })) cambios++
+                    // Copia propia: manda al leer y evita que vuelva a "Desconocido"
+                    val arte = try { artRepo.embedded(s) } catch (_: Exception) { null }
+                    val nombre = try { java.io.File(s.dataPath).name } catch (_: Exception) { "" }
+                    if (nombre.isNotBlank()) {
+                        repo.saveDownloadMeta(nombre, titulo, posible, titulo, arte)
+                    }
                 }
                 if (cambios > 0) withContext(Dispatchers.Main) { reload() }
             }

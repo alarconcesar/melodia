@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
-class MusicRepository(context: Context) {
+class MusicRepository(context: Context, private val dlMeta: DownloadMetaStore = DownloadMetaStore(context)) {
     private val resolver = context.contentResolver
     private val prefs = context.getSharedPreferences("melodia_lib", Context.MODE_PRIVATE)
 
@@ -61,6 +61,11 @@ class MusicRepository(context: Context) {
             }
             resolver.update(uri, cv, null, null) > 0
         } catch (_: Exception) { false }
+    }
+
+    /** Guarda la ficha propia de una descarga (manda sobre MediaStore al leer). */
+    fun saveDownloadMeta(fileName: String, title: String, artist: String, album: String, artPath: String?) {
+        dlMeta.put(fileName, DownloadMetaStore.Meta(title, artist, album, artPath))
     }
 
     /**
@@ -154,7 +159,18 @@ class MusicRepository(context: Context) {
                             trackNumber = track,
                             discNumber = if (rawTrack > 0) disc else 0,
                             albumArtist = albumArtist
-                        )
+                        ).let { base ->
+                            // Lo descargado manda: MediaStore puede perder el
+                            // artista/álbum al reescribir las etiquetas del m4a.
+                            val nombre = try { java.io.File(path).name } catch (_: Exception) { "" }
+                            val m = if (nombre.isNotBlank()) dlMeta.get(nombre) else null
+                            if (m == null) base else base.copy(
+                                title = m.title.ifBlank { base.title },
+                                artist = m.artist.ifBlank { base.artist },
+                                album = m.album.ifBlank { base.album },
+                                artUrl = m.artPath ?: base.artUrl
+                            )
+                        }
                     )
                 }
             }
