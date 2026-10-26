@@ -74,6 +74,10 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
   (`vm.loaded`), para no mostrar "biblioteca vacía" durante el arranque.
 - **Carrusel "Tus álbumes"** en Inicio — tarjetas de 138dp ordenadas por
   cantidad de temas; tocar aplica el filtro de álbum en Explorar.
+- **QueueSheet** — diálogo ancho (94% de la pantalla) con conteo y duración
+  total, chips de aleatorio/repetir, filas con ↑ ↓ ✕ (cajas de 30dp, no
+  `IconButton`, cuyo mínimo de 48dp ahoga el título), "Vaciar" (deja sonando el
+  tema actual) y "Guardar lista" (playlist nueva en el mismo orden).
 - **TrackInfoSheet / EqSheet** — diálogos con scroll, colores explícitos.
 
 ## 📏 Reglas duras (aprende de nuestros bugs)

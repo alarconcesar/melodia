@@ -14,6 +14,7 @@ sin Hilt: arranque estable con DI manual.
 | Área | Detalle |
 |---|---|
 | 🎵 Biblioteca | Canciones desde MediaStore, buscar global, ordenar (título/artista/recientes/duración) |
+| 🧺 Cola | Ver, reordenar (↑/↓), quitar, vaciar dejando el tema actual y guardarla como playlist |
 | 📁 Explorar | Carpetas reales del dispositivo, álbumes, artistas |
 | 📃 Playlists | Crear / renombrar / eliminar, añadir temas (tap largo), detalle con play |
 | ❤️ Favoritos | Corazón único por fila, tab dedicada |
@@ -82,7 +83,13 @@ cd melodia
 
 ## 🗺️ Roadmap
 
-- [ ] Servicio foreground + notificación persistente
-- [ ] Cola visible (ver / reordenar / limpiar)
-- [ ] Carátulas reales (MediaStore art) + widget + Android Auto
-- [ ] Letras embebidas/LRC · velocidad/pitch · estadísticas
+Hecho:
+- [x] Servicio foreground + notificación persistente (MediaSession)
+- [x] Cola visible: reordenar, quitar, vaciar y guardar como playlist
+- [x] Carátulas reales (MediaStore), widget y letras (incl. LRC)
+- [x] Velocidad/pitch, estadísticas, respaldo JSON
+
+Ideas siguientes (sin compromiso):
+- [ ] Cola persistente entre sesiones (restaurar al reabrir la app)
+- [ ] Android Auto (Car App Library)
+- [ ] Descargas en segundo plano con reintentos

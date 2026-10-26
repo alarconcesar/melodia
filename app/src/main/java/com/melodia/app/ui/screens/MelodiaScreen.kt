@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -79,6 +80,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LowPriority
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -139,10 +141,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.melodia.app.MainViewModel
 import com.melodia.app.player.YT_STREAM_ID
+import com.melodia.app.player.QueueOps
 import com.melodia.app.SafeMode
 import com.melodia.app.SortMode
 import com.melodia.app.data.model.Song
@@ -1993,82 +1998,265 @@ fun ToggleChip(
 // ── Cola de reproducción ───────────────────────────────────────────
 @Composable
 fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
+    val ctx = LocalContext.current
     val queue by vm.queueSongs.collectAsState()
     val current by vm.currentSong.collectAsState()
     val playing by vm.playerState.collectAsState()
-    AlertDialog(
+    var confirmClear by remember { mutableStateOf(false) }
+    var showSave by remember { mutableStateOf(false) }
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Cola · ${queue.size}", color = cs.onBackground) },
-        text = {
-            // Controles de repetición y aleatorio sin salir de la cola
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
-            ) {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        // La lista se lleva como máximo ~la mitad de la ventana: en pantallas
+        // cortas el pie (Vaciar / Guardar) no se sale de la hoja.
+        BoxWithConstraints {
+            val listMax = (maxHeight * 0.52f).coerceIn(140.dp, 360.dp)
+            QueueSheetContent(
+                queue = queue,
+                currentId = current?.id,
+                shuffle = playing.shuffle,
+                repeatMode = playing.repeatMode,
+                listMaxHeight = listMax,
+                onPlay = { idx ->
+                    val picked = queue.getOrNull(idx)
+                    if (picked != null && picked.id != YT_STREAM_ID) {
+                        // Tocar el tema que ya suena = play/pausa, no reiniciarlo
+                        if (picked.id == current?.id) vm.player.toggle() else vm.playQueueAt(idx)
+                        onDismiss()
+                    }
+                },
+                onMove = { from, to ->
+                    if (!vm.moveQueueAt(from, to)) toast(ctx, "No se pudo mover")
+                },
+                onRemove = { idx -> vm.removeQueueAt(idx) },
+                onToggleShuffle = { vm.player.toggleShuffle() },
+                onCycleRepeat = { vm.player.cycleRepeat() },
+                onClear = { confirmClear = true },
+                onSave = { showSave = true },
+                onClose = onDismiss
+            )
+        }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("¿Vaciar la cola?", color = MaterialTheme.colorScheme.onBackground) },
+            text = {
+                Text(
+                    "Se quitan todos los temas menos el que está sonando.",
+                    style = Ds.Body, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClear = false
+                    vm.clearQueue()
+                    toast(ctx, "Cola vaciada")
+                }) { Text("Vaciar", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancelar") } }
+        )
+    }
+
+    if (showSave) {
+        TextDialog("Guardar cola", defaultQueueName(), onDismiss = { showSave = false }) { name ->
+            showSave = false
+            vm.saveQueueAsPlaylist(name) { saved ->
+                toast(ctx, if (saved > 0) "Guardada con $saved ${if (saved == 1) "tema" else "temas"}" else "No se pudo guardar")
+                if (saved > 0) onDismiss()
+            }
+        }
+    }
+}
+
+/**
+ * Contenido de la cola, sin ViewModel ni ventana: se puede componer en la JVM
+ * con datos falsos y verificar botones y textos sin tocar Room ni el servicio.
+ */
+@Composable
+fun QueueSheetContent(
+    queue: List<Song>,
+    currentId: Long?,
+    shuffle: Boolean,
+    repeatMode: Int,
+    listMaxHeight: androidx.compose.ui.unit.Dp = 350.dp,
+    onPlay: (Int) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onRemove: (Int) -> Unit,
+    onToggleShuffle: () -> Unit,
+    onCycleRepeat: () -> Unit,
+    onClear: () -> Unit,
+    onSave: () -> Unit,
+    onClose: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val isStream = queue.any { it.id == YT_STREAM_ID }
+    val curIdx = queue.indexOfFirst { it.id == currentId }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = if (curIdx > 2) curIdx - 2 else 0
+    )
+    Surface(
+        shape = RoundedCornerShape(26.dp),
+        color = cs.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, cs.outline.copy(alpha = 0.55f)),
+        modifier = Modifier.fillMaxWidth(0.94f)
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Cola", style = Ds.Title, color = cs.onBackground)
+                    Text(
+                        if (queue.isEmpty()) "Sin temas"
+                        else "${queue.size} ${if (queue.size == 1) "tema" else "temas"} · ${fmtTotal(queue.sumOf { it.durationMs })}",
+                        style = Ds.Sub, color = cs.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, "Cerrar", Modifier.size(20.dp), tint = cs.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            // Repetición y aleatorio sin salir de la cola
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 ToggleChip(
-                    selected = playing.shuffle, text = "Aleatorio",
-                    icon = Icons.Default.Shuffle, onClick = { vm.player.toggleShuffle() }
+                    selected = shuffle, text = "Aleatorio",
+                    icon = Icons.Default.Shuffle, onClick = onToggleShuffle
                 )
                 Spacer(Modifier.width(8.dp))
                 ToggleChip(
-                    selected = playing.repeatMode != 0,
-                    text = when (playing.repeatMode) {
+                    selected = repeatMode != 0,
+                    text = when (repeatMode) {
                         2 -> "Repetir uno"
                         1 -> "Repetir todo"
                         else -> "No repetir"
                     },
-                    icon = if (playing.repeatMode == 2) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                    onClick = { vm.player.cycleRepeat() }
+                    icon = if (repeatMode == 2) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                    onClick = onCycleRepeat
                 )
             }
+            Spacer(Modifier.height(6.dp))
             if (queue.isEmpty()) {
-                Text("Vacía", style = Ds.Body, color = cs.onSurfaceVariant)
+                Column(
+                    Modifier.fillMaxWidth().padding(vertical = 30.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(Icons.Default.QueueMusic, null, Modifier.size(30.dp), tint = cs.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    Text("La cola está vacía", style = Ds.Body, color = cs.onSurfaceVariant)
+                }
             } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = listMaxHeight)
+                ) {
                     itemsIndexed(queue, key = { i, e -> "$i-${e.id}" }) { idx, e ->
-                        val cur = e.id == current?.id && e.id != YT_STREAM_ID || (e.id == YT_STREAM_ID && current?.id == YT_STREAM_ID)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
-                                    if (e.id != YT_STREAM_ID) {
-                                        vm.playQueueAt(idx)
-                                        onDismiss()
-                                    }
-                                }
-                                .padding(vertical = 7.dp, horizontal = 4.dp)
-                        ) {
-                            Text(
-                                "${idx + 1}", style = Ds.Sub,
-                                color = if (cur && playing.isPlaying) cs.primary else cs.onSurfaceVariant,
-                                modifier = Modifier.width(26.dp)
-                            )
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    e.title, style = Ds.Body,
-                                    color = if (cur) cs.primary else cs.onBackground,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    e.artist.ifBlank { "Desconocido" }, style = Ds.Sub,
-                                    color = cs.onSurfaceVariant,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (e.id != YT_STREAM_ID && queue.size > 1) {
-                                IconButton(onClick = { vm.removeQueueAt(idx) }, modifier = Modifier.size(32.dp)) {
-                                    Icon(Icons.Default.Close, "Quitar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
-                                }
-                            }
-                        }
+                        QueueRow(
+                            index = idx, song = e,
+                            isCurrent = e.id == currentId,
+                            canUp = !isStream && QueueOps.canMoveUp(idx, queue.size),
+                            canDown = !isStream && QueueOps.canMoveDown(idx, queue.size),
+                            canRemove = !isStream && queue.size > 1,
+                            onPlay = { onPlay(idx) },
+                            onUp = { onMove(idx, idx - 1) },
+                            onDown = { onMove(idx, idx + 1) },
+                            onRemove = { onRemove(idx) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    val canClear = queue.size > 1 && !isStream
+                    TextButton(onClick = onClear, enabled = canClear) {
+                        Icon(
+                            Icons.Default.Delete, null, Modifier.size(16.dp),
+                            tint = if (canClear) cs.error else cs.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Vaciar", color = if (canClear) cs.error else cs.onSurfaceVariant)
+                    }
+                    TextButton(onClick = onSave, enabled = !isStream) {
+                        Icon(
+                            Icons.Default.PlaylistAdd, null, Modifier.size(16.dp),
+                            tint = if (!isStream) cs.primary else cs.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Guardar lista", color = if (!isStream) cs.primary else cs.onSurfaceVariant)
                     }
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } }
-    )
+        }
+    }
+}
+
+/** Nombre propuesto al guardar una cola: "Cola 26 oct". */
+private fun defaultQueueName(): String = try {
+    "Cola " + java.text.SimpleDateFormat("d MMM", java.util.Locale.getDefault())
+        .format(java.util.Date())
+} catch (_: Exception) { "Mi cola" }
+
+@Composable
+private fun QueueRow(
+    index: Int, song: Song, isCurrent: Boolean,
+    canUp: Boolean, canDown: Boolean, canRemove: Boolean,
+    onPlay: () -> Unit, onUp: () -> Unit, onDown: () -> Unit, onRemove: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isCurrent) cs.primary.copy(alpha = 0.09f) else Color.Transparent)
+            .clickable(onClick = onPlay)
+            .padding(start = 8.dp, end = 2.dp, top = 3.dp, bottom = 3.dp)
+    ) {
+        Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+            if (isCurrent) {
+                Icon(Icons.Default.PlayArrow, null, Modifier.size(14.dp), tint = cs.primary)
+            } else {
+                Text("${index + 1}", style = Ds.Sub, color = cs.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                song.title, style = Ds.Body,
+                color = if (isCurrent) cs.primary else cs.onBackground,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                song.artist.ifBlank { "Desconocido" }, style = Ds.Sub,
+                color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+        }
+        QueueIconBtn(Icons.Default.KeyboardArrowUp, "Subir", canUp, onUp)
+        QueueIconBtn(Icons.Default.KeyboardArrowDown, "Bajar", canDown, onDown)
+        QueueIconBtn(Icons.Default.Close, "Quitar", canRemove, onRemove)
+    }
+}
+
+@Composable
+private fun QueueIconBtn(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String, enabled: Boolean, onClick: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    // Caja propia (no IconButton): el mínimo táctil de Material (48dp) por botón
+    // dejaría el título del tema sin espacio en pantallas de 360dp.
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            icon, label, Modifier.size(18.dp),
+            tint = cs.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.28f)
+        )
+    }
 }
 
 // ── Diálogos ─────────────────────────────────────────────────────

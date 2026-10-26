@@ -248,6 +248,48 @@ class MainViewModel(
         _queue.value = q.filterIndexed { i, _ -> i != idx }
     }
 
+    /**
+     * Reordena la cola (botones subir/bajar de la hoja). Solo se actualiza el
+     * estado de la UI si el reproductor aceptó el movimiento: así nunca se ve
+     * una cola distinta a la que está sonando.
+     */
+    fun moveQueueAt(from: Int, to: Int): Boolean {
+        val q = _queue.value
+        if (q.any { it.id == YT_STREAM_ID }) return false
+        val moved = com.melodia.app.player.QueueOps.move(q, from, to) ?: return false
+        if (!player.moveItem(from, to)) return false
+        _queue.value = moved
+        return true
+    }
+
+    /** Quita todo menos el tema actual (sigue sonando sin corte). */
+    fun clearQueue() {
+        val q = _queue.value
+        if (q.any { it.id == YT_STREAM_ID }) return
+        if (q.size <= 1) return
+        if (!player.clearQueueKeepCurrent()) return
+        val cur = player.state.value.currentId
+        val idx = q.indexOfFirst { it.id == cur }
+        _queue.value = com.melodia.app.player.QueueOps.keepOnly(q, idx)
+    }
+
+    /** Guarda la cola actual como playlist nueva, en el mismo orden. */
+    fun saveQueueAsPlaylist(name: String, onDone: (Int) -> Unit = {}) {
+        val songs = _queue.value.filter { it.id != YT_STREAM_ID }.distinctBy { it.id }
+        if (name.isBlank() || songs.isEmpty()) { onDone(0); return }
+        viewModelScope.launch {
+            val saved = try {
+                withContext(Dispatchers.IO) {
+                    val pid = lists.createPlaylist(name)
+                    var n = 0
+                    songs.forEach { s -> if (lists.addToPlaylist(pid, s)) n++ }
+                    n
+                }
+            } catch (_: Exception) { 0 }
+            onDone(saved)
+        }
+    }
+
     fun playSong(id: Long) {
         val list = filtered.value.ifEmpty { songs.value }
         val idx = list.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return

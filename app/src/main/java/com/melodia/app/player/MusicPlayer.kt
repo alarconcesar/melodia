@@ -214,6 +214,55 @@ class MusicPlayer(private val context: Context) {
             updateState()
         } catch (e: Exception) { Log.e("MusicPlayer", "removeAt fail", e) }
     }
+
+    /**
+     * Mueve un tema dentro de la cola sin cortar la reproducción.
+     *
+     * ExoPlayer y [queueIds] son dos listas paralelas: si el movimiento nativo
+     * falla, se devuelve false SIN tocar queueIds para que la UI no muestre una
+     * cola que el reproductor no tiene.
+     */
+    fun moveItem(from: Int, to: Int): Boolean {
+        return try {
+            val p = exo ?: return false
+            if (from !in queueIds.indices || to !in queueIds.indices || from == to) return false
+            if (from >= p.mediaItemCount || to >= p.mediaItemCount) return false
+            p.moveMediaItem(from, to)
+            val id = queueIds.removeAt(from)
+            queueIds.add(to, id)
+            updateState()
+            true
+        } catch (e: Exception) {
+            Log.e("MusicPlayer", "moveItem fail", e)
+            false
+        }
+    }
+
+    /**
+     * Deja en la cola únicamente el tema que está sonando.
+     * Se quitan primero los posteriores y después los anteriores para que el
+     * índice actual no se mueva en el camino (el tema sigue sonando sin corte).
+     */
+    fun clearQueueKeepCurrent(): Boolean {
+        return try {
+            val p = exo ?: return false
+            val cur = p.currentMediaItemIndex
+            if (cur < 0 || cur >= p.mediaItemCount) return false
+            val total = p.mediaItemCount
+            if (total > cur + 1) p.removeMediaItems(cur + 1, total)
+            if (cur > 0) p.removeMediaItems(0, cur)
+            val id = p.currentMediaItem?.mediaId?.toLongOrNull()
+                ?: queueIds.getOrNull(cur)
+            queueIds.clear()
+            if (id != null) queueIds.add(id)
+            updateState()
+            true
+        } catch (e: Exception) {
+            Log.e("MusicPlayer", "clearQueue fail", e)
+            false
+        }
+    }
+
     private fun attachEq() { try { exo?.let { eq?.attach(it.audioSessionId) } } catch (_: Exception) {} }
     fun toggle() { ensureBound(); try { exo?.let { if (it.isPlaying) it.pause() else it.play() } } catch (_: Exception) {} }
     fun next() { ensureBound(); jumpWithFade { try { exo?.seekToNextMediaItem() } catch (_: Exception) {} } }

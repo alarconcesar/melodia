@@ -12,6 +12,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.SQLiteMode
 import java.util.Collections
 
 /**
@@ -25,6 +26,7 @@ import java.util.Collections
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [33])
+@SQLiteMode(SQLiteMode.Mode.LEGACY)
 class ViewModelArranqueTest {
 
     private val errores: MutableList<Throwable> = Collections.synchronizedList(mutableListOf())
