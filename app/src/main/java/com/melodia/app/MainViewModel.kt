@@ -304,6 +304,11 @@ class MainViewModel(
     // ── Cola de reproducción visible ──
     private fun emitPlay(list: List<Song>, idx: Int) {
         if (list.isEmpty()) return
+        // Tocar el tema que ya suena pausa/reanuda: antes se reiniciaba desde cero.
+        if (_currentId.value == list[idx.coerceIn(0, list.size - 1)].id) {
+            player.toggle()
+            return
+        }
         _queue.value = list
         _currentId.value = list[idx.coerceIn(0, list.size - 1)].id
         player.play(list.map { it.id }, idx.coerceIn(0, list.size - 1))

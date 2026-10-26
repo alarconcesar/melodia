@@ -27,6 +27,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.combinedClickable
@@ -273,20 +276,43 @@ fun TrackRow(
             modifier = Modifier.fillMaxWidth()
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
                 .then(
-                    if (safeGestures) Modifier else Modifier.draggable(
-                        state = rememberDraggableState { d ->
-                            scope.launch {
-                                offset.snapTo((offset.value + d).coerceIn(-maxSwipe, maxSwipe))
+                    if (safeGestures) Modifier else Modifier.pointerInput(Unit) {
+                        // Dirección bloqueada al primer movimiento: si el gesto es
+                        // vertical se abandona y la lista scrollea. Con `draggable`
+                        // un scroll diagonal abría la franja sin querer.
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val startX = down.position.x
+                            val startY = down.position.y
+                            var locked = 0 // 0 = indeciso, 1 = horizontal, -1 = vertical
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!ch.pressed) break
+                                val dx = ch.position.x - startX
+                                val dy = ch.position.y - startY
+                                if (locked == 0) {
+                                    val slop = viewConfiguration.touchSlop
+                                    when {
+                                        kotlin.math.abs(dx) > slop &&
+                                            kotlin.math.abs(dx) > kotlin.math.abs(dy) -> locked = 1
+                                        kotlin.math.abs(dy) > slop -> { locked = -1; break }
+                                    }
+                                }
+                                if (locked == 1) {
+                                    ch.consume()
+                                    val v = dx.coerceIn(-maxSwipe, maxSwipe)
+                                    scope.launch { offset.snapTo(v) }
+                                }
                             }
-                        },
-                        orientation = Orientation.Horizontal,
-                        onDragStopped = {
-                            val v = offset.value
-                            if (v >= threshold && onQueue != null) onQueue()
-                            else if (v <= -threshold) onFav()
-                            offset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                            if (locked == 1) {
+                                val v = offset.value
+                                if (v >= threshold && onQueue != null) onQueue()
+                                else if (v <= -threshold) onFav()
+                                scope.launch { offset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
+                            }
                         }
-                    )
+                    }
                 )
                 .combinedClickable(onClick = onTap, onLongClick = onLongPress)
                 .padding(horizontal = 20.dp, vertical = 8.dp),
@@ -308,11 +334,17 @@ fun TrackRow(
             )
         }
         if (isFav) {
-            // Solo se marca lo que es favorito: el corazón vacío en cada fila era ruido.
-            Icon(
-                Icons.Default.Favorite, null,
-                tint = cs.primary, modifier = Modifier.padding(end = 4.dp).size(18.dp)
-            )
+            // Solo se marca lo que es favorito, y ahora el corazón quita: antes era
+            // un icono decorativo y en Favs había que deslizar para sacar un tema.
+            Box(
+                Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onFav),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Favorite, "Quitar de favoritos",
+                    tint = cs.primary, modifier = Modifier.size(18.dp)
+                )
+            }
         }
         }
     }

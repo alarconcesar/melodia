@@ -13,8 +13,8 @@ android {
         applicationId = "com.melodia.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 50
-        versionName = "5.3"
+        versionCode = 51
+        versionName = "5.4"
         resConfigs("es")
     }
     signingConfigs {
@@ -64,6 +64,10 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            // Un JVM por clase: los tests que instancian el ViewModel dejan
+            // corrutinas de Room vivas y contaminaban la clase siguiente
+            // (UncaughtExceptionsBeforeTest intermitente en aarch64).
+            all { it.forkEvery = 1 }
         }
     }
     buildFeatures { compose = true }
