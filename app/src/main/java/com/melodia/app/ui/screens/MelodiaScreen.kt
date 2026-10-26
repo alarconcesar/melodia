@@ -34,6 +34,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import dev.chrisbanes.haze.haze
 import androidx.compose.foundation.layout.Arrangement
@@ -136,7 +137,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -424,7 +428,28 @@ fun MelodiaScreen(vm: MainViewModel) {
             }
 
             // ── Content: sin blur en vivo (Haze re-blurea en cada frame de scroll) ──
-            Box(Modifier.weight(1f)) {
+            // Entrada de pestaña con alpha + 8 dp: se anima el contenedor ya
+            // compuesto (una sola pantalla), no dos como hacía AnimatedContent.
+            val tabAlpha = remember { androidx.compose.animation.core.Animatable(1f) }
+            val tabY = remember { androidx.compose.animation.core.Animatable(0f) }
+            var primeraVez by remember { mutableStateOf(true) }
+            LaunchedEffect(tab) {
+                // El arranque no se anima: la app ya está entrando con su esqueleto.
+                if (primeraVez) { primeraVez = false; return@LaunchedEffect }
+                tabAlpha.snapTo(0f)
+                tabY.snapTo(8f)
+                coroutineScope {
+                    launch { tabAlpha.animateTo(1f, tween(170)) }
+                    tabY.animateTo(0f, tween(210, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+                }
+            }
+            val tabDensity = LocalDensity.current.density
+            Box(
+                Modifier.weight(1f).graphicsLayer {
+                    alpha = tabAlpha.value
+                    translationY = tabY.value * tabDensity
+                }
+            ) {
                 // Sin transición entre pestañas: animar dos pantallas completas
                 // cuesta frames justo cuando el usuario acaba de tocar.
                 androidx.compose.runtime.CompositionLocalProvider(
@@ -1516,6 +1541,12 @@ private fun SeekBar(progress: Float, onSeek: (Float) -> Unit, modifier: Modifier
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableStateOf(0f) }
     val shown = (if (dragging) dragValue else progress).coerceIn(0f, 1f)
+    // La perilla crece al arrastrar: confirma que el gesto está tomado.
+    val knobScale by androidx.compose.animation.core.animateFloatAsState(
+        if (dragging) 1.55f else 1f,
+        androidx.compose.animation.core.spring(stiffness = 900f, dampingRatio = 0.7f),
+        label = "knob"
+    )
     Box(
         modifier.fillMaxWidth().height(28.dp)
             .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
@@ -1557,7 +1588,11 @@ private fun SeekBar(progress: Float, onSeek: (Float) -> Unit, modifier: Modifier
             }
             val knobR = 6.dp.toPx()
             val knobX = fill.coerceIn(knobR, (size.width - knobR).coerceAtLeast(knobR))
-            drawCircle(color = cs.primary, radius = knobR, center = androidx.compose.ui.geometry.Offset(knobX, cy))
+            drawCircle(
+                color = cs.primary,
+                radius = knobR * knobScale,
+                center = androidx.compose.ui.geometry.Offset(knobX, cy)
+            )
         }
     }
 }
@@ -1897,16 +1932,24 @@ private fun NpAction(
     onClick: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
+    // Fondo y texto animados: al activar (favorito, cola, letra) no salta.
+    val fondo by androidx.compose.animation.animateColorAsState(
+        if (active) cs.primary.copy(alpha = 0.14f) else cs.surface.copy(alpha = 0.55f),
+        tween(180), label = "npbg"
+    )
+    val tono by androidx.compose.animation.animateColorAsState(
+        if (active) cs.primary else cs.onSurfaceVariant, tween(180), label = "npt"
+    )
     Row(
         Modifier.clip(RoundedCornerShape(12.dp))
-            .background(if (active) cs.primary.copy(alpha = 0.14f) else cs.surface.copy(alpha = 0.55f))
-            .clickable(onClick = onClick)
+            .background(fondo)
+            .then(pressClick(onClick, min = 0.95f))
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, Modifier.size(16.dp), tint = if (active) cs.primary else cs.onSurfaceVariant)
+        Icon(icon, null, Modifier.size(16.dp), tint = tono)
         Spacer(Modifier.width(6.dp))
-        Text(label, style = Ds.Sub, color = if (active) cs.primary else cs.onBackground)
+        Text(label, style = Ds.Sub, color = if (active) tono else cs.onBackground)
     }
 }
 

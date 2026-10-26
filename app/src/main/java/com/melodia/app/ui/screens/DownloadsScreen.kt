@@ -226,15 +226,22 @@ private fun DlJobCard(
             }
             if (st == DlStatus.ACTIVE || st == DlStatus.QUEUED || st == DlStatus.PAUSED) {
                 Spacer(Modifier.height(10.dp))
+                // Progreso suavizado: los saltos de ~120 ms del medidor se ven
+                // como tirones; el tween los convierte en avance continuo.
+                val avance by androidx.compose.animation.core.animateFloatAsState(
+                    job.progress.coerceIn(0f, 1f),
+                    androidx.compose.animation.core.tween(420, easing = androidx.compose.animation.core.LinearEasing),
+                    label = "dlprog"
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     LinearProgressIndicator(
-                        progress = job.progress.coerceIn(0f, 1f),
+                        progress = avance,
                         color = cs.primary,
                         trackColor = cs.onSurfaceVariant.copy(alpha = 0.20f),
                         modifier = Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp))
                     )
                     Spacer(Modifier.width(10.dp))
-                    Text("${(job.progress * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
+                    Text("${(avance * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
                 }
             }
         }

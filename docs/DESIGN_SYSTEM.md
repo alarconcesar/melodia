@@ -206,3 +206,28 @@ el texto tiene 2+ caracteres y dejas de teclear 650 ms, busca también en YouTub
   es de otra app (Android 10+) devuelve el `IntentSender` de
   `MediaStore.createDeleteRequest` y la raíz lo lanza con
   `StartIntentSenderForResult`.
+
+## Movimiento (7.7)
+
+Regla general: se anima **transform, alpha o color**, nunca tamaño/padding, y el
+tween vive en el composable más pequeño posible. Nada de animar contenedores
+grandes durante el scroll.
+
+| Dónde | Qué hace | Tiempo |
+| --- | --- | --- |
+| `TrackRow` | se hunde a 0.985 al presionar (spring 1200/0.8) | ~120 ms |
+| `TrackRow` · corazón | late al marcar: 0.7 → 1 con spring rebotado | ~350 ms |
+| `TrackRow` · título activo | el color pasa a acento con `animateColorAsState` | 200 ms |
+| `HeroCard` | se hunde a 0.985 al tocar; el botón de play a 0.9 | ~120 ms |
+| Pestañas | alpha 0→1 y 8 dp de subida sobre el contenedor ya compuesto | 170/210 ms |
+| `SeekBar` | la perilla escala 1.55× mientras arrastras | spring |
+| `NpAction` | fondo y tono animados al activarse; press a 0.95 | 180 ms |
+| Descargas | progreso suavizado con tween lineal 420 ms | — |
+| Carátulas | `crossfade(180)` de Coil al cargar | 180 ms |
+
+Cuidados:
+
+- `pressClick` usa 0.96 por defecto (un botón que se hunde 10 % se siente roto).
+- El cambio de pestaña anima **una sola** composición (no `AnimatedContent`, que
+  compone las dos pantallas).
+- La primera composición no se anima: en el arranque manda el esqueleto.

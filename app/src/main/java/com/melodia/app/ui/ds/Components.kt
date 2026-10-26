@@ -71,6 +71,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -135,7 +136,11 @@ fun SongArt(
     val ctx = LocalContext.current
     val px = with(LocalDensity.current) { size.roundToPx() }
     val req = remember(model, px) {
-        model?.let { coil.request.ImageRequest.Builder(ctx).data(it).size(px).build() }
+        model?.let {
+            coil.request.ImageRequest.Builder(ctx).data(it).size(px)
+                .crossfade(180) // la carátula aparece con un fundido, no de golpe
+                .build()
+        }
     }
     Box(
         modifier = modifier.size(size).clip(shape)
@@ -164,12 +169,13 @@ fun SongArt(
 
 // ── Click con rebote: se hunde al presionar y vuelve con spring ──
 @Composable
-fun pressClick(onClick: () -> Unit, min: Float = 0.9f): Modifier {
+fun pressClick(onClick: () -> Unit, min: Float = 0.96f): Modifier {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
         if (pressed) min else 1f,
-        spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioMediumBouncy),
+        // Respuesta de pulsación: rápida y con un rebote apenas perceptible.
+        spring(stiffness = 900f, dampingRatio = 0.6f),
         label = "press"
     )
     return Modifier
@@ -251,6 +257,20 @@ fun TrackRow(
     val offset = remember { Animatable(0f) }
     val maxSwipe = with(LocalDensity.current) { 140.dp.toPx() }
     val threshold = maxSwipe * 0.5f
+    // Feedback de pulsación: la fila se hunde 1.5 % mientras el dedo está encima.
+    val pressSource = remember { MutableInteractionSource() }
+    val rowPressed by pressSource.collectIsPressedAsState()
+    val rowScale by animateFloatAsState(
+        if (rowPressed) 0.985f else 1f, spring(stiffness = 1200f, dampingRatio = 0.8f), label = "rowpress"
+    )
+    // El corazón late al marcar: aparece pequeño y crece con spring.
+    val heart = remember { Animatable(1f) }
+    LaunchedEffect(isFav) {
+        if (isFav) {
+            heart.snapTo(0.7f)
+            heart.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = 500f))
+        }
+    }
     Box(Modifier.fillMaxWidth()) {
         // Franja de acción: solo existe mientras hay deslizamiento. Sin esto cada
         // fila visible arrastraba dos capas (Canvas + caja con alpha) al hacer scroll.
@@ -289,6 +309,7 @@ fun TrackRow(
         }
         Row(
             modifier = Modifier.fillMaxWidth()
+                .graphicsLayer { scaleX = rowScale; scaleY = rowScale }
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
                 .then(
                     if (safeGestures || selecting) Modifier else Modifier.pointerInput(Unit) {
@@ -330,6 +351,8 @@ fun TrackRow(
                     }
                 )
                 .combinedClickable(
+                    interactionSource = pressSource,
+                    indication = null,
                     onClick = { if (selecting) onSelectToggle() else onTap() },
                     onLongClick = { if (selecting) onSelectToggle() else onLongPress() }
                 )
@@ -341,10 +364,13 @@ fun TrackRow(
             iconSize = 24.dp, active = active, artUrl = s.artUrl
         )
         Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            val tituloColor by androidx.compose.animation.animateColorAsState(
+                if (active) cs.primary else cs.onBackground, tween(200), label = "titcol"
+            )
             Text(
                 s.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 style = if (active) Ds.Body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium) else Ds.Body,
-                color = if (active) cs.primary else cs.onBackground
+                color = tituloColor
             )
             Text(
                 "${s.artist} · ${fmt(s.durationMs)}", maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -368,7 +394,9 @@ fun TrackRow(
             ) {
                 Icon(
                     Icons.Default.Favorite, "Quitar de favoritos",
-                    tint = cs.primary, modifier = Modifier.size(18.dp)
+                    tint = cs.primary,
+                    modifier = Modifier.size(18.dp)
+                        .graphicsLayer { scaleX = heart.value; scaleY = heart.value }
                 )
             }
         }
@@ -436,7 +464,17 @@ fun HeroCard(
     onOpen: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    Surface(shape = Ds.HeroShape, color = cs.surface, modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+    val cardPress = remember { MutableInteractionSource() }
+    val cardDown by cardPress.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        if (cardDown) 0.985f else 1f, spring(stiffness = 900f, dampingRatio = 0.8f), label = "heropress"
+    )
+    Surface(
+        shape = Ds.HeroShape, color = cs.surface,
+        modifier = Modifier.fillMaxWidth()
+            .graphicsLayer { scaleX = cardScale; scaleY = cardScale }
+            .clickable(interactionSource = cardPress, indication = null, onClick = onOpen)
+    ) {
         Column(modifier = Modifier.padding(18.dp)) {
             MicroLabel(label)
             Spacer(Modifier.height(6.dp))
@@ -446,7 +484,7 @@ fun HeroCard(
             Spacer(Modifier.height(14.dp))
             Surface(
                 shape = CircleShape, color = cs.primary,
-                modifier = Modifier.size(Ds.PlayHero).clickable(onClick = onPlay)
+                modifier = Modifier.size(Ds.PlayHero).then(pressClick(onPlay, min = 0.9f))
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
