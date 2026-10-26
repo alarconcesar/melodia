@@ -28,7 +28,9 @@ data class DlJob(
     val progress: Float = 0f,
     val downloaded: Long = 0L,
     val total: Long = 0L,
-    val error: String? = null
+    val error: String? = null,
+    /** Velocidad estimada en bytes por segundo (0 = sin dato todavía). */
+    val speedBps: Long = 0L
 )
 
 /**
@@ -39,7 +41,8 @@ data class DlJob(
 class DownloadManager(private val context: Context, private val yt: YtRepository) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val slots = Semaphore(3)
+    // Dos descargas a la vez: cada una abre varios sockets y en LTE se cortan
+    private val slots = Semaphore(2)
     private val dir = File(context.cacheDir, "dl").apply { mkdirs() }
 
     private val _jobs = MutableStateFlow<List<DlJob>>(emptyList())
@@ -137,46 +140,30 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             var done = if (part.exists()) part.length() else 0L
             var total = _jobs.value.find { it.track.id == track.id }?.total ?: 0L
             // Conexión con Range para reanudar
-            val conn = URL(audio.url).openConnection() as HttpURLConnection
-            conn.setRequestProperty(
-                "User-Agent",
-                "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
-            )
-            if (done > 0) conn.setRequestProperty("Range", "bytes=$done-")
-            conn.connectTimeout = 20_000
-            conn.readTimeout = 30_000
-            conn.connect()
-            val code = conn.responseCode
-            if (code == 416 || (code == 200 && done > 0)) {
-                // El servidor no reanuda: empezar de cero
-                try { part.delete() } catch (_: Exception) {}
-                done = 0L
-            } else if (code !in 200..299 && code != 206) {
-                error("Red ${conn.responseCode}")
-            }
-            val remaining = conn.contentLengthLong.takeIf { it > 0 } ?: 0L
-            if (total <= 0 && remaining > 0) total = done + remaining
-            update(track.id) { it.copy(total = total) }
-            RandomAccessFile(part, "rw").use { raf ->
-                raf.seek(done)
-                conn.inputStream.use { inp ->
-                    val buf = ByteArray(64 * 1024)
-                    var lastPush = 0L
-                    while (true) {
-                        val n = inp.read(buf)
-                        if (n < 0) break
-                        raf.write(buf, 0, n)
-                        done += n
-                        val now = System.currentTimeMillis()
-                        if (now - lastPush > 250) {
-                            lastPush = now
-                            val p = progressOf(done, total)
-                            update(track.id) { it.copy(progress = p, downloaded = done, total = total) }
-                            syncProgress()
-                        }
-                    }
+            // Descarga en trozos paralelos (YouTube limita cada conexión). El
+            // manager solo aporta el .part, el reanudado y el estado.
+            var ultimoBytes = done
+            var ultimoMs = System.currentTimeMillis()
+            var velocidad = 0L
+            val descargado = yt.downloadToFile(audio.url, part, done) { d, tot ->
+                val ahora = System.currentTimeMillis()
+                val dt = ahora - ultimoMs
+                if (dt >= 400) {
+                    val inst = ((d - ultimoBytes) * 1000L) / dt
+                    velocidad = if (velocidad <= 0L) inst else (velocidad * 2 + inst) / 3
+                    ultimoBytes = d
+                    ultimoMs = ahora
                 }
+                if (tot != total) total = tot
+                update(track.id) {
+                    it.copy(
+                        progress = progressOf(d, tot), downloaded = d, total = tot,
+                        speedBps = velocidad
+                    )
+                }
+                syncProgress()
             }
+            done = descargado
             if (total > 0 && done < total) error("Descarga incompleta")
             update(track.id) { it.copy(status = DlStatus.DONE, progress = 1f, downloaded = done, total = total) }
             syncProgress()
@@ -197,7 +184,7 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
                 it.copy(
                     status = DlStatus.ERROR, downloaded = kept, total = tot,
                     progress = progressOf(kept, tot),
-                    error = (t.message ?: "Error de red").take(80)
+                    error = com.melodia.app.data.online.YtErrors.message(t, "Error de red").take(90)
                 )
             }
             syncProgress()

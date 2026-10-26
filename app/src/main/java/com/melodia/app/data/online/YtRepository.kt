@@ -360,7 +360,7 @@ class YtRepository(private val context: Context) {
         c.setRequestProperty("User-Agent", UA)
         if (range != null) c.setRequestProperty("Range", range)
         c.connectTimeout = 20_000
-        c.readTimeout = 30_000
+        c.readTimeout = 45_000
         return c
     }
 
@@ -383,50 +383,128 @@ class YtRepository(private val context: Context) {
      */
     @androidx.annotation.VisibleForTesting
     internal suspend fun fetchToFile(url: String, dest: File, onProgress: (Float) -> Unit) {
-        val total = contentLength(url)
-        if (total <= 0L) {
-            streamToFile(url, dest, -1L, onProgress)
-            return
-        }
-        try {
-            val parts = if (total > 1_500_000L) 4 else 2
-            val chunk = total / parts
-            RandomAccessFile(dest, "rw").use { raf ->
-                raf.setLength(total)
-                val ch = raf.channel
-                val done = AtomicLong(0)
-                val lastEmit = AtomicLong(0)
-                val onBytes: (Long) -> Unit = { n ->
-                    val d = done.addAndGet(n)
-                    val now = System.nanoTime()
-                    if (now - lastEmit.get() > 120_000_000L) {
-                        lastEmit.set(now)
-                        onProgress((d.toFloat() / total).coerceIn(0f, 1f))
-                    }
-                }
-                coroutineScope {
-                    (0 until parts).map { i ->
-                        val from = i * chunk
-                        val to = if (i == parts - 1) total - 1 else from + chunk - 1
-                        async { downloadRange(url, ch, from, to, onBytes) }
-                    }.awaitAll()
-                }
-                onProgress(1f)
-            }
-        } catch (e: Exception) {
-            // El servidor no respetó Range o falló un trozo: una sola conexión.
-            try { dest.delete() } catch (_: Exception) {}
-            streamToFile(url, dest, total, onProgress)
+        downloadToFile(url, dest, 0L) { done, total ->
+            if (total > 0) onProgress((done.toFloat() / total).coerceIn(0f, 1f))
         }
     }
 
+    /** Cantidad de conexiones según el tamaño: más trozos = más ancho de banda. */
+    private fun partesPara(restante: Long): Int {
+        val ideal = when {
+            restante >= 12L * 1024 * 1024 -> 8
+            restante >= 6L * 1024 * 1024 -> 6
+            restante >= 3L * 1024 * 1024 -> 4
+            restante >= 1_500_000L -> 3
+            else -> 2
+        }
+        // Cada trozo de al menos 256 KB: más conexiones que datos solo agregan overhead.
+        val maxPorTamano = (restante / 262_144L).toInt().coerceAtLeast(1)
+        return ideal.coerceAtMost(maxPorTamano)
+    }
+
+    /**
+     * Baja [url] a [dest] en trozos paralelos, reanudando desde [startAt] bytes
+     * que ya estén en el archivo. Devuelve el total descargado.
+     *
+     * Si algo falla, el archivo queda truncado en [startAt] para que el próximo
+     * intento retome desde un prefijo íntegro (nunca desde un hueco).
+     */
+    suspend fun downloadToFile(
+        url: String,
+        dest: File,
+        startAt: Long = 0L,
+        onProgress: (downloaded: Long, total: Long) -> Unit
+    ): Long = withContext(Dispatchers.IO) {
+        val total = contentLength(url)
+        if (total <= 0L) {
+            val final = streamToFileResume(url, dest, startAt, onProgress)
+            return@withContext final
+        }
+        val desde = startAt.coerceIn(0L, total)
+        if (desde >= total) {
+            onProgress(total, total)
+            return@withContext total
+        }
+        RandomAccessFile(dest, "rw").use { raf ->
+            raf.setLength(total)
+            val ch = raf.channel
+            val partes = partesPara(total - desde)
+            val chunk = (total - desde) / partes
+            val done = AtomicLong(desde)
+            val lastEmit = AtomicLong(0L)
+            val onBytes: (Long) -> Unit = { n ->
+                val d = done.addAndGet(n)
+                val now = System.nanoTime()
+                if (now - lastEmit.get() > 150_000_000L) {
+                    lastEmit.set(now)
+                    onProgress(d, total)
+                }
+            }
+            try {
+                coroutineScope {
+                    (0 until partes).map { i ->
+                        val from = desde + i * chunk
+                        val to = if (i == partes - 1) total - 1 else from + chunk - 1
+                        async { downloadRange(url, ch, from, to, onBytes) }
+                    }.awaitAll()
+                }
+            } catch (e: Exception) {
+                try { raf.setLength(desde) } catch (_: Exception) {}
+                throw e
+            }
+        }
+        onProgress(total, total)
+        total
+    }
+
+    /** Servidor sin tamaño conocido: una conexión y sin reanudar. */
+    private suspend fun streamToFileResume(
+        url: String,
+        dest: File,
+        startAt: Long,
+        onProgress: (downloaded: Long, total: Long) -> Unit
+    ): Long = withContext(Dispatchers.IO) {
+        val c = openConn(url)
+        c.connect()
+        val len = c.contentLengthLong.takeIf { it > 0 } ?: -1L
+        // Sin tamaño no hay forma de reanudar: se reescribe desde cero. Antes se
+        // agregaba al final y el archivo quedaba con el doble de bytes.
+        var read = 0L
+        var lastEmit = 0L
+        java.io.FileOutputStream(dest, false).use { out ->
+            c.inputStream.use { inp ->
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = inp.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    read += n
+                    val now = System.nanoTime()
+                    if (now - lastEmit > 150_000_000L) {
+                        lastEmit = now
+                        onProgress(read, len)
+                    }
+                }
+            }
+        }
+        c.disconnect()
+        onProgress(read, if (len > 0) len else read)
+        read
+    }
+
+    /**
+     * Baja un trozo. Si la conexión se corta (típico "software caused connection
+     * abort" en LTE), reintenta y, si el rango es grande, lo parte en mitades
+     * más chicas: pedazos pequeños sobreviven mejor a los cortes del CDN.
+     */
     private suspend fun downloadRange(
         url: String,
         ch: FileChannel,
         from: Long,
         to: Long,
-        onBytes: (Long) -> Unit
-    ) = withContext(Dispatchers.IO) {
+        onBytes: (Long) -> Unit,
+        depth: Int = 0
+    ): Unit = withContext(Dispatchers.IO) {
         var attempt = 0
         while (true) {
             try {
@@ -451,8 +529,15 @@ class YtRepository(private val context: Context) {
                 return@withContext
             } catch (e: Exception) {
                 attempt++
-                if (attempt >= 3) throw e
-                delay(400L * attempt)
+                if (attempt >= 3 && depth < 3 && (to - from) > 512_000L) {
+                    // Reintentar el resto en dos mitades más pequeñas
+                    val mid = (from + to) / 2
+                    downloadRange(url, ch, from, mid, onBytes, depth + 1)
+                    downloadRange(url, ch, mid + 1, to, onBytes, depth + 1)
+                    return@withContext
+                }
+                if (attempt >= 5) throw e
+                delay(500L * attempt + kotlin.random.Random.nextLong(0L, 250L))
             }
         }
     }

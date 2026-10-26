@@ -13,8 +13,8 @@ android {
         applicationId = "com.melodia.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 65
-        versionName = "6.8"
+        versionCode = 66
+        versionName = "6.9"
         resConfigs("es")
     }
     signingConfigs {

@@ -204,7 +204,8 @@ private fun DlJobCard(
                     )
                     Text(
                         "${job.track.artist.ifBlank { "YouTube" }} · ${if (job.high) "Alta" else "Estándar"}" +
-                            estado(job),
+                            estado(job) +
+                            if (job.speedBps > 0 && job.status == DlStatus.ACTIVE) " · ${vel(job.speedBps)}" else "",
                         style = Ds.Sub,
                         color = if (st == DlStatus.ERROR) cs.error else cs.onSurfaceVariant,
                         maxLines = 2, overflow = TextOverflow.Ellipsis
@@ -249,6 +250,11 @@ private fun estado(job: DlJob): String = when (job.status) {
 }
 
 private fun mb(b: Long): String = "%.1f MB".format(b / 1048576f)
+
+/** Velocidad legible: KB/s o MB/s. */
+private fun vel(bps: Long): String =
+    if (bps >= 1_048_576L) "%.1f MB/s".format(bps / 1048576f)
+    else "${(bps / 1024L).coerceAtLeast(1L)} KB/s"
 
 private fun fecha(at: Long): String = try {
     java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault()).format(java.util.Date(at))

@@ -216,6 +216,7 @@ fun MelodiaScreen(vm: MainViewModel) {
     val cs = MaterialTheme.colorScheme
     var tab by remember { mutableStateOf(0) }
     val songs by vm.filtered.collectAsState()
+    val homeSongs by vm.homeSongs.collectAsState()
     val all by vm.songs.collectAsState()
     val query by vm.query.collectAsState()
     // Solo isPlaying en la raíz: el PlayerState completo se observa dentro del
@@ -431,7 +432,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                 androidx.compose.runtime.key(tab) {
                 val t = tab
                 when (t) {
-                    0 -> HomeTab(vm, songs, all, current?.id, isPlaying, favIds,
+                    0 -> HomeTab(vm, homeSongs, all, current?.id, isPlaying, favIds,
                         onAdd = { showInfo = it }, onTab = { tab = it },
                         onOpenPlayer = { showPlayer = true })
                     1 -> ExploreTab(vm, folders, albums, artists, folderSel, albumSel, artistSel, songs, all,
@@ -781,7 +782,8 @@ fun HomeTab(
         return
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 200.dp)) {
-        item {
+        // Con una búsqueda activa el hero sobra: el usuario ya está buscando.
+        if (query.isBlank()) item {
             Box(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
                 val hero = current ?: all.firstOrNull()
                 if (hero != null) {
@@ -959,13 +961,15 @@ fun HomeTab(
                             progress = null,
                             busy = busyYt == item.track.id,
                             onPlay = { vm.playYt(item.track) },
-                            onDownload = { vm.downloadYt(item.track) }
+                            onDownload = { vm.downloadYt(item.track) },
+                            modifier = Modifier.padding(horizontal = 20.dp)
                         )
                         is com.melodia.app.data.online.YtSearchItem.Collection -> YtCollectionRow(
                             item = item,
                             busy = busyYt == item.key,
                             onOpen = { vm.openYtCollection(item) },
-                            onDownload = { vm.downloadYtCollection(item) }
+                            onDownload = { vm.downloadYtCollection(item) },
+                            modifier = Modifier.padding(horizontal = 20.dp)
                         )
                     }
                 }

@@ -443,10 +443,11 @@ fun YtRowFlat(
     progress: Float?,
     busy: Boolean,
     onPlay: () -> Unit,
-    onDownload: () -> Unit
+    onDownload: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val cs = MaterialTheme.colorScheme
-    Column(Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(vertical = 5.dp)) {
+    Column(modifier.fillMaxWidth().clickable(onClick = onPlay).padding(vertical = 5.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             OnlineThumb(track, 48.dp)
             Spacer(Modifier.width(12.dp))
@@ -486,11 +487,12 @@ fun YtCollectionRow(
     item: YtSearchItem.Collection,
     busy: Boolean,
     onOpen: () -> Unit,
-    onDownload: () -> Unit
+    onDownload: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 6.dp),
+        modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(48.dp).clip(RoundedCornerShape(Ds.RCard))) {

@@ -79,6 +79,27 @@ class MainViewModel(
     }.flowOn(kotlinx.coroutines.Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /**
+     * Lista de Inicio: biblioteca completa + búsqueda, **sin** los filtros de
+     * Explorar (carpeta/álbum/artista). Antes elegir una carpeta en Explorar
+     * dejaba a Inicio mostrando solo esa carpeta, sin decir por qué.
+     */
+    val homeSongs: StateFlow<List<Song>> = combine(_songs, _query, _sort) { list, q, s ->
+        var out = list
+        if (q.isNotBlank()) {
+            out = out.filter {
+                it.title.contains(q, true) || it.artist.contains(q, true) || it.album.contains(q, true)
+            }
+        }
+        when (s) {
+            SortMode.TITLE -> out.sortedBy { it.title.lowercase() }
+            SortMode.ARTIST -> out.sortedBy { it.artist.lowercase() }
+            SortMode.RECENT -> out.sortedByDescending { it.dateAdded }
+            SortMode.LONGEST -> out.sortedByDescending { it.durationMs }
+        }
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val folders: StateFlow<List<MusicFolder>> = songs.map { groupFolders(it) }
         .flowOn(kotlinx.coroutines.Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
