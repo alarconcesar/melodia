@@ -530,6 +530,9 @@ class MainViewModel(
     val ytLoading: StateFlow<Boolean> = _ytLoading
     private val _ytError = MutableStateFlow<String?>(null)
     val ytError: StateFlow<String?> = _ytError
+    /** false = reintentar la misma búsqueda no sirve (YouTube no la tiene). */
+    private val _ytErrorRetry = MutableStateFlow(true)
+    val ytErrorRetry: StateFlow<Boolean> = _ytErrorRetry
     /** videoId cuyo audio se está resolviendo para reproducir */
     private val _busyYt = MutableStateFlow<String?>(null)
     val busyYt: StateFlow<String?> = _busyYt
@@ -555,10 +558,8 @@ class MainViewModel(
     fun refreshDlHistory() { try { _dlHistory.value = yt.getDlHistory() } catch (_: Exception) {} }
     fun clearDlHistory() { viewModelScope.launch { withContext(Dispatchers.IO) { yt.clearDlHistory() }; _dlHistory.value = emptyList() } }
 
-    private fun errMsg(t: Throwable, fallback: String): String {
-        val detail = "${t.javaClass.simpleName}${if (!t.message.isNullOrBlank()) ": ${t.message}" else ""}"
-        return "$fallback\n($detail)"
-    }
+    private fun errMsg(t: Throwable, fallback: String): String =
+        com.melodia.app.data.online.YtErrors.message(t, fallback)
 
     fun setYtQuery(q: String) { _ytQuery.value = q }
     private var searchJob: kotlinx.coroutines.Job? = null
@@ -569,11 +570,14 @@ class MainViewModel(
         searchJob = viewModelScope.launch {
             _ytLoading.value = true
             _ytError.value = null
+            _ytErrorRetry.value = true
             try {
                 _ytResults.value = yt.search(query)
                 _ytHasMore.value = yt.hasMore()
-                if (_ytResults.value.isEmpty()) _ytError.value = "Sin resultados — prueba con otras palabras"
-                else {
+                if (_ytResults.value.isEmpty()) {
+                    _ytError.value = "Sin resultados — prueba con otras palabras"
+                    _ytErrorRetry.value = false
+                } else {
                     try {
                         yt.pushRecent(query)
                         _ytRecent.value = yt.getRecent()
@@ -589,7 +593,8 @@ class MainViewModel(
                 }
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
-                _ytError.value = errMsg(t, "Sin conexión o YouTube no responde — reintenta")
+                _ytError.value = errMsg(t, "YouTube no respondió — reintenta en un momento")
+                _ytErrorRetry.value = com.melodia.app.data.online.YtErrors.retryable(t)
             }
             _ytLoading.value = false
         }

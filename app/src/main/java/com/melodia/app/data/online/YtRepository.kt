@@ -12,6 +12,7 @@ import org.schabi.newpipe.extractor.InfoItem.InfoType
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.search.SearchExtractor
+import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
@@ -53,12 +54,32 @@ class YtRepository(private val context: Context) {
 
     suspend fun search(query: String): List<YtTrack> = withContext(Dispatchers.IO) {
         ensure()
-        val ex = yt().getSearchExtractor(query)
+        // Índice general primero (mejores resultados para videos). Si YouTube
+        // no devuelve nada —filtra búsquedas que considera "inapropiadas" con
+        // NothingFoundException— se busca en el catálogo de música, que sí las
+        // tiene. Sin esto, "sexy magic" terminaba en un error técnico.
+        val general = try {
+            fetchPage(query, null)
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            if (t !is SearchExtractor.NothingFoundException) throw t
+            emptyList()
+        }
+        if (general.isNotEmpty()) general
+        else fetchPage(query, listOf(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS))
+    }
+
+    /** Ejecuta la búsqueda y deja listo el paginador. filters=null → índice general. */
+    private fun fetchPage(query: String, filters: List<String>?): List<YtTrack> {
+        val service = yt()
+        val ex = if (filters == null) service.getSearchExtractor(query)
+        else service.getSearchExtractor(service.searchQHFactory.fromQuery(query, filters, ""))
         ex.fetchPage()
         val page = ex.initialPage
+        val tracks = mapItems(page.items)
         pager = ex
         next = try { page.nextPage } catch (_: Exception) { null }
-        mapItems(page.items)
+        return tracks
     }
 
     /** Devuelve true si hay más páginas por cargar. */

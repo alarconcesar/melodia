@@ -85,6 +85,7 @@ fun OnlineTab(vm: MainViewModel) {
     val results by vm.ytResults.collectAsState()
     val loading by vm.ytLoading.collectAsState()
     val error by vm.ytError.collectAsState()
+    val errorRetry by vm.ytErrorRetry.collectAsState()
     val dl by vm.dlProgress.collectAsState()
     val busy by vm.busyYt.collectAsState()
     val recent by vm.ytRecent.collectAsState()
@@ -226,15 +227,26 @@ fun OnlineTab(vm: MainViewModel) {
                 MelodiaSpinner()
             }
             error != null && results.isEmpty() -> Column(Modifier.padding(vertical = 16.dp)) {
-                Text(error ?: "", style = Ds.Body, color = cs.error)
-                Spacer(Modifier.height(10.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp), color = cs.primary,
-                    modifier = Modifier.clickable { vm.searchYt() }
-                ) {
+                Text(
+                    error ?: "", style = Ds.Body,
+                    color = if (errorRetry) cs.error else cs.onSurfaceVariant
+                )
+                if (errorRetry) {
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp), color = cs.primary,
+                        modifier = Modifier.clickable { vm.searchYt() }
+                    ) {
+                        Text(
+                            "Reintentar", style = Ds.Body, color = cs.surface,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.height(6.dp))
                     Text(
-                        "Reintentar", style = Ds.Body, color = cs.surface,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                        "Cambia las palabras y toca la lupa.", style = Ds.Sub,
+                        color = cs.onSurfaceVariant
                     )
                 }
             }
