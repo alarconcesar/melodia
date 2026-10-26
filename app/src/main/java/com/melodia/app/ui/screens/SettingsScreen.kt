@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.LightMode
@@ -41,6 +44,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -97,6 +101,8 @@ fun SettingsScreen(
     var showSleep by remember { mutableStateOf(false) }
     var safeMode by remember { mutableStateOf(com.melodia.app.SafeMode.estaActivo(ctx)) }
     var showAbout by remember { mutableStateOf(false) }
+    var showExcluded by remember { mutableStateOf(false) }
+    val excluded by vm.excludedFolders.collectAsState()
     val version = remember {
         try {
             ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "—"
@@ -204,6 +210,13 @@ fun SettingsScreen(
                         title = "Carpetas y escaneo",
                         value = (folder?.substringAfterLast("/") ?: "Toda la música") + " · mínimo ${minSecs}s",
                         onClick = onOpenLibrary
+                    )
+                    SettingsDivider()
+                    SettingsRow(
+                        icon = Icons.Default.FolderOff,
+                        title = "Carpetas excluidas",
+                        value = if (excluded.isEmpty()) "Ninguna" else "${excluded.size} fuera de la biblioteca",
+                        onClick = { showExcluded = true }
                     )
                     SettingsDivider()
                     SettingsRow(
@@ -373,6 +386,10 @@ fun SettingsScreen(
             confirmButton = { TextButton(onClick = { showAbout = false }) { Text("Cerrar") } }
         )
     }
+
+    if (showExcluded) {
+        ExcludedFoldersDialog(vm, excluded, onClose = { showExcluded = false })
+    }
 }
 
 // ── Piezas de la pantalla ────────────────────────────────────────
@@ -448,5 +465,65 @@ private fun SettingsSwitch(
         }
         Spacer(Modifier.width(8.dp))
         Switch(checked = checked, onCheckedChange = onChecked)
+
     }
+}
+
+/**
+ * Carpetas que no deben entrar a la biblioteca (audios de WhatsApp, grabaciones
+ * de voz, etc.). Se listan también las excluidas para poder reactivarlas.
+ */
+@Composable
+private fun ExcludedFoldersDialog(
+    vm: MainViewModel,
+    excluded: Set<String>,
+    onClose: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val folders by vm.folders.collectAsState()
+    val paths = remember(folders, excluded) {
+        (folders.map { it.path } + excluded).distinct().sortedBy { it.lowercase() }
+    }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Carpetas excluidas", color = cs.onBackground) },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                Text(
+                    "Lo que esté dentro de una carpeta excluida no aparece en tu biblioteca.",
+                    style = Ds.Sub, color = cs.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                if (paths.isEmpty()) {
+                    Text("Todavía no hay carpetas para mostrar.", style = Ds.Body, color = cs.onSurfaceVariant)
+                } else {
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                        items(paths, key = { "ex-$it" }) { p ->
+                            val activa = excluded.contains(p)
+                            Row(
+                                Modifier.fillMaxWidth()
+                                    .clickable { vm.toggleExcludedFolder(p) }
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        try { java.io.File(p).name.ifBlank { p } } catch (_: Exception) { p },
+                                        style = Ds.Body, color = cs.onBackground,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        p, style = Ds.Sub, color = cs.onSurfaceVariant,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Checkbox(checked = activa, onCheckedChange = { vm.toggleExcludedFolder(p) })
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onClose) { Text("Listo") } }
+    )
 }

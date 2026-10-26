@@ -79,6 +79,7 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
@@ -2676,6 +2677,20 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
                         InfoAction(Icons.Default.Checklist, "Elegir") {
                             vm.startSelection(song.id)
                             onClose()
+                        }
+                        if (song.dataPath.isNotBlank()) {
+                            InfoAction(Icons.Default.FolderOff, "Excluir") {
+                                val carpeta = try { java.io.File(song.dataPath).parent } catch (_: Exception) { null }
+                                if (carpeta != null) {
+                                    vm.setExcludedFolders(vm.excludedFolders.value + carpeta)
+                                    android.widget.Toast.makeText(
+                                        ctx,
+                                        "Carpeta excluida: ${java.io.File(carpeta).name}",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                    onClose()
+                                }
+                            }
                         }
                     }
                 }

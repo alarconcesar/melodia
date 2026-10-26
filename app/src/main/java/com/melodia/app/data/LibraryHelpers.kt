@@ -32,3 +32,19 @@ fun groupArtists(songs: List<Song>): List<Artist> =
     songs.groupBy { it.artist.ifBlank { "Desconocido" } }
         .map { (n, l) -> Artist(n, l.size) }
         .sortedBy { it.name.lowercase() }
+
+/**
+ * Filtros de biblioteca que no dependen de Android: rutas excluidas por el
+ * usuario (p. ej. la carpeta de audios de WhatsApp).
+ */
+object LibraryFilters {
+    /** true si [path] está dentro de alguna carpeta excluida. */
+    fun isExcluded(path: String, excluded: Set<String>): Boolean {
+        if (path.isBlank() || excluded.isEmpty()) return false
+        val limpio = path.trim()
+        return excluded.any { raw ->
+            val ex = raw.trim().trimEnd('/')
+            ex.isNotEmpty() && (limpio == ex || limpio.startsWith("$ex/"))
+        }
+    }
+}

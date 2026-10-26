@@ -20,6 +20,22 @@ class MusicRepository(context: Context) {
     private val _scanFolder = kotlinx.coroutines.flow.MutableStateFlow(prefs.getString("scan_folder", null))
     val scanFolder: kotlinx.coroutines.flow.StateFlow<String?> = _scanFolder
 
+    /** Carpetas que el usuario decidió no escanear (WhatsApp, grabaciones, etc.). */
+    private val _excluded = kotlinx.coroutines.flow.MutableStateFlow(
+        try { prefs.getStringSet("excluded_folders", emptySet())?.toSet() ?: emptySet() }
+        catch (_: Exception) { emptySet() }
+    )
+    val excludedFolders: kotlinx.coroutines.flow.StateFlow<Set<String>> = _excluded
+
+    fun setExcludedFolders(paths: Set<String>) {
+        val limpio = paths.map { it.trim().trimEnd('/') }.filter { it.isNotBlank() }.toSet()
+        prefs.edit().putStringSet("excluded_folders", limpio).apply()
+        _excluded.value = limpio
+    }
+
+    fun isExcluded(path: String): Boolean =
+        com.melodia.app.data.LibraryFilters.isExcluded(path, _excluded.value)
+
     fun setMinSecs(s: Int) {
         val v = s.coerceIn(0, 300)
         prefs.edit().putInt("min_secs", v).apply()
@@ -105,6 +121,7 @@ class MusicRepository(context: Context) {
                     if (dur < minMs) continue
                     val path = if (iData >= 0) c.getString(iData) ?: "" else ""
                     if (onlyFolder != null && !path.startsWith(onlyFolder)) continue
+                    if (isExcluded(path)) continue
                     var title = if (iTitle >= 0) c.getString(iTitle) ?: "" else ""
                     if (title.isBlank()) {
                         title = try { java.io.File(path).nameWithoutExtension.ifBlank { "Sin título" } } catch (_: Exception) { "Sin título" }

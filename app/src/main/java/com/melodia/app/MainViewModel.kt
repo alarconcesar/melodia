@@ -287,6 +287,19 @@ class MainViewModel(
         reload()
     }
 
+    val excludedFolders: StateFlow<Set<String>> = repo.excludedFolders
+
+    fun setExcludedFolders(paths: Set<String>) {
+        repo.setExcludedFolders(paths)
+        reload()
+    }
+
+    fun toggleExcludedFolder(path: String) {
+        val cur = repo.excludedFolders.value.toMutableSet()
+        if (!cur.remove(path)) cur.add(path)
+        setExcludedFolders(cur)
+    }
+
     fun updateMetadata(s: Song, title: String, artist: String, album: String, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             val ok = withContext(Dispatchers.IO) { repo.updateMetadata(s.id, title, artist, album) }
