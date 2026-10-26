@@ -1560,9 +1560,6 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
         } else {
             DsBackground()
         }
-        // La carátula se adapta a la pantalla: en móviles pequeños no se cortan los controles
-        // (el factor ya descuenta barras del sistema y el bloque de controles)
-        val artSize = minOf(maxWidth - 56.dp, maxHeight * 0.34f).coerceIn(170.dp, 330.dp)
         val dlProg = if (isStream) curTrack?.let { dlMap[it.id] } else null
         Column(
             Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
@@ -1626,18 +1623,21 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
-
-            // ── Carátula, título y artista ──
-            AnimatedContent(
-                targetState = s.id, label = "nowplaying",
-                transitionSpec = {
-                    (fadeIn(tween(220)) + scaleIn(initialScale = 0.97f)) togetherWith
-                        (fadeOut(tween(160)) + scaleOut(targetScale = 0.97f))
-                },
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+            // ── Carátula: ocupa todo el aire disponible (antes sobraba un hueco
+            // enorme entre el título y los controles) ──
+            BoxWithConstraints(
+                Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val artSize = minOf(maxWidth, maxHeight).coerceIn(170.dp, 430.dp)
+                AnimatedContent(
+                    targetState = s.id, label = "nowplaying",
+                    transitionSpec = {
+                        (fadeIn(tween(220)) + scaleIn(initialScale = 0.97f)) togetherWith
+                            (fadeOut(tween(160)) + scaleOut(targetScale = 0.97f))
+                    },
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
                     Box(Modifier.size(artSize), contentAlignment = Alignment.Center) {
                         SongArt(
                             albumId = s.albumId, size = artSize, shape = Ds.HeroShape,
@@ -1661,26 +1661,29 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                             }
                         }
                     }
-                    Spacer(Modifier.height(20.dp))
-                    Text(
-                        s.title, style = Ds.Display, color = cs.onBackground,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        "${s.artist.ifBlank { "Desconocido" }} · ${s.album.ifBlank { "Sencillo" }}",
-                        style = Ds.Body, color = cs.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
 
-            // Espacio flexible: absorbe la altura sobrante y evita que se corten los controles
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(16.dp))
+
+            // ── Título y artista, pegados a los controles ──
+            Text(
+                s.title, style = Ds.Display, color = cs.onBackground,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "${s.artist.ifBlank { "Desconocido" }} · ${s.album.ifBlank { "Sencillo" }}",
+                style = Ds.Body, color = cs.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(14.dp))
 
             PlaybackProgress(state) { vm.player.seekTo(it) }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
 
             // ── Transporte ──
             Row(
@@ -1733,9 +1736,9 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // ── Acciones de la canción: antes vivían escondidas en el menú ──
+            // ── Acciones de la canción ──
             Row(
                 Modifier.fillMaxWidth().padding(bottom = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),

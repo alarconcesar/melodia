@@ -54,8 +54,10 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
   margen se calculaba midiendo la nav con `onGloballyPositioned` y en algunos
   estados se solapaban; apilados el orden lo garantiza el layout. Al aparecer,
   el mini crece con `expandVertically` en vez de saltar encima de la nav.
-- **NowPlaying** (rediseño 5.3) — `BoxWithConstraints`: la carátula escala con
-  la pantalla (`min(ancho−56dp, alto×0.34)` clamp 170–330dp), plana y sin sombra,
+- **NowPlaying** (rediseño 5.3, ajuste 5.6) — la carátula ocupa **todo el aire
+  disponible**: vive en un `BoxWithConstraints` con `weight(1f)` y mide
+  `min(ancho, alto)` del área (clamp 170–430dp). Antes era `alto×0.34` y dejaba
+  un hueco muerto entre el título y los controles. Plana y sin sombra,
   con fondo teñido a 160 px + degradado. Columna: barra superior (cerrar ·
   `N de M` en Micro · ⋮), carátula, título en `Display` a 2 líneas, artista ·
   álbum, espaciador flexible, barra de avance, transporte y **fila de acciones**
