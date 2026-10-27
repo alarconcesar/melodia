@@ -4,10 +4,12 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.melodia.app.data.model.Song
 import com.melodia.app.ui.screens.QueueSheetContent
@@ -25,7 +27,7 @@ import org.robolectric.annotation.Config
  * sin ViewModel para no depender de Room ni del servicio de audio.
  */
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [33])
+@Config(sdk = [33], qualifiers = "w411dp-h891dp-xxhdpi")
 class QueueSheetTest {
 
     @get:Rule
@@ -78,7 +80,8 @@ class QueueSheetTest {
 
     @Test
     fun losExtremosNoSePuedenMoverMasAlla() {
-        componer(canciones(4))
+        // Sin tema actual la lista muestra la cola completa (índices 0..3).
+        componer(canciones(4), currentId = null)
         val subir = rule.onAllNodesWithContentDescription("Subir")
         val bajar = rule.onAllNodesWithContentDescription("Bajar")
         subir[0].assertIsNotEnabled()
@@ -94,6 +97,7 @@ class QueueSheetTest {
         var guardado = false
         componer(
             canciones(4),
+            currentId = null,
             onMove = { from, to -> movido = from to to },
             onRemove = { quitado = it },
             onSave = { guardado = true }
@@ -114,14 +118,28 @@ class QueueSheetTest {
     }
 
     @Test
-    fun laHojaEntraEnLaPantallaConColaLarga() {
+    fun laColaLargaEntraEnLaPantalla() {
         componer(canciones(12), currentId = 5L)
         val root = rule.onRoot().getUnclippedBoundsInRoot()
         val guardar = rule.onNodeWithText("Guardar lista").getUnclippedBoundsInRoot()
         assertTrue("el pie se sale por la derecha", guardar.right <= root.right)
         assertTrue("el pie se corta abajo", guardar.bottom <= root.bottom)
-        val titulo = rule.onNodeWithText("Tema 5").getUnclippedBoundsInRoot()
-        val anchoTitulo = titulo.right - titulo.left
-        assertTrue("el título queda sin espacio: $anchoTitulo", anchoTitulo.value >= 110f)
+        // La lista arranca después del tema que suena y solo muestra lo que viene.
+        rule.onNodeWithText("A continuación · 7").assertExists()
+        rule.onNodeWithText("SONANDO AHORA").assertExists()
+    }
+
+    @Test
+    fun laListaEmpiezaDespuesDelTemaActual() {
+        componer(canciones(5), currentId = 2L)
+        rule.onNodeWithText("A continuación · 3").assertExists()
+        rule.onNodeWithText("Tema 2").assertExists()   // solo en la tarjeta
+        rule.onNodeWithText("Tema 3").assertExists()   // primer próximo
+    }
+
+    @Test
+    fun sinColaAvisaQueNoHayNadaMas() {
+        componer(canciones(2), currentId = 2L)
+        rule.onNodeWithText("No hay más temas después de este.").assertExists()
     }
 }

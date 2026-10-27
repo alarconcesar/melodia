@@ -168,6 +168,7 @@ import com.melodia.app.SortMode
 import com.melodia.app.data.model.Song
 import com.melodia.app.ui.ds.DsBackground
 import com.melodia.app.ui.ds.EmptyState
+import com.melodia.app.ui.ds.EqBars
 import com.melodia.app.ui.ds.HeroCard
 import com.melodia.app.ui.ds.HomeSkeleton
 import com.melodia.app.ui.ds.MelodiaPillNav
@@ -2326,18 +2327,13 @@ fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        // La lista se lleva como máximo ~la mitad de la ventana: en pantallas
-        // cortas el pie (Vaciar / Guardar) no se sale de la hoja.
-        BoxWithConstraints {
-            val listMax = (maxHeight * 0.52f).coerceIn(140.dp, 360.dp)
             QueueSheetContent(
                 queue = queue,
                 currentId = current?.id,
                 shuffle = playing.shuffle,
                 repeatMode = playing.repeatMode,
-                listMaxHeight = listMax,
                 onPlay = { idx ->
                     val picked = queue.getOrNull(idx)
                     if (picked != null && picked.id != YT_STREAM_ID) {
@@ -2356,7 +2352,6 @@ fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
                 onSave = { showSave = true },
                 onClose = onDismiss
             )
-        }
     }
 
     if (confirmClear) {
@@ -2414,32 +2409,75 @@ fun QueueSheetContent(
     val cs = MaterialTheme.colorScheme
     val isStream = queue.any { it.id == YT_STREAM_ID }
     val curIdx = queue.indexOfFirst { it.id == currentId }
+    val actual = queue.getOrNull(curIdx)
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = if (curIdx > 2) curIdx - 2 else 0
     )
-    Surface(
-        shape = RoundedCornerShape(26.dp),
-        color = cs.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, cs.outline.copy(alpha = 0.55f)),
-        modifier = Modifier.fillMaxWidth(0.94f)
-    ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Cola", style = Ds.Title, color = cs.onBackground)
-                    Text(
-                        if (queue.isEmpty()) "Sin temas"
-                        else "${queue.size} ${if (queue.size == 1) "tema" else "temas"} · ${fmtTotal(queue.sumOf { it.durationMs })}",
-                        style = Ds.Sub, color = cs.onSurfaceVariant
+    val conteo = when {
+        queue.isEmpty() -> "Sin temas"
+        queue.size == 1 -> "1 tema · ${fmtTotal(queue.sumOf { it.durationMs })}"
+        else -> "${queue.size} temas · ${fmtTotal(queue.sumOf { it.durationMs })}"
+    }
+
+    Surface(color = cs.background, modifier = Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+        ) {
+            // ── Barra superior ────────────────────────────────────────
+            Row(
+                Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown, "Cerrar",
+                        Modifier.size(24.dp), tint = cs.onBackground
                     )
                 }
-                IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Close, "Cerrar", Modifier.size(20.dp), tint = cs.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Cola", style = Ds.Title, color = cs.onBackground)
+                    Text(conteo, style = Ds.Sub, color = cs.onSurfaceVariant)
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            // Repetición y aleatorio sin salir de la cola
-            Row(verticalAlignment = Alignment.CenterVertically) {
+
+            // ── Lo que suena ahora ────────────────────────────────────
+            if (actual != null) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SongArt(
+                        albumId = actual.albumId, size = 52.dp,
+                        shape = RoundedCornerShape(12.dp), iconSize = 20.dp,
+                        active = true, artUrl = actual.artUrl
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        MicroLabel("Sonando ahora")
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            actual.title, style = Ds.Body, color = cs.onBackground,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            "${actual.artist.ifBlank { "Desconocido" }} · ${fmt(actual.durationMs)}",
+                            style = Ds.Sub, color = cs.onSurfaceVariant,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    EqBars(color = cs.primary, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            // ── Aleatorio y repetición ────────────────────────────────
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 ToggleChip(
                     selected = shuffle, text = "Aleatorio",
                     icon = Icons.Default.Shuffle, onClick = onToggleShuffle
@@ -2456,25 +2494,35 @@ fun QueueSheetContent(
                     onClick = onCycleRepeat
                 )
             }
-            Spacer(Modifier.height(6.dp))
+
+            Spacer(Modifier.height(10.dp))
+
             if (queue.isEmpty()) {
-                Column(
-                    Modifier.fillMaxWidth().padding(vertical = 30.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(Icons.Default.QueueMusic, null, Modifier.size(30.dp), tint = cs.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    Text("La cola está vacía", style = Ds.Body, color = cs.onSurfaceVariant)
-                }
+                EmptyState(
+                    icon = Icons.Default.QueueMusic,
+                    title = "La cola está vacía",
+                    subtitle = "Agrega temas desde cualquier lista para verlos aquí."
+                )
             } else {
+                // La lista arranca después del tema que suena: lo anterior ya
+                // está en la tarjeta de arriba y repetirlo confunde.
+                val desde = if (curIdx >= 0) curIdx + 1 else 0
+                val siguientes = queue.drop(desde)
+                Text(
+                    if (siguientes.isEmpty()) "A continuación" else "A continuación · ${siguientes.size}",
+                    style = Ds.Micro, color = cs.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 22.dp, top = 6.dp, bottom = 4.dp)
+                )
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = listMaxHeight)
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(bottom = 8.dp)
                 ) {
-                    itemsIndexed(queue, key = { i, e -> "$i-${e.id}" }) { idx, e ->
+                    itemsIndexed(siguientes, key = { i, e -> "${desde + i}-${e.id}" }) { i, e ->
+                        val idx = desde + i
                         QueueRow(
                             index = idx, song = e,
-                            isCurrent = e.id == currentId,
+                            isCurrent = false,
                             canUp = !isStream && QueueOps.canMoveUp(idx, queue.size),
                             canDown = !isStream && QueueOps.canMoveDown(idx, queue.size),
                             canRemove = !isStream && queue.size > 1,
@@ -2484,9 +2532,27 @@ fun QueueSheetContent(
                             onRemove = { onRemove(idx) }
                         )
                     }
+                    if (siguientes.isEmpty()) item {
+                        Text(
+                            "No hay más temas después de este.",
+                            style = Ds.Sub, color = cs.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp)
+                        )
+                    }
                 }
-                Spacer(Modifier.height(2.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            }
+
+            // ── Pie fijo ──────────────────────────────────────────────
+            if (queue.isNotEmpty()) {
+                Box(
+                    Modifier.fillMaxWidth().height(1.dp)
+                        .background(cs.onSurfaceVariant.copy(alpha = 0.12f))
+                )
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     val canClear = queue.size > 1 && !isStream
                     TextButton(onClick = onClear, enabled = canClear) {
                         Icon(
@@ -2526,20 +2592,24 @@ private fun QueueRow(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isCurrent) cs.primary.copy(alpha = 0.09f) else Color.Transparent)
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isCurrent) cs.primary.copy(alpha = 0.08f) else Color.Transparent)
             .clickable(onClick = onPlay)
-            .padding(start = 8.dp, end = 2.dp, top = 3.dp, bottom = 3.dp)
+            .padding(start = 4.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
     ) {
-        Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-            if (isCurrent) {
-                Icon(Icons.Default.PlayArrow, null, Modifier.size(14.dp), tint = cs.primary)
-            } else {
-                Text("${index + 1}", style = Ds.Sub, color = cs.onSurfaceVariant)
-            }
-        }
-        Spacer(Modifier.width(4.dp))
-        Column(Modifier.weight(1f)) {
+        // Barra de acento: solo el tema que suena la tiene.
+        Box(
+            Modifier.width(3.dp).height(30.dp).clip(CircleShape)
+                .background(if (isCurrent) cs.primary else Color.Transparent)
+        )
+        Spacer(Modifier.width(10.dp))
+        SongArt(
+            albumId = song.albumId, size = 40.dp, shape = RoundedCornerShape(10.dp),
+            iconSize = 16.dp, active = isCurrent, artUrl = song.artUrl
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f).fillMaxWidth()) {
             Text(
                 song.title, style = Ds.Body,
                 color = if (isCurrent) cs.primary else cs.onBackground,
@@ -2550,6 +2620,7 @@ private fun QueueRow(
                 color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
+        Spacer(Modifier.width(2.dp))
         QueueIconBtn(Icons.Default.KeyboardArrowUp, "Subir", canUp, onUp)
         QueueIconBtn(Icons.Default.KeyboardArrowDown, "Bajar", canDown, onDown)
         QueueIconBtn(Icons.Default.Close, "Quitar", canRemove, onRemove)
@@ -2566,7 +2637,7 @@ private fun QueueIconBtn(
     // dejaría el título del tema sin espacio en pantallas de 360dp.
     Box(
         modifier = Modifier
-            .size(30.dp)
+            .size(26.dp)
             .clip(CircleShape)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center

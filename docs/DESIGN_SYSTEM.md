@@ -231,3 +231,18 @@ Cuidados:
 - El cambio de pestaña anima **una sola** composición (no `AnimatedContent`, que
   compone las dos pantallas).
 - La primera composición no se anima: en el arranque manda el esqueleto.
+
+## Cola (7.8)
+
+Dejó de ser un diálogo flotante al 94 %: ahora es **pantalla completa**, con la
+misma jerarquía que el reproductor.
+
+- Barra superior: chevron para cerrar, "Cola" y el conteo con duración total.
+- **Sonando ahora**: tarjeta con carátula, título, artista y barras de
+  ecualizador. Es el único lugar donde aparece el tema actual.
+- Chips de aleatorio y repetición.
+- **A continuación · N**: lista que arranca en el tema siguiente al que suena
+  (lo anterior ya está en la tarjeta; repetirlo confundía). Cada fila lleva
+  barra de acento, carátula de 40 dp y tres acciones (subir, bajar, quitar).
+- Si no queda nada después: "No hay más temas después de este."
+- Pie fijo con "Vaciar" y "Guardar lista", separado por una línea de 1 dp.
