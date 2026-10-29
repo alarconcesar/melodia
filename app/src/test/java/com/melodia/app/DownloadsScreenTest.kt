@@ -84,8 +84,21 @@ class DownloadsScreenTest {
     }
 
     @Test
-    fun unaDescargaTerminadaNoSeListaEnCurso() {
+    fun unaDescargaTerminadaSeMuestraComoGuardada() {
         componer(jobs = listOf(job("a", DlStatus.DONE, 100, 100)))
+        // DONE queda visible como "Guardada" (antes desaparecía al instante y
+        // salía "Sin descargas en curso" aunque acabara de terminar).
+        rule.onNodeWithText("Guardada", substring = true).assertExists()
+        rule.onNodeWithText("Tema a", substring = true).assertExists()
+    }
+
+    @Test
+    fun sinJobsMuestraElVacioAunqueHayaHistorial() {
+        componer(
+            history = listOf(
+                YtRepository.DlRecord(title = "Viejo", artist = "A", high = true, at = 1L)
+            )
+        )
         rule.onNodeWithText("Sin descargas en curso").assertExists()
     }
 

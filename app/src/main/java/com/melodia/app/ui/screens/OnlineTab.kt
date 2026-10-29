@@ -58,6 +58,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -114,7 +115,7 @@ fun OnlineTab(vm: MainViewModel) {
     val notice by vm.ytMsg.collectAsState()
 
     var dlPick by remember { mutableStateOf<YtTrack?>(null) }
-    var showImport by remember { mutableStateOf(false) }
+    var showImport by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.refreshDlHistory() }
 
     OnlineTabContent(
@@ -285,6 +286,11 @@ fun OnlineTabContent(
             Modifier.weight(1f).fillMaxWidth(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 200.dp)
         ) {
+            if (loading && items.isNotEmpty()) item {
+                androidx.compose.material3.LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
+                )
+            }
             when {
                 loading && items.isEmpty() -> item {
                     Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
@@ -571,10 +577,12 @@ private fun OnlineThumb(track: YtTrack, size: androidx.compose.ui.unit.Dp) {
 private fun ImportPlaylistDialog(vm: MainViewModel, onClose: () -> Unit, onQueued: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     val importState by vm.ytImport.collectAsState()
-    var url by remember { mutableStateOf("") }
+    var url by rememberSaveable { mutableStateOf("") }
     val busy = importState == "…"
     val ok = importState?.startsWith("OK|") == true
-    LaunchedEffect(ok) { if (ok) onQueued() }
+    var abierto by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { abierto = false } }
+    LaunchedEffect(ok) { if (ok && abierto) onQueued() }
     AlertDialog(
         onDismissRequest = { if (!busy) onClose() },
         title = { Text("Importar playlist", color = cs.onBackground) },

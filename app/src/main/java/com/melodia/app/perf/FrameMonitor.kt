@@ -20,12 +20,14 @@ object FrameMonitor {
 
     @Volatile
     private var current = "Inicio"
+    @Volatile
+    private var callback: Choreographer.FrameCallback? = null
 
     fun start() {
         if (running) return
         running = true
         val choreographer = Choreographer.getInstance()
-        choreographer.postFrameCallback(object : Choreographer.FrameCallback {
+        val cb = object : Choreographer.FrameCallback {
             override fun doFrame(frameTimeNanos: Long) {
                 if (lastNanos > 0L) {
                     val ms = (frameTimeNanos - lastNanos) / 1_000_000
@@ -40,7 +42,18 @@ object FrameMonitor {
                 lastNanos = frameTimeNanos
                 choreographer.postFrameCallback(this)
             }
-        })
+        }
+        callback = cb
+        choreographer.postFrameCallback(cb)
+    }
+
+    /** Detiene la medición (antes era imposible: el callback se re-registraba solo). */
+    fun stop() {
+        try {
+            callback?.let { Choreographer.getInstance().removeFrameCallback(it) }
+        } catch (_: Exception) {}
+        callback = null
+        running = false
     }
 
     /** Marca la pantalla que se está usando (Inicio, Explorar, Reproductor…). */

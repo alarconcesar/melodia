@@ -29,7 +29,6 @@ class EqualizerManager(context: Context) {
 
     fun attach(newSession: Int) {
         if (newSession == 0 || newSession == sessionId) return
-        sessionId = newSession
         try {
             releaseFx()
             eq = Equalizer(0, newSession).also { e ->
@@ -41,7 +40,14 @@ class EqualizerManager(context: Context) {
             }
             bass = BassBoost(0, newSession).also { it.enabled = _enabled.value; try { it.setStrength(_bass.value.coerceIn(0, 1000).toShort()) } catch (_: Exception) {} }
             reverb = PresetReverb(0, newSession).also { it.enabled = false }
-        } catch (e: Exception) { Log.e("EQ", "attach fail", e) }
+            // Solo se marca tras crear los tres efectos: si el dispositivo no
+            // tiene efectos, el próximo cambio de sesión reintenta en vez de
+            // dejar el EQ muerto para siempre.
+            sessionId = newSession
+        } catch (e: Exception) {
+            try { releaseFx() } catch (_: Exception) {}
+            Log.e("EQ", "attach fail", e)
+        }
     }
 
     fun setEnabled(v: Boolean) {

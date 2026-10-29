@@ -28,6 +28,14 @@ class DownloadMetaStore(context: Context) {
         } catch (_: Exception) {}
     }
 
+    /** Borra las fichas de archivos que ya no están (evita prefs eternas). */
+    fun sweep(existingNames: Set<String>) {
+        try {
+            val all = prefs.all.keys.toList()
+            all.forEach { k -> if (!existingNames.contains(k)) prefs.edit().remove(k).apply() }
+        } catch (_: Exception) {}
+    }
+
     fun get(fileName: String): Meta? {
         return try {
             val raw = prefs.getString(fileName, null) ?: return null

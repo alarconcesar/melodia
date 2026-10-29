@@ -338,6 +338,9 @@ fun TrackRow(
                                 if (locked == 1) {
                                     ch.consume()
                                     val v = dx.coerceIn(-maxSwipe, maxSwipe)
+                                    // awaitEachGesture es scope restringido (no deja
+                                    // llamar a snapTo directo): un launch por evento
+                                    // es barato frente al costo del propio frame.
                                     scope.launch { offset.snapTo(v) }
                                 }
                             }
@@ -488,7 +491,8 @@ fun HeroCard(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null,
+                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (playing) "Pausar" else "Reproducir",
                         tint = cs.surface, modifier = Modifier.size(30.dp)
                     )
                 }
@@ -655,7 +659,7 @@ fun MiniPlayerDs(
                 }
                 if (isFav) {
                     Icon(
-                        Icons.Default.Favorite, null,
+                        Icons.Default.Favorite, "En favoritos",
                         tint = cs.primary, modifier = Modifier.padding(horizontal = 10.dp).size(18.dp)
                     )
                 }
@@ -663,7 +667,8 @@ fun MiniPlayerDs(
                     Box(contentAlignment = Alignment.Center) {
                         AnimatedContent(targetState = playing, label = "pp-mini") { p ->
                             Icon(
-                                if (p) Icons.Default.Pause else Icons.Default.PlayArrow, null,
+                                if (p) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                if (p) "Pausar" else "Reproducir",
                                 tint = cs.surface, modifier = Modifier.size(22.dp)
                             )
                         }

@@ -60,7 +60,11 @@ class QueueStore(context: Context) {
      * la composición de la cola, no en cada cambio de tema.
      */
     fun saveSongs(songs: List<Song>) {
-        if (songs.isEmpty()) return
+        // Vacía también se escribe: si no, el JSON viejo "resucita" al reabrir.
+        if (songs.isEmpty()) {
+            try { prefs.edit().putString(KEY_SONGS, "[]").apply() } catch (_: Exception) {}
+            return
+        }
         try {
             val arr = JSONArray()
             songs.forEach { s ->
@@ -131,7 +135,11 @@ class QueueStore(context: Context) {
                 index = prefs.getInt(KEY_INDEX, 0).coerceIn(0, songs.size - 1),
                 positionMs = prefs.getLong(KEY_POS, 0L).coerceAtLeast(0L),
                 shuffle = prefs.getBoolean(KEY_SHUFFLE, false),
-                repeatMode = prefs.getInt(KEY_REPEAT, 0)
+                // Un valor corrupto ya no aborta la restauración (iba en el mismo
+                // try que setMediaItems y dejaba sin cola).
+                repeatMode = prefs.getInt(KEY_REPEAT, 0).let {
+                    if (it in 0..2) it else 0
+                }
             )
         } catch (_: Exception) { null }
     }

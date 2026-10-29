@@ -1,6 +1,7 @@
 package com.melodia.app.data
 import com.melodia.app.data.local.*
 import com.melodia.app.data.model.Song
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 class PlaylistRepository(private val db: MelodiaDatabase) {
     fun playlists(): Flow<List<PlaylistEntity>> = db.playlistDao().observeAll()
@@ -8,10 +9,12 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
     fun favorites(): Flow<List<FavoriteEntity>> = db.favoriteDao().observeAll()
     fun isFav(id: Long): Flow<Boolean> = db.favoriteDao().isFav(id)
     suspend fun createPlaylist(name: String): Long = db.playlistDao().insert(PlaylistEntity(name = name.trim()))
+    @Transaction
     suspend fun deletePlaylist(id: Long) { db.playlistSongDao().clear(id); db.playlistDao().delete(id) }
     suspend fun rename(id: Long, name: String) = db.playlistDao().rename(id, name)
     suspend fun setCover(id: Long, albumId: Long?) = db.playlistDao().setCover(id, albumId)
     suspend fun togglePin(id: Long) = db.playlistDao().togglePin(id)
+    @Transaction
     suspend fun addToPlaylist(pid: Long, s: Song): Boolean {
         if (db.playlistSongDao().exists(pid, s.id) > 0) return false // sin duplicados
         val pos = db.playlistSongDao().count(pid)
@@ -19,6 +22,7 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
         return true
     }
     /** Mueve un tema dentro de la playlist (up = hacia arriba). */
+    @Transaction
     suspend fun moveSong(pid: Long, sid: Long, up: Boolean) {
         val dao = db.playlistSongDao()
         val list = dao.getSongs(pid)
@@ -33,8 +37,12 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
     suspend fun removeFromPlaylist(pid: Long, sid: Long) = db.playlistSongDao().remove(pid, sid)
     suspend fun toggleFav(id: Long, isFav: Boolean) { if (isFav) db.favoriteDao().remove(id) else db.favoriteDao().add(FavoriteEntity(id)) }
 
+    /** Clave estable de un tema entre equipos (minúsculas, sin espacios de más). */
+    fun favKey(artist: String, title: String) =
+        artist.trim().lowercase() + "|" + title.trim().lowercase()
+
     /** Exporta playlists + favoritos a JSON. */
-    suspend fun exportJson(): String {
+    suspend fun exportJson(songs: List<Song> = emptyList()): String {
         val pls = db.playlistDao().getAll()
         val arr = org.json.JSONArray()
         pls.forEach { p ->
@@ -50,8 +58,14 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
             }
             arr.put(org.json.JSONObject().put("name", p.name).put("songs", sarr))
         }
-        val favs = org.json.JSONArray()
-        db.favoriteDao().getAllIds().forEach { favs.put(it) }
-        return org.json.JSONObject().put("playlists", arr).put("favs", favs).toString()
+        // Favoritos con clave estable (artista|título) ADEMÁS del id: el ID de
+        // MediaStore cambia entre teléfonos, y el respaldo solo-ids recuperaba
+        // 0 favs al restaurar en otro equipo.
+        val byId = songs.associateBy { it.id }
+        val favKeys = org.json.JSONArray()
+        db.favoriteDao().getAllIds().forEach { id ->
+            byId[id]?.let { favKeys.put(favKey(it.artist, it.title)) }
+        }
+        return org.json.JSONObject().put("playlists", arr).put("favs", favKeys).toString()
     }
 }

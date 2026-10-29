@@ -44,7 +44,9 @@ class LibraryScaleTest {
             carpetas = groupFolders(songs)
         }
         assertEquals(120, artistas.size)
-        assertEquals(400, albums.size)
+        // Clave nombre+artista: "Album X" de artistas distintos ya no se fusiona
+        // en una mega-lista (400 nombres × combinaciones con 120 artistas).
+        assertEquals(1200, albums.size)
         // Las carpetas son combinaciones artista/álbum presentes en la biblioteca
         assertTrue(carpetas.isNotEmpty())
         assertEquals(5_000, carpetas.sumOf { it.count })

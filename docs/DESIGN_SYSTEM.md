@@ -246,3 +246,31 @@ misma jerarquía que el reproductor.
   barra de acento, carátula de 40 dp y tres acciones (subir, bajar, quitar).
 - Si no queda nada después: "No hay más temas después de este."
 - Pie fijo con "Vaciar" y "Guardar lista", separado por una línea de 1 dp.
+
+## Auditoría 7.9 (bugs corregidos)
+
+- "Todo" selecciona lo visible en la pestaña actual (antes `filtered` global:
+  en Inicio borraba lo de la carpeta de Explorar).
+- Denegar el borrado ya no limpia la selección ni finge éxito (solo RESULT_OK
+  limpia; si se deniega se recarga para mostrar los archivos que siguen ahí).
+- Sin migración destructiva ciega: backup del sqlite + MIGRATION_1_3
+  idempotente + validación de esquema (si la v1 no calza, se parte de cero
+  con respaldo, no con crash).
+- Cola del player: `play()` y el restore filtran ids sin item (remapean el
+  índice) y respetan el shuffle; `removeAt` devuelve Boolean y la UI solo
+  filtra si el player aceptó; `pending` es cola (no se pierde "A continuación"
+  en frío); next/prev/seek aplican el restore pendiente.
+- SleepTimer con guarda `minutes<=0`, expiración solo si no se canceló y
+  fundido en job propio que se aborta al cancelar (antes pausaba igual).
+- Tema local muerto: el player salta al siguiente (máx. 5) y la UI avisa.
+- Descargas: extracción con cupo (3), ACTIVE persiste (reabrir retoma),
+  `cancel()` no borra el .part de un DONE en copia, DONE queda "Guardada" 8 s,
+  403 re-resuelve el enlace una vez (`DlUrlExpiredException`), la cancelación
+  no se reintenta, fileName lleva el id (sin colisiones), historial dedupica,
+  poda de dlart/lyrics y barrido de prefs huérfanas.
+- Stats por escucha real (>=30 s o mitad) con sentencia atómica; favoritos del
+  respaldo con clave estable artista|título.
+- UI: `rememberSaveable` en flags de pantallas/diálogos (rotación),
+  `playerState.map` recordado, SeekBar en un solo gesto + semántica,
+  letra que no roba scroll, cola que acompaña al tema actual, keys estables en
+  Descargas/PlaylistDetail, `FrameMonitor.stop()`, widget con fallback a la app.

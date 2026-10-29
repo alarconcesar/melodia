@@ -41,9 +41,11 @@ data class DlJob(
 class DownloadManager(private val context: Context, private val yt: YtRepository) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    // Dos descargas a la vez: cada una abre varios sockets y en LTE se cortan
     // Tres transferencias a la vez: la extracción del enlace ya no ocupa cupo.
     private val slots = Semaphore(3)
+    // …pero la extracción tampoco es libre: 100 resoluciones a la vez disparan
+    // el rate-limit de YouTube. Máx. 3 extracciones concurrentes.
+    private val extractSlots = Semaphore(3)
     private val dir = File(context.cacheDir, "dl").apply { mkdirs() }
 
     private val _jobs = MutableStateFlow<List<DlJob>>(emptyList())
@@ -118,7 +120,9 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             synchronized(running) { running.remove(id) }?.cancelAndJoin()
             val j = _jobs.value.find { it.track.id == id }
             _jobs.value = _jobs.value.filterNot { it.track.id == id }
-            if (j != null) {
+            // Si ya marcó DONE, el .part puede estar copiándose a MediaStore:
+            // borrarlo aquí dejaba una copia truncada. DONE lo limpia solo.
+            if (j != null && j.status != DlStatus.DONE) {
                 try { partFile(j.track.id, j.high).delete() } catch (_: Exception) {}
             }
             syncProgress()
@@ -129,7 +133,36 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
     private suspend fun runJob(track: YtTrack, high: Boolean, fromScratch: Boolean) {
         update(track.id) { it.copy(status = DlStatus.ACTIVE) }
         try {
-            val audio = withContext(Dispatchers.IO) { yt.bestAudio(track.url, high) }
+            val audio = withContext(Dispatchers.IO) {
+                extractSlots.acquire()
+                try { yt.bestAudio(track.url, high) }
+                finally { extractSlots.release() }
+            }
+            runJobFresh(track, high, audio, fromScratch)
+        } catch (t: Throwable) {
+            // Solo llegan fallos de extracción o del reintento fresco:
+            // runJobFresh ya dejó DONE o lanzó ERROR él mismo.
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            val kept = partFile(track.id, high).let { if (it.exists()) it.length() else 0L }
+            val tot = _jobs.value.find { it.track.id == track.id }?.total ?: 0L
+            update(track.id) {
+                it.copy(
+                    status = DlStatus.ERROR, downloaded = kept, total = tot,
+                    progress = progressOf(kept, tot),
+                    error = com.melodia.app.data.online.YtErrors.message(t, "Error de red").take(90)
+                )
+            }
+            syncProgress()
+            persist()
+        }
+    }
+
+    /**
+     * Transfiere bytes con un audio ya resuelto y cierra el ciclo (DONE/ERROR).
+     * Separado para reintentar con un enlace fresco ante 403 sin duplicar código.
+     */
+    private suspend fun runJobFresh(track: YtTrack, high: Boolean, audio: YtAudio, fromScratch: Boolean = false) {
+        try {
             val part = partFile(track.id, high)
             if (fromScratch) try { part.delete() } catch (_: Exception) {}
             var done = if (part.exists()) part.length() else 0L
@@ -171,12 +204,26 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             } finally {
                 try { part.delete() } catch (_: Exception) {}
             }
-            delay(1500)
+            // La tarjeta queda como "Guardada" unos segundos: desaparecer al
+            // instante parecía que la descarga se había esfumado.
+            delay(8_000)
             _jobs.value = _jobs.value.filterNot { it.track.id == track.id }
             syncProgress()
             persist()
         } catch (t: Throwable) {
             if (t is kotlinx.coroutines.CancellationException) throw t
+            if (t is DlUrlExpiredException) {
+                // La URL del CDN murió antes de tiempo: un reintento con enlace
+                // fresco, sin castigar al usuario con "reintentar" manual.
+                val fresh = withContext(Dispatchers.IO) {
+                    extractSlots.acquire()
+                    try { yt.bestAudio(track.url, high, force = true) }
+                    finally { extractSlots.release() }
+                }
+                update(track.id) { it.copy(status = DlStatus.ACTIVE, error = null) }
+                runJobFresh(track, high, fresh)
+                return
+            }
             val kept = partFile(track.id, high).let { if (it.exists()) it.length() else 0L }
             val tot = _jobs.value.find { it.track.id == track.id }?.total ?: 0L
             update(track.id) {
@@ -215,8 +262,10 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
     private fun persist() {
         try {
             val arr = JSONArray()
+            // ACTIVE también: al reabrir entra como PAUSED y retoma el .part.
+            // Antes se perdía y el .part quedaba huérfano para siempre.
             _jobs.value
-                .filter { it.status == DlStatus.QUEUED || it.status == DlStatus.PAUSED || it.status == DlStatus.ERROR }
+                .filter { it.status == DlStatus.QUEUED || it.status == DlStatus.PAUSED || it.status == DlStatus.ERROR || it.status == DlStatus.ACTIVE }
                 .take(40)
                 .forEach { j ->
                     arr.put(

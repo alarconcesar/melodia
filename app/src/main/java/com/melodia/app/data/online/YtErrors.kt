@@ -18,6 +18,8 @@ import org.schabi.newpipe.extractor.search.SearchExtractor
 object YtErrors {
 
     fun message(t: Throwable, fallback: String): String = when (t) {
+        is DlUrlExpiredException ->
+            "El enlace de YouTube venció — reintenta la descarga."
         is SearchExtractor.NothingFoundException ->
             "YouTube no tiene resultados para esa búsqueda. Prueba con el nombre del artista o del álbum."
         is AgeRestrictedContentException ->

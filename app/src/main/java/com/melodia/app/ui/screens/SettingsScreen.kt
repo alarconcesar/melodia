@@ -58,6 +58,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,10 +99,10 @@ fun SettingsScreen(
     val saver by vm.dataSaver.collectAsState()
     val highQ by vm.ytHighQuality.collectAsState()
     val sleepLeft by vm.sleep.minsLeft.collectAsState()
-    var showSleep by remember { mutableStateOf(false) }
+    var showSleep by rememberSaveable { mutableStateOf(false) }
     var safeMode by remember { mutableStateOf(com.melodia.app.SafeMode.estaActivo(ctx)) }
-    var showAbout by remember { mutableStateOf(false) }
-    var showExcluded by remember { mutableStateOf(false) }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
+    var showExcluded by rememberSaveable { mutableStateOf(false) }
     val excluded by vm.excludedFolders.collectAsState()
     val version = remember {
         try {

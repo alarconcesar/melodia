@@ -21,11 +21,16 @@ fun groupFolders(songs: List<Song>): List<MusicFolder> =
         .map { (p, l) -> MusicFolder(p, try { File(p).name.ifBlank { p } } catch (_: Exception) { p }, l.size) }
         .sortedBy { it.name.lowercase() }
 fun groupAlbums(songs: List<Song>): List<Album> =
-    songs.groupBy { it.album.ifBlank { "Sin álbum" } }
-        .map { (n, l) ->
+    // Clave nombre+artista: antes dos "Greatest Hits" de artistas distintos se
+    // fusionaban en una mega-lista que se reproducía entera por error.
+    songs.groupBy {
+        val n = it.album.ifBlank { "Sin álbum" }
+        val a = it.albumArtist.takeIf { a -> a.isNotBlank() } ?: it.artist.ifBlank { "Desconocido" }
+        n.lowercase() + "|" + a.lowercase()
+    }.map { (_, l) ->
             val first = l.firstOrNull()
             val artist = first?.albumArtist?.takeIf { it.isNotBlank() } ?: first?.artist ?: ""
-            Album(n, artist, l.size, first?.albumId ?: 0L)
+            Album(first?.album?.ifBlank { "Sin álbum" } ?: "Sin álbum", artist, l.size, first?.albumId ?: 0L)
         }
         .sortedBy { it.name.lowercase() }
 fun groupArtists(songs: List<Song>): List<Artist> =

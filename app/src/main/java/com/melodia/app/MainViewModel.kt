@@ -141,6 +141,10 @@ class MainViewModel(
     /** Historial de descargas completadas. */
     private val _dlHistory = MutableStateFlow<List<YtRepository.DlRecord>>(emptyList())
     val dlHistory: StateFlow<List<YtRepository.DlRecord>> = _dlHistory
+    /** Aviso de una línea para la UI (toasts desde eventos del player). */
+    private val _notice = MutableStateFlow<String?>(null)
+    val notice: StateFlow<String?> = _notice
+    fun clearNotice() { _notice.value = null }
 
     // La restauración de cola corre desde el init: estos estados deben existir
     // ANTES o el constructor revienta con NPE (mismo bug que la 4.3).
@@ -162,11 +166,12 @@ class MainViewModel(
         player.onStreamError = { pos -> refreshStreamAudio(pos) }
         // Persistir la cola: la lista (JSON) solo cuando cambia su composición;
         // índice/shuffle/repeat como claves sueltas para no reescribir 5k temas
-        // en cada cambio de pista.
+        // en cada cambio de pista. Un stream NUNCA se persiste: antes pisaba la
+        // cola local guardada y la reanudación quedaba inútil tras escuchar online.
         viewModelScope.launch {
             _queue.map { q -> q.map { it.id } }.distinctUntilChanged().collect {
                 val q = _queue.value
-                if (q.isNotEmpty()) queueStore.saveSongs(q)
+                if (q.isNotEmpty() && q.none { it.id == YT_STREAM_ID }) queueStore.saveSongs(q)
             }
         }
         viewModelScope.launch {
@@ -174,7 +179,7 @@ class MainViewModel(
                 .distinctUntilChanged()
                 .collect { (currentId, shuffle, repeat) ->
                     val q = _queue.value
-                    if (q.isEmpty()) return@collect
+                    if (q.isEmpty() || q.any { it.id == YT_STREAM_ID }) return@collect
                     val idx = q.indexOfFirst { it.id == currentId }.takeIf { it >= 0 } ?: 0
                     queueStore.saveState(idx, player.state.value.positionMs, shuffle, repeat)
                 }
@@ -191,19 +196,44 @@ class MainViewModel(
             }
         }
         // Sincronizar UI con el item real de ExoPlayer (next/prev/fin de tema)
+        // Estadísticas por ESCUCHA real: se mide cuánto sonó el tema anterior
+        // y solo cuenta si pasó el umbral (>=30 s o la mitad en temas cortos).
+        var escuchandoId = -1L
+        var escuchandoDesde = 0L
         viewModelScope.launch {
-            player.state.map { it.currentId }.distinctUntilChanged().collect { id ->
-                if (id > 0 || id == YT_STREAM_ID) _currentId.value = id
-                // Estadísticas: cada tema local que empieza suma una reproducción
-                if (id > 0) {
-                    val dur = songs.value.find { it.id == id }?.durationMs ?: 0L
-                    viewModelScope.launch { stats.recordPlay(id, dur) }
+            player.state.map { it.currentId to it.isPlaying }.distinctUntilChanged().collect { (id, playing) ->
+                val ahora = System.currentTimeMillis()
+                if (escuchandoId > 0 && id != escuchandoId) {
+                    val ms = ahora - escuchandoDesde
+                    val dur = songs.value.find { it.id == escuchandoId }?.durationMs ?: 0L
+                    val previo = escuchandoId
+                    viewModelScope.launch { stats.recordHeard(previo, ms, dur) }
                 }
+                if (id > 0 || id == YT_STREAM_ID) _currentId.value = id
+                if (id != escuchandoId) {
+                    escuchandoId = id
+                    escuchandoDesde = ahora
+                }
+                // Sin cola local visible no hay nada que reanudar después.
+                if (id == YT_STREAM_ID) queueStore.savePosition(0L)
             }
+        }
+        // Tema local irreproducible (borrado/movido): el player ya saltó al
+        // siguiente; aquí solo se avisa con palabras normales.
+        player.onUnplayable = { id ->
+            val nombre = songs.value.find { it.id == id }?.title?.take(40) ?: "Ese audio"
+            _notice.value = "“$nombre” ya no está en el dispositivo — se saltó"
         }
         viewModelScope.launch {
             try { _ytRecent.value = yt.getRecent() } catch (_: Exception) {}
             try { _ytHistory.value = yt.getHistory() } catch (_: Exception) {}
+            // Pendientes invisibles de una muerte anterior: se borran una vez.
+            try { yt.cleanupStalePending() } catch (_: Exception) {}
+            // Fichas de descargas cuyos archivos ya no existen: se barren con
+            // cada recarga de biblioteca.
+            try { repo.sweepDownloadMeta(songs.value.mapNotNull {
+                try { java.io.File(it.dataPath).name } catch (_: Exception) { null } }.toSet())
+            } catch (_: Exception) {}
         }
         // Letras: cargar automáticamente al cambiar de tema
         viewModelScope.launch {
@@ -370,11 +400,17 @@ class MainViewModel(
         setExcludedFolders(cur)
     }
 
-    fun updateMetadata(s: Song, title: String, artist: String, album: String, onDone: (Boolean) -> Unit = {}) {
+    fun updateMetadata(
+        s: Song, title: String, artist: String, album: String,
+        onConsent: (android.content.IntentSender) -> Unit = {},
+        onDone: (Boolean) -> Unit = {}
+    ) {
         viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) { repo.updateMetadata(s.id, title, artist, album) }
-            if (ok) reload()
-            onDone(ok)
+            when (val r = withContext(Dispatchers.IO) { repo.updateMetadata(s.id, title, artist, album) }) {
+                is MusicRepository.MetaResult.Ok -> { reload(); onDone(true) }
+                is MusicRepository.MetaResult.NeedConsent -> onConsent(r.sender)
+                is MusicRepository.MetaResult.Fail -> onDone(false)
+            }
         }
     }
 
@@ -390,6 +426,7 @@ class MainViewModel(
     private val _homeYtQuery = MutableStateFlow("")
     val homeYtQuery: StateFlow<String> = _homeYtQuery
     private var homeYtJob: kotlinx.coroutines.Job? = null
+    private var homeYtGen = 0
 
     fun searchHomeYt(q: String = _query.value) {
         val query = q.trim()
@@ -400,26 +437,37 @@ class MainViewModel(
             _homeYtQuery.value = ""
             return
         }
+        val gen = ++homeYtGen
         homeYtJob = viewModelScope.launch {
             _homeYtLoading.value = true
             try {
                 val encontrados = withContext(Dispatchers.IO) { yt.searchFirstPage(query) }
+                // Si otra búsqueda empezó mientras tanto, estos resultados son viejos.
+                if (gen != homeYtGen) return@launch
                 _homeYt.value = encontrados
                 _homeYtQuery.value = query
-                val primeros = _homeYt.value
+                // Hijo del job: se cancela con la búsqueda y no mantiene el
+                // spinner encendido con resultados ya visibles.
+                val primeros = encontrados
                     .filterIsInstance<com.melodia.app.data.online.YtSearchItem.Track>()
                     .take(3)
-                for (t in primeros) {
-                    try {
-                        withContext(Dispatchers.IO) { yt.prefetchAudio(t.track.url, !_dataSaver.value) }
-                    } catch (_: Exception) {}
+                if (primeros.isNotEmpty()) {
+                    launch {
+                        for (t in primeros) {
+                            try {
+                                withContext(Dispatchers.IO) { yt.prefetchAudio(t.track.url, !_dataSaver.value) }
+                            } catch (_: Exception) {}
+                        }
+                    }
                 }
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
+                if (gen != homeYtGen) return@launch
                 _homeYt.value = emptyList()
                 _homeYtQuery.value = query
             } finally {
-                _homeYtLoading.value = false
+                // El finally del job cancelado apagaba el loading del nuevo.
+                if (gen == homeYtGen) _homeYtLoading.value = false
             }
         }
     }
@@ -441,14 +489,16 @@ class MainViewModel(
     // ── Cola de reproducción visible ──
     private fun emitPlay(list: List<Song>, idx: Int) {
         if (list.isEmpty()) return
-        // Tocar el tema que ya suena pausa/reanuda: antes se reiniciaba desde cero.
-        if (_currentId.value == list[idx.coerceIn(0, list.size - 1)].id) {
+        val at = idx.coerceIn(0, list.size - 1)
+        // Tocar el tema que ya suena pausa/reanuda SOLO dentro del mismo
+        // contexto: desde otra lista se reproduce ese contexto en vez de pausar.
+        if (_currentId.value == list[at].id && _queue.value.map { it.id } == list.map { it.id }) {
             player.toggle()
             return
         }
         _queue.value = list
-        _currentId.value = list[idx.coerceIn(0, list.size - 1)].id
-        player.play(list.map { it.id }, idx.coerceIn(0, list.size - 1))
+        _currentId.value = list[at].id
+        player.play(list.map { it.id }, at)
     }
     fun playQueueAt(idx: Int) {
         val q = _queue.value
@@ -463,7 +513,9 @@ class MainViewModel(
         if (q.isEmpty() || idx !in q.indices) return
         if (q.any { it.id == YT_STREAM_ID }) return
         if (q.size <= 1) return
-        player.removeAt(idx)
+        // Solo se filtra la UI si el player lo aceptó (con restore pendiente el
+        // exo aún es null y el tema reaparecía al aplicar el restore).
+        if (!player.removeAt(idx)) return
         _queue.value = q.filterIndexed { i, _ -> i != idx }
     }
 
@@ -509,10 +561,14 @@ class MainViewModel(
         }
     }
 
-    fun playSong(id: Long) {
-        val list = filtered.value.ifEmpty { songs.value }
-        val idx = list.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return
-        emitPlay(list, idx)
+    /**
+     * Reproduce por id dentro de [list]. Cada pantalla pasa SU lista visible:
+     * antes Inicio usaba `filtered` (con filtros de Explorar) y sonaba otra cosa.
+     */
+    fun playSong(id: Long, list: List<Song>? = null) {
+        val base = list ?: filtered.value.ifEmpty { songs.value }
+        val idx = base.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return
+        emitPlay(base, idx)
     }
     /** Reproduce por id desde toda la biblioteca (historial, estadísticas). */
     fun playById(id: Long) {
@@ -520,10 +576,10 @@ class MainViewModel(
         val idx = list.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return
         emitPlay(list, idx)
     }
-    fun playShuffle() {
-        val list = filtered.value.ifEmpty { songs.value }
-        if (list.isEmpty()) return
-        emitPlay(list, (list.indices).random())
+    fun playShuffle(list: List<Song>? = null) {
+        val base = list ?: filtered.value.ifEmpty { songs.value }
+        if (base.isEmpty()) return
+        emitPlay(base, (base.indices).random())
     }
     fun playListAt(list: List<Song>, idx: Int) = emitPlay(list, idx)
     fun playFavAt(idx: Int) = emitPlay(favSongs.value, idx)
@@ -570,18 +626,28 @@ class MainViewModel(
     // ── A continuación / al final ──
     fun queueNext(id: Long, onDone: (Boolean) -> Unit = {}) {
         val s = songs.value.find { it.id == id } ?: run { onDone(false); return }
+        // Sobre un stream no se encola: ninguna otra operación de cola acepta
+        // colas mixtas y el estado quedaba sin salida.
+        if (_queue.value.any { it.id == YT_STREAM_ID }) { onDone(false); return }
         if (!player.playNext(id)) { onDone(false); return }
+        // La posición la dice el player (su índice va en vivo); el state de la
+        // UI llega con retardo y el doble toque rápido la desfasaba.
+        val at = player.queueIds().indexOf(id).takeIf { it >= 0 }
+            ?: ((player.state.value.currentIndex + 1).coerceIn(0, _queue.value.size))
         val q = _queue.value.toMutableList()
-        val at = (player.state.value.currentIndex + 1).coerceIn(0, q.size)
-        q.add(at, s)
+        q.add(at.coerceIn(0, q.size), s)
         _queue.value = q
         onDone(true)
     }
 
     fun queueEnd(id: Long, onDone: (Boolean) -> Unit = {}) {
         val s = songs.value.find { it.id == id } ?: run { onDone(false); return }
+        if (_queue.value.any { it.id == YT_STREAM_ID }) { onDone(false); return }
         if (!player.addToEnd(id)) { onDone(false); return }
-        _queue.value = _queue.value + s
+        val at = player.queueIds().indexOf(id).takeIf { it >= 0 } ?: _queue.value.size
+        val q = _queue.value.toMutableList()
+        q.add(at.coerceIn(0, q.size), s)
+        _queue.value = q
         onDone(true)
     }
 
@@ -686,7 +752,7 @@ class MainViewModel(
     fun backup(ctx: android.content.Context, onDone: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val json = withContext(Dispatchers.IO) { lists.exportJson() }
+                val json = withContext(Dispatchers.IO) { lists.exportJson(songs.value) }
                 val values = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.Downloads.DISPLAY_NAME, "melodia-respaldo.json")
                     put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
@@ -734,10 +800,20 @@ class MainViewModel(
                     }
                 }
                 val farr = root.optJSONArray("favs") ?: org.json.JSONArray()
+                val byKey = lib.associateBy { lists.favKey(it.artist, it.title) }
+                val byId = lib.associateBy { it.id }
+                val vistos = mutableSetOf<Long>()
                 for (i in 0 until farr.length()) {
-                    val id = farr.optLong(i, -1)
-                    if (lib.any { it.id == id } && !_favIds.value.contains(id)) {
-                        lists.toggleFav(id, false); favs++
+                    val raw = farr.opt(i)
+                    // Respaldo nuevo: "artista|titulo" (estable entre equipos).
+                    // Respaldo viejo: id numérico de MediaStore.
+                    val match = when (raw) {
+                        is String -> byKey[raw]
+                        is Number -> byId[raw.toLong()]
+                        else -> byId[farr.optLong(i, -1)]
+                    } ?: continue
+                    if (vistos.add(match.id) && !_favIds.value.contains(match.id)) {
+                        lists.toggleFav(match.id, false); favs++
                     }
                 }
                 onDone("Restaurado: $pls listas, $added temas, $favs favoritos")
@@ -776,9 +852,10 @@ class MainViewModel(
                         artRepo.cached(s.artist, s.title)?.let { s.id to it }
                     }.toMap()
                     if (cached.isNotEmpty()) {
-                        val upd = _songs.value.map { s -> cached[s.id]?.let { s.copy(artUrl = it) } ?: s }
-                        _songs.value = upd
-                        actual = upd.associateBy { it.id }
+                        // update{}: lectura-modificación atómica. Con = había
+                        // carreras con reload() que tiraban carátulas ya puestas.
+                        _songs.update { cur -> cur.map { s -> cached[s.id]?.let { s.copy(artUrl = it) } ?: s } }
+                        actual = _songs.value.associateBy { it.id }
                     }
 
                     // 2) carátula incrustada en el archivo (máx. 80 grupos de álbum)
@@ -801,11 +878,16 @@ class MainViewModel(
                         emb++
                     }
                     if (found.isNotEmpty()) {
-                        val upd = _songs.value.map { s ->
-                            found[albumKey(s)]?.let { s.copy(artUrl = it) } ?: s
+                        // La clave de búsqueda es la misma de guardado: para
+                        // descargas es "s:id", no la del álbum (nunca coincidía
+                        // y la carátula incrustada jamás aparecía).
+                        _songs.update { cur ->
+                            cur.map { s ->
+                                val k = if (s.dataPath.contains("/Melodia/")) "s:${s.id}" else albumKey(s)
+                                found[k]?.let { s.copy(artUrl = it) } ?: s
+                            }
                         }
-                        _songs.value = upd
-                        actual = upd.associateBy { it.id }
+                        actual = _songs.value.associateBy { it.id }
                     }
 
                     // 3) red, solo lo que sigue sin arte (máx. 50 por carga)
@@ -817,8 +899,7 @@ class MainViewModel(
                         if (cur.artist.isBlank() || cur.artist == "Desconocido") continue
                         val url = try { artRepo.fetch(cur.artist, cur.title) } catch (_: Exception) { null }
                         if (!url.isNullOrBlank()) {
-                            val upd = _songs.value.map { x -> if (x.id == s.id) x.copy(artUrl = url) else x }
-                            _songs.value = upd
+                            _songs.update { cur2 -> cur2.map { x -> if (x.id == s.id) x.copy(artUrl = url) else x } }
                             actual = actual + (s.id to s.copy(artUrl = url))
                         }
                         n++
@@ -874,16 +955,22 @@ class MainViewModel(
 
     fun setYtQuery(q: String) { _ytQuery.value = q }
     private var searchJob: kotlinx.coroutines.Job? = null
+    private var searchGen = 0
     fun searchYt(q: String = _ytQuery.value) {
         val query = q.trim()
         if (query.isBlank()) return
         searchJob?.cancel() // evita que una búsqueda anterior pise a la nueva
+        val gen = ++searchGen
         searchJob = viewModelScope.launch {
             _ytLoading.value = true
             _ytError.value = null
             _ytErrorRetry.value = true
             try {
-                _ytResults.value = yt.search(query)
+                val res = yt.search(query)
+                // El fetch bloqueante no se interrumpe al cancelar: una búsqueda
+                // vieja que termina después no debe pisar a la nueva.
+                if (gen != searchGen) return@launch
+                _ytResults.value = res
                 _ytHasMore.value = yt.hasMore()
                 if (_ytResults.value.isEmpty()) {
                     _ytError.value = "Sin resultados — prueba con otras palabras"
@@ -912,10 +999,11 @@ class MainViewModel(
                 }
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
+                if (gen != searchGen) return@launch
                 _ytError.value = errMsg(t, "YouTube no respondió — reintenta en un momento")
                 _ytErrorRetry.value = com.melodia.app.data.online.YtErrors.retryable(t)
             }
-            _ytLoading.value = false
+            if (gen == searchGen) _ytLoading.value = false
         }
     }
 

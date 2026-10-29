@@ -7,18 +7,16 @@ import kotlinx.coroutines.flow.Flow
 class StatsRepository(private val db: MelodiaDatabase) {
     fun observe(): Flow<List<StatEntity>> = db.statDao().observeAll()
 
-    /** Registra el inicio de una reproducción (suma 1 play + duración aprox.). */
-    suspend fun recordPlay(songId: Long, durationMs: Long) {
+    /**
+     * Registra una escucha REAL: solo si sonó al menos 30 s (o la mitad en temas
+     * cortos). Antes sumaba 1 play + la duración completa al primer segundo, y
+     * saltar 10 temas de 5 min daba +10 plays y +50 min en 10 s.
+     */
+    suspend fun recordHeard(songId: Long, listenedMs: Long, durationMs: Long) {
         try {
-            val cur = db.statDao().get(songId)
-            db.statDao().upsert(
-                StatEntity(
-                    songId = songId,
-                    plays = (cur?.plays ?: 0) + 1,
-                    lastPlayedAt = System.currentTimeMillis(),
-                    listenMs = (cur?.listenMs ?: 0L) + durationMs.coerceAtLeast(0)
-                )
-            )
+            val umbral = minOf(30_000L, (durationMs / 2).coerceAtLeast(0))
+            if (listenedMs < umbral) return
+            db.statDao().heard(songId, System.currentTimeMillis(), listenedMs.coerceAtLeast(0))
         } catch (_: Exception) {}
     }
 

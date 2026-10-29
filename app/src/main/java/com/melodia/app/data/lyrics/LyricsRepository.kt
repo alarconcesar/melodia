@@ -153,6 +153,18 @@ class LyricsRepository(context: Context) {
             cacheFile(key).writeText(
                 JSONObject().put("synced", arr).put("plain", l.plain ?: "").put("inst", l.instrumental).toString()
             )
+            trimCache()
+        } catch (_: Exception) {}
+    }
+
+    /** Tope de disco: ~300 letras; se borran las más viejas. */
+    private fun trimCache() {
+        try {
+            val files = dir.listFiles() ?: return
+            if (files.size <= 300) return
+            files.sortedBy { it.lastModified() }.take(files.size - 300).forEach { f ->
+                try { f.delete() } catch (_: Exception) {}
+            }
         } catch (_: Exception) {}
     }
 

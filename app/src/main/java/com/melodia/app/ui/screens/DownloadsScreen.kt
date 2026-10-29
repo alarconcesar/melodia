@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -86,7 +88,10 @@ fun DownloadsScreenContent(
     onClearHistory: () -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    val activos = jobs.filter { it.status != DlStatus.DONE }
+    // DONE queda visible unos segundos como "Guardada": antes la tarjeta
+    // desaparecía al instante y salía "Sin descargas en curso" aunque acabara
+    // de terminar (hasta que refrescaba el historial).
+    val activos = jobs
     val reanudables = activos.filter { it.status == DlStatus.PAUSED || it.status == DlStatus.ERROR }
     val pausables = activos.filter { it.status == DlStatus.ACTIVE || it.status == DlStatus.QUEUED }
 
@@ -133,7 +138,7 @@ fun DownloadsScreenContent(
                         }
                     }
                 }
-                items(activos, key = { "job-${it.track.id}-${it.status}" }) { j ->
+                items(activos, key = { it.track.id }) { j ->
                     DlJobCard(
                         job = j,
                         onPause = { onPause(j.track.id) },
@@ -163,7 +168,7 @@ fun DownloadsScreenContent(
                         }
                     }
                 }
-                items(history, key = { "hist-${it.at}-${it.title}" }) { r ->
+                itemsIndexed(history, key = { i, r -> "hist-$i-${r.at}-${r.title}" }) { _, r ->
                     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                         Text(
                             r.title, style = Ds.Body, color = cs.onBackground,
@@ -218,7 +223,10 @@ private fun DlJobCard(
                     DlStatus.PAUSED, DlStatus.ERROR -> IconButton(onClick = onResume, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Default.PlayArrow, "Reanudar", Modifier.size(18.dp), tint = cs.primary)
                     }
-                    else -> {}
+                    DlStatus.DONE -> Icon(
+                        Icons.Default.Check, "Guardada",
+                        Modifier.size(20.dp), tint = cs.primary
+                    )
                 }
                 IconButton(onClick = onCancel, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, "Quitar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
@@ -252,7 +260,7 @@ private fun estado(job: DlJob): String = when (job.status) {
     DlStatus.QUEUED -> " · En cola"
     DlStatus.PAUSED -> if (job.total > 0) " · Pausada · ${mb(job.downloaded)}/${mb(job.total)}" else " · Pausada"
     DlStatus.ERROR -> " · ${job.error ?: "Falló"}"
-    DlStatus.DONE -> " · Guardando…"
+    DlStatus.DONE -> " · Guardada"
     else -> if (job.total > 0) " · ${mb(job.downloaded)}/${mb(job.total)}" else ""
 }
 

@@ -155,8 +155,21 @@ class ArtworkRepository(private val context: Context) {
     private fun trimCache() {
         try {
             val files = artDir.listFiles() ?: return
-            if (files.size <= 600) return
-            files.sortedBy { it.lastModified() }.take(files.size - 600).forEach { it.delete() }
+            if (files.size > 600) {
+                files.sortedBy { it.lastModified() }.take(files.size - 600).forEach { it.delete() }
+            }
+            // Las claves emb: guardan file:// y la poda las dejaba colgadas:
+            // embedded() devolvía rutas de JPG borrados (arte roto permanente).
+            val alive = artDir.listFiles()?.map { it.absolutePath }?.toSet() ?: emptySet()
+            prefs.all.forEach { (k, v) ->
+                val path = (v as? String) ?: return@forEach
+                if (path.startsWith("file://")) {
+                    val abs = try { java.io.File(java.net.URI(path).path ?: "").absolutePath } catch (_: Exception) { "" }
+                    if (abs.isNotBlank() && !alive.contains(abs) && abs.contains(artDir.absolutePath)) {
+                        try { prefs.edit().remove(k).apply() } catch (_: Exception) {}
+                    }
+                }
+            }
         } catch (_: Exception) {}
     }
 }

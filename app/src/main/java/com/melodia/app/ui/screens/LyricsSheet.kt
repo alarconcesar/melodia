@@ -83,7 +83,11 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
                 val idx = lines.indexOfLast { it.ms <= pos + 300 }.coerceAtLeast(0)
                 val listState = rememberLazyListState()
                 LaunchedEffect(idx) {
-                    try { listState.animateScrollToItem((idx - 2).coerceAtLeast(0)) } catch (_: Exception) {}
+                    // Si el usuario está leyendo otras estrofas (scrolleando),
+                    // no se le arranca la lista de las manos cada 3 segundos.
+                    if (!listState.isScrollInProgress) {
+                        try { listState.animateScrollToItem((idx - 2).coerceAtLeast(0)) } catch (_: Exception) {}
+                    }
                 }
                 LazyColumn(
                     state = listState,

@@ -24,6 +24,11 @@ class MainActivity : ComponentActivity() {
     private val perm = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) vm.reload()
     }
+    override fun onDestroy() {
+        try { com.melodia.app.perf.FrameMonitor.stop() } catch (_: Exception) {}
+        super.onDestroy()
+    }
+
     private val notifPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val writePerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 

@@ -26,8 +26,14 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
@@ -136,6 +142,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -219,15 +226,19 @@ private fun openAppSettings(ctx: android.content.Context) {
 @Composable
 fun MelodiaScreen(vm: MainViewModel) {
     val cs = MaterialTheme.colorScheme
-    var tab by remember { mutableStateOf(0) }
+    var tab by rememberSaveable { mutableStateOf(0) }
     val songs by vm.filtered.collectAsState()
     val homeSongs by vm.homeSongs.collectAsState()
     val all by vm.songs.collectAsState()
     val query by vm.query.collectAsState()
     // Solo isPlaying en la raíz: el PlayerState completo se observa dentro del
     // miniplayer y del reproductor, para no recomponer toda la pantalla cada tick.
-    val isPlaying by vm.playerState.map { it.isPlaying }.distinctUntilChanged()
-        .collectAsState(initial = false)
+    // El map{} crea un Flow nuevo por recomposición: sin remember se
+    // re-suscribía en cada frame (churn + flash a false).
+    val playingFlow = remember(vm.playerState) {
+        vm.playerState.map { it.isPlaying }.distinctUntilChanged()
+    }
+    val isPlaying by playingFlow.collectAsState(initial = false)
     val current by vm.currentSong.collectAsState()
     val folders by vm.folders.collectAsState()
     val albums by vm.albums.collectAsState()
@@ -246,22 +257,41 @@ fun MelodiaScreen(vm: MainViewModel) {
     val sleepLeft by vm.sleep.minsLeft.collectAsState()
     val selecting by vm.selecting.collectAsState()
     val selected by vm.selected.collectAsState()
-    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     val dlJobs by vm.dlJobs.collectAsState()
     val showDownloads by vm.showDownloads.collectAsState()
+    // Denegar el permiso NO es éxito: solo se limpia la selección cuando el
+    // sistema confirma (RESULT_OK). Si se deniega, se recarga igual para que la
+    // lista vuelva a mostrar los archivos (siguen ahí) y se mantiene la selección.
+    val notice by vm.notice.collectAsState()
+    val ctxToast = LocalContext.current
+    LaunchedEffect(notice) {
+        notice?.let {
+            try { android.widget.Toast.makeText(ctxToast, it, android.widget.Toast.LENGTH_LONG).show() } catch (_: Exception) {}
+            vm.clearNotice()
+        }
+    }
     val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
-    ) { vm.clearSelection(); vm.reload() }
-    var showPlayer by remember { mutableStateOf(false) }
-    var showLyrics by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
-    var showCreate by remember { mutableStateOf(false) }
-    var showAddTo by remember { mutableStateOf<Song?>(null) }
-    var showSort by remember { mutableStateOf(false) }
-    var showSleep by remember { mutableStateOf(false) }
-    var showXfade by remember { mutableStateOf(false) }
-    var showStats by remember { mutableStateOf(false) }
-    var showLib by remember { mutableStateOf(false) }
+    ) { res ->
+        if (res.resultCode == android.app.Activity.RESULT_OK) vm.clearSelection()
+        vm.reload()
+    }
+    // Editar metadatos de archivos ajenos (API 29+) también pide consentimiento.
+    val metaLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { res -> if (res.resultCode == android.app.Activity.RESULT_OK) vm.reload() }
+    var showPlayer by rememberSaveable { mutableStateOf(false) }
+    var showLyrics by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showCreate by rememberSaveable { mutableStateOf(false) }
+    var showAddToId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val showAddTo = all.find { it.id == showAddToId }
+    var showSort by rememberSaveable { mutableStateOf(false) }
+    var showSleep by rememberSaveable { mutableStateOf(false) }
+    var showXfade by rememberSaveable { mutableStateOf(false) }
+    var showStats by rememberSaveable { mutableStateOf(false) }
+    var showLib by rememberSaveable { mutableStateOf(false) }
     // Etiqueta para el reporte de fluidez (Ajustes → Rendimiento).
     LaunchedEffect(tab, showPlayer, showSettings, showLyrics) {
         com.melodia.app.perf.FrameMonitor.screen(
@@ -277,10 +307,11 @@ fun MelodiaScreen(vm: MainViewModel) {
             }
         )
     }
-    var showBackup by remember { mutableStateOf(false) }
-    var showEq by remember { mutableStateOf(false) }
-    var showInfo by remember { mutableStateOf<Song?>(null) }
-    var renameId by remember { mutableStateOf<Long?>(null) }
+    var showBackup by rememberSaveable { mutableStateOf(false) }
+    var showEq by rememberSaveable { mutableStateOf(false) }
+    var showInfoId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val showInfo = all.find { it.id == showInfoId }
+    var renameId by rememberSaveable { mutableStateOf<Long?>(null) }
     // Áreas de las barras flotantes para el blur (Haze)
     // Alto real de la barra inferior: el miniplayer se apoya justo encima (sin taparla)
 
@@ -410,20 +441,27 @@ fun MelodiaScreen(vm: MainViewModel) {
                         "${selected.size} ${if (selected.size == 1) "seleccionado" else "seleccionados"}",
                         style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f)
                     )
+                    val visibleSel = when (tab) {
+                        0 -> homeSongs
+                        3 -> favSongs
+                        else -> songs
+                    }
                     Text(
                         "Todo", style = Ds.Sub, color = cs.primary,
-                        modifier = Modifier.clickable { vm.selectAll(songs.map { it.id }) }.padding(6.dp)
+                        modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) {
+                            vm.selectAll(visibleSel.map { it.id })
+                        }.padding(6.dp)
                     )
                     Text(
                         "Borrar", style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
                         color = if (selected.isEmpty()) cs.onSurfaceVariant else cs.error,
-                        modifier = Modifier.clickable(enabled = selected.isNotEmpty()) {
+                        modifier = Modifier.clickable(enabled = selected.isNotEmpty(), role = androidx.compose.ui.semantics.Role.Button) {
                             showDeleteConfirm = true
                         }.padding(6.dp)
                     )
                     Text(
                         "Cancelar", style = Ds.Sub, color = cs.onSurfaceVariant,
-                        modifier = Modifier.clickable { vm.clearSelection() }.padding(6.dp)
+                        modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) { vm.clearSelection() }.padding(6.dp)
                     )
                 }
             }
@@ -461,10 +499,10 @@ fun MelodiaScreen(vm: MainViewModel) {
                 val t = tab
                 when (t) {
                     0 -> HomeTab(vm, homeSongs, all, current?.id, isPlaying, favIds,
-                        onAdd = { showInfo = it }, onTab = { tab = it },
+                        onAdd = { showInfoId = it.id }, onTab = { tab = it },
                         onOpenPlayer = { showPlayer = true })
                     1 -> ExploreTab(vm, folders, albums, artists, folderSel, albumSel, artistSel, songs, all,
-                        current?.id, isPlaying, favIds, onAdd = { showInfo = it })
+                        current?.id, isPlaying, favIds, onAdd = { showInfoId = it.id })
                     2 -> {
                         if (openPid == null) PlaylistsTab(playlists, allLinks, all,
                             onOpen = { vm.openPl(it) }, onCreate = { showCreate = true },
@@ -486,8 +524,8 @@ fun MelodiaScreen(vm: MainViewModel) {
                             onRemove = { sid -> vm.removeFromPlaylist(openPid!!, sid) })
                     }
                     3 -> FavsTab(favSongs, current?.id, isPlaying, favIds,
-                        onPlayAt = { vm.playFavAt(it) }, onFav = { vm.toggleFav(it) }, onAdd = { showInfo = it },
-                        onQueue = { s -> vm.queueEnd(s.id) { ok -> toast(appCtx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
+                        onPlayAt = { vm.playFavAt(it) }, onFav = { vm.toggleFav(it) }, onAdd = { showInfoId = it.id },
+                        onQueue = { s -> vm.queueEnd(s.id) { ok -> if (!ok && vm.currentSong.value?.id == YT_STREAM_ID) toast(appCtx, "Estás en online: reproduce un tema local para encolar") else toast(appCtx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
                     else -> OnlineTab(vm)
                 }
                 }
@@ -533,7 +571,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                         interactionSource = remember { MutableInteractionSource() }
                     ) {}
             ) {
-                current?.let { s -> NowPlaying(s, vm, s.id != YT_STREAM_ID && favIds.contains(s.id), onClose = { showPlayer = false }, onAdd = { showAddTo = s }, onLyrics = { showLyrics = true }) }
+                current?.let { s -> NowPlaying(s, vm, s.id != YT_STREAM_ID && favIds.contains(s.id), onClose = { showPlayer = false }, onAdd = { showAddToId = s.id }, onLyrics = { showLyrics = true }) }
             }
         }
         // ── Letra en tiempo real (encima del player) ──
@@ -629,10 +667,10 @@ fun MelodiaScreen(vm: MainViewModel) {
     }
     showAddTo?.let { s ->
         AlertDialog(
-            onDismissRequest = { showAddTo = null },
+            onDismissRequest = { showAddToId = null },
             title = { Text("Añadir a playlist", color = MaterialTheme.colorScheme.onBackground) },
             text = {
-                LazyColumn {
+                LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     if (playlists.isEmpty()) {
                         item { Text("Aún no hay playlists — créala desde la sección Listas", style = Ds.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
@@ -646,7 +684,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                                         android.widget.Toast.LENGTH_SHORT
                                     ).show()
                                 }
-                                showAddTo = null
+                                showAddToId = null
                             }
                                 .padding(vertical = 10.dp)
                         ) {
@@ -657,16 +695,16 @@ fun MelodiaScreen(vm: MainViewModel) {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showAddTo = null }) { Text("Cerrar") } }
+            confirmButton = { TextButton(onClick = { showAddToId = null }) { Text("Cerrar") } }
         )
     }
     showInfo?.let { s ->
         TrackInfoSheet(
             song = s, isFav = favIds.contains(s.id),
-            onPlay = { vm.playSong(s.id); showInfo = null },
+            onPlay = { vm.playSong(s.id, listOf(s)); showInfoId = null },
             onFav = { vm.toggleFav(s.id) },
-            onAdd = { showAddTo = s; showInfo = null },
-            onClose = { showInfo = null }, vm = vm
+            onAdd = { showAddToId = s.id; showInfoId = null },
+            onClose = { showInfoId = null }, vm = vm
         )
     }
     if (showSort) {
@@ -754,6 +792,12 @@ fun HomeTab(
     val homeYtQuery by vm.homeYtQuery.collectAsState()
     val busyYt by vm.busyYt.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
+    // Estas listas se usan dentro de item{}: se recolectan UNA vez arriba.
+    // Antes cada item creaba su propio observer y todo HomeTab se recomponía.
+    val artistsAll by vm.artists.collectAsState()
+    val albumsAll by vm.albums.collectAsState()
+    val playlistsAll by vm.playlists.collectAsState()
+    val recentAll by vm.recentPlayed.collectAsState()
     // La biblioteca filtra al instante; YouTube espera a que deje de teclear.
     LaunchedEffect(query) {
         if (query.isBlank()) {
@@ -820,21 +864,18 @@ fun HomeTab(
                         label = if (current != null) "Seguir escuchando" else "Tu biblioteca",
                         title = hero.title, subtitle = "${hero.artist} · ${all.size} temas",
                         playing = playing && current != null,
-                        onPlay = { if (current != null) vm.player.toggle() else vm.playShuffle() },
-                        onOpen = { if (current != null) onOpenPlayer() else vm.playShuffle() }
+                        onPlay = { if (current != null) vm.player.toggle() else vm.playShuffle(songs) },
+                        onOpen = { if (current != null) onOpenPlayer() else vm.playShuffle(songs) }
                     )
                 }
             }
         }
         item {
-            val q by vm.query.collectAsState()
-            if (q.isNotBlank()) {
-                val artists by vm.artists.collectAsState()
-                val albums by vm.albums.collectAsState()
-                val pls by vm.playlists.collectAsState()
-                val mArtists = artists.filter { it.name.contains(q, true) }.take(4)
-                val mAlbums = albums.filter { it.name.contains(q, true) }.take(4)
-                val mPls = pls.filter { it.name.contains(q, true) }.take(4)
+            if (query.isNotBlank()) {
+                val q = query
+                val mArtists = artistsAll.filter { it.name.contains(q, true) }.take(4)
+                val mAlbums = albumsAll.filter { it.name.contains(q, true) }.take(4)
+                val mPls = playlistsAll.filter { it.name.contains(q, true) }.take(4)
                 if (mArtists.isNotEmpty() || mAlbums.isNotEmpty() || mPls.isNotEmpty()) {
                     Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
                         Text("Coincidencias", style = Ds.Title, color = cs.onBackground)
@@ -866,7 +907,7 @@ fun HomeTab(
             }
         }
         item {
-            val recent by vm.recentPlayed.collectAsState()
+            val recent = recentAll
             if (recent.isNotEmpty() && query.isBlank()) {
                 Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
                     Text("Escuchado recientemente", style = Ds.Title, color = cs.onBackground)
@@ -899,8 +940,7 @@ fun HomeTab(
             }
         }
         if (!safeExtras2) item {
-            val albums by vm.albums.collectAsState()
-            val shown = remember(albums) { albums.sortedByDescending { it.count }.take(14) }
+            val shown = remember(albumsAll) { albumsAll.sortedByDescending { it.count }.take(14) }
             if (shown.isNotEmpty() && query.isBlank()) {
                 Column(Modifier.padding(vertical = 10.dp)) {
                     Row(
@@ -944,7 +984,7 @@ fun HomeTab(
                 }
             }
         }
-        item { SectionHeader("Tus temas", "Aleatorio", onAction = { vm.playShuffle() }) }
+        item { SectionHeader("Tus temas", "Aleatorio", onAction = { vm.playShuffle(songs) }) }
         if (songs.isEmpty()) {
             item {
                 EmptyState(
@@ -957,8 +997,8 @@ fun HomeTab(
         } else {
             items(songs, key = { it.id }) { s ->
                 TrackRow(s, s.id == currentId && playing, favs.contains(s.id),
-                    onTap = { vm.playSong(s.id) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) },
-                    onQueue = { vm.queueEnd(s.id) { ok -> toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
+                    onTap = { vm.playSong(s.id, songs) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) },
+                    onQueue = { vm.queueEnd(s.id) { ok -> if (!ok && vm.currentSong.value?.id == YT_STREAM_ID) toast(ctx, "Estás en online: reproduce un tema local para encolar") else toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
             }
         }
         // ── YouTube: lo que no está en tu biblioteca, sin cambiar de pestaña ──
@@ -1028,9 +1068,9 @@ fun ExploreTab(
 ) {
     val cs = MaterialTheme.colorScheme
     val ctx = LocalContext.current.applicationContext
-    var seg by remember { mutableStateOf(0) }
-    var artistDetail by remember { mutableStateOf<String?>(null) }
-    var albumDetail by remember { mutableStateOf<String?>(null) }
+    var seg by rememberSaveable { mutableStateOf(0) }
+    var artistDetail by rememberSaveable { mutableStateOf<String?>(null) }
+    var albumDetail by rememberSaveable { mutableStateOf<String?>(null) }
     if (artistDetail != null || albumDetail != null) {
         BackHandler { artistDetail = null; albumDetail = null }
     }
@@ -1039,23 +1079,23 @@ fun ExploreTab(
     val alName = albumDetail
     if (aName != null) {
         val mine = remember(all, aName) { all.filter { (it.artist.ifBlank { "Desconocido" }) == aName } }
-        if (mine.isEmpty()) artistDetail = null
-        else {
+        LaunchedEffect(mine.isEmpty()) { if (mine.isEmpty()) artistDetail = null }
+        if (mine.isNotEmpty()) {
             ArtistDetail(
                 name = aName, songs = mine, currentId = currentId, playing = playing, favs = favs,
                 onBack = { artistDetail = null },
                 onPlay = { vm.playArtist(aName) }, onShuffle = { vm.shuffleArtist(aName) },
                 onTap = { vm.playListAt(mine, mine.indexOfFirst { s -> s.id == it }.takeIf { i -> i >= 0 } ?: 0) },
                 onFav = { vm.toggleFav(it) }, onLongPress = onAdd,
-                onQueue = { vm.queueEnd(it.id) { ok -> toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } }
+                onQueue = { vm.queueEnd(it.id) { ok -> if (!ok && vm.currentSong.value?.id == YT_STREAM_ID) toast(ctx, "Estás en online: reproduce un tema local para encolar") else toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } }
             )
             return
         }
     }
     if (alName != null) {
         val mine = remember(all, alName) { all.filter { (it.album.ifBlank { "Sin álbum" }) == alName } }
-        if (mine.isEmpty()) albumDetail = null
-        else {
+        LaunchedEffect(mine.isEmpty()) { if (mine.isEmpty()) albumDetail = null }
+        if (mine.isNotEmpty()) {
             AlbumDetail(
                 album = albums.find { it.name == alName }, name = alName, songs = mine,
                 currentId = currentId, playing = playing, favs = favs,
@@ -1063,7 +1103,7 @@ fun ExploreTab(
                 onPlay = { vm.playAlbum(alName) }, onShuffle = { vm.shuffleAlbum(alName) },
                 onTap = { vm.playListAt(mine, mine.indexOfFirst { s -> s.id == it }.takeIf { i -> i >= 0 } ?: 0) },
                 onFav = { vm.toggleFav(it) }, onLongPress = onAdd,
-                onQueue = { vm.queueEnd(it.id) { ok -> toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } }
+                onQueue = { vm.queueEnd(it.id) { ok -> if (!ok && vm.currentSong.value?.id == YT_STREAM_ID) toast(ctx, "Estás en online: reproduce un tema local para encolar") else toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } }
             )
             return
         }
@@ -1089,8 +1129,8 @@ fun ExploreTab(
             }
             items(songs, key = { it.id }) { s ->
                 TrackRow(s, s.id == currentId && playing, favs.contains(s.id),
-                    onTap = { vm.playSong(s.id) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) },
-                    onQueue = { vm.queueEnd(s.id) { ok -> toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
+                    onTap = { vm.playSong(s.id, songs) }, onFav = { vm.toggleFav(s.id) }, onLongPress = { onAdd(s) },
+                    onQueue = { vm.queueEnd(s.id) { ok -> if (!ok && vm.currentSong.value?.id == YT_STREAM_ID) toast(ctx, "Estás en online: reproduce un tema local para encolar") else toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } })
             }
         } else {
             item {
@@ -1548,23 +1588,43 @@ private fun SeekBar(progress: Float, onSeek: (Float) -> Unit, modifier: Modifier
         androidx.compose.animation.core.spring(stiffness = 900f, dampingRatio = 0.7f),
         label = "knob"
     )
+    // Un solo gesto (tap o arrastre) sobre el mismo down: antes dos
+    // pointerInput competían y el tap a veces no respondía o saltaba doble.
+    // Además expone semántica de progreso: TalkBack ya puede operarla.
     Box(
         modifier.fillMaxWidth().height(28.dp)
             .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
-            .pointerInput(Unit) {
-                detectTapGestures { off -> onSeek((off.x / widthPx).coerceIn(0f, 1f)) }
+            .semantics {
+                contentDescription = "Progreso de reproducción"
+                progressBarRangeInfo = androidx.compose.ui.semantics.ProgressBarRangeInfo(
+                    shown, 0f..1f
+                )
             }
             .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragStart = { off ->
-                        dragging = true
-                        dragValue = (off.x / widthPx).coerceIn(0f, 1f)
-                    },
-                    onDragEnd = { dragging = false; onSeek(dragValue) },
-                    onDragCancel = { dragging = false }
-                ) { change, _ ->
-                    change.consume()
-                    dragValue = (change.position.x / widthPx).coerceIn(0f, 1f)
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    var v = (down.position.x / widthPx).coerceIn(0f, 1f)
+                    var moved = false
+                    var done = false
+                    while (!done) {
+                        val ev = awaitPointerEvent()
+                        val ch = ev.changes.firstOrNull { it.id == down.id }
+                        if (ch == null || !ch.pressed) {
+                            if (!moved) onSeek(v)
+                            else { onSeek(dragValue) }
+                            done = true
+                            break
+                        }
+                        val dx = kotlin.math.abs(ch.position.x - down.position.x)
+                        if (dx > viewConfiguration.touchSlop) moved = true
+                        if (moved) {
+                            if (!dragging) { dragging = true; dragValue = v }
+                            ch.consume()
+                            dragValue = (ch.position.x / widthPx).coerceIn(0f, 1f)
+                        }
+                        if (ch.pressed) ch.consume()
+                    }
+                    dragging = false
                 }
             },
         contentAlignment = Alignment.CenterStart
@@ -1631,7 +1691,7 @@ fun PlaylistDetail(
                 Text("Sin temas — mantén presionada una canción para agregarla", style = Ds.Body, color = cs.onSurfaceVariant)
             }
         }
-        itemsIndexed(songs, key = { idx0, e -> "pl-$idx0-${e.playlistId}-${e.songId}" }) { idx, e ->
+        itemsIndexed(songs, key = { _, e -> "pl-${e.playlistId}-${e.songId}" }) { idx, e ->
             var menu by remember { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth().clickable { onPlay(idx) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("${idx + 1}", style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.width(28.dp))
@@ -1699,8 +1759,8 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     val queue by vm.queueSongs.collectAsState()
     val queueTotal = queue.size
     val isStream = s.id == YT_STREAM_ID
-    var showQueue by remember { mutableStateOf(false) }
-    var showPitch by remember { mutableStateOf(false) }
+    var showQueue by rememberSaveable { mutableStateOf(false) }
+    var showPitch by rememberSaveable { mutableStateOf(false) }
     var tapMsg by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
     LaunchedEffect(tapMsg) { if (tapMsg != null) { kotlinx.coroutines.delay(900); tapMsg = null } }
@@ -1881,7 +1941,8 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                     Box(contentAlignment = Alignment.Center) {
                         AnimatedContent(targetState = state.isPlaying, label = "pp-hero") { p ->
                             Icon(
-                                if (p) Icons.Default.Pause else Icons.Default.PlayArrow, null,
+                                if (p) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                if (p) "Pausar" else "Reproducir",
                                 tint = cs.surface, modifier = Modifier.size(36.dp)
                             )
                         }
@@ -2413,6 +2474,15 @@ fun QueueSheetContent(
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = if (curIdx > 2) curIdx - 2 else 0
     )
+    // Al avanzar la cola con la hoja abierta, el índice inicial queda obsoleto.
+    // Si el usuario no scrolleó lejos, se acompaña al tema actual.
+    LaunchedEffect(curIdx) {
+        try {
+            if (curIdx >= 0 && listState.firstVisibleItemIndex <= 2) {
+                listState.scrollToItem((curIdx - 2).coerceAtLeast(0))
+            }
+        } catch (_: Exception) {}
+    }
     val conteo = when {
         queue.isEmpty() -> "Sin temas"
         queue.size == 1 -> "1 tema · ${fmtTotal(queue.sumOf { it.durationMs })}"
@@ -2655,10 +2725,22 @@ private fun QueueIconBtn(
 fun EditMetadataSheet(song: Song, vm: MainViewModel, onDismiss: () -> Unit, onSaved: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     val ctx = LocalContext.current
-    var title by remember(song.id) { mutableStateOf(song.title) }
-    var artist by remember(song.id) { mutableStateOf(song.artist) }
-    var album by remember(song.id) { mutableStateOf(song.album) }
-    var saving by remember { mutableStateOf(false) }
+    var title by rememberSaveable(song.id) { mutableStateOf(song.title) }
+    var artist by rememberSaveable(song.id) { mutableStateOf(song.artist) }
+    var album by rememberSaveable(song.id) { mutableStateOf(song.album) }
+    var saving by rememberSaveable { mutableStateOf(false) }
+    // El consentimiento de escritura (API 29+) se pide con este launcher.
+    val consentLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { res ->
+        saving = false
+        if (res.resultCode == android.app.Activity.RESULT_OK) {
+            android.widget.Toast.makeText(ctx, "Datos actualizados", android.widget.Toast.LENGTH_SHORT).show()
+            onSaved()
+        } else {
+            android.widget.Toast.makeText(ctx, "Sin permiso: no se guardó", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = { Text("Editar datos", color = cs.onBackground) },
@@ -2683,7 +2765,14 @@ fun EditMetadataSheet(song: Song, vm: MainViewModel, onDismiss: () -> Unit, onSa
                 onClick = {
                     if (title.isBlank() || saving) return@TextButton
                     saving = true
-                    vm.updateMetadata(song, title, artist, album) { ok ->
+                    vm.updateMetadata(
+                        song, title, artist, album,
+                        onConsent = { sender ->
+                            consentLauncher.launch(
+                                androidx.activity.result.IntentSenderRequest.Builder(sender).build()
+                            )
+                        }
+                    ) { ok ->
                         saving = false
                         android.widget.Toast.makeText(
                             ctx,
@@ -2705,7 +2794,7 @@ fun EditMetadataSheet(song: Song, vm: MainViewModel, onDismiss: () -> Unit, onSa
 fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> Unit, onAdd: () -> Unit, onClose: () -> Unit, vm: MainViewModel) {
     val cs = MaterialTheme.colorScheme
     val ctx = LocalContext.current
-    var showEdit by remember { mutableStateOf(false) }
+    var showEdit by rememberSaveable { mutableStateOf(false) }
     if (showEdit) {
         EditMetadataSheet(song, vm, onDismiss = { showEdit = false }, onSaved = { showEdit = false; onClose() })
     }
@@ -2906,7 +2995,7 @@ fun InfoRow(label: String, value: String) {
 
 @Composable
 fun TextDialog(title: String, initial: String, onDismiss: () -> Unit, onOk: (String) -> Unit) {
-    var v by remember { mutableStateOf(initial) }
+    var v by rememberSaveable(initial) { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, color = MaterialTheme.colorScheme.onBackground) },

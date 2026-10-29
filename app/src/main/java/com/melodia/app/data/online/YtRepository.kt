@@ -11,6 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.InfoItem.InfoType
 import org.schabi.newpipe.extractor.NewPipe
@@ -41,6 +42,13 @@ data class YtTrack(
 
 data class YtAudio(val url: String, val ext: String, val mime: String)
 
+/**
+ * El CDN rechazó con 403: la URL firmada murió antes de lo previsto.
+ * No es un corte de red: reintentar sobre la misma URL es inútil, hay que
+ * re-resolver con `bestAudio(force = true)`.
+ */
+class DlUrlExpiredException(m: String) : java.io.IOException(m)
+
 /** Búsqueda, audio y descarga de YouTube vía NewPipeExtractor (sin API key). */
 class YtRepository(private val context: Context) {
 
@@ -60,6 +68,8 @@ class YtRepository(private val context: Context) {
     // ── Paginación: se guarda el extractor y la página siguiente ──
     private var pager: SearchExtractor? = null
     private var next: Page? = null
+    /** Generación de búsqueda: una búsqueda lenta no debe pisar a una rápida. */
+    private var searchGen = 0
     private data class CachedAudio(val audio: YtAudio, val expiresAt: Long)
     private val audioCache = mutableMapOf<String, CachedAudio>()
 
@@ -86,9 +96,13 @@ class YtRepository(private val context: Context) {
 
     /** Ejecuta la búsqueda y deja listo el paginador. filters=null → índice general. */
     private fun fetchPage(query: String, filters: List<String>?): List<YtSearchItem> {
+        val gen = ++searchGen
         val (ex, items) = extract(query, filters)
-        pager = ex
-        next = try { ex.initialPage.nextPage } catch (_: Exception) { null }
+        // Si otra búsqueda empezó mientras extraíamos, sus resultados mandan.
+        synchronized(this) { if (gen == searchGen) {
+            pager = ex
+            next = try { ex.initialPage.nextPage } catch (_: Exception) { null }
+        } }
         return items
     }
 
@@ -200,6 +214,7 @@ class YtRepository(private val context: Context) {
             }
             val ex = yt().getStreamExtractor(videoUrl)
             ex.fetchPage()
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
             val audios: List<AudioStream> = ex.audioStreams
             require(audios.isNotEmpty()) { "Sin audio disponible" }
             val ranked = audios.sortedByDescending { try { it.averageBitrate } catch (_: Exception) { 0 } }
@@ -260,7 +275,7 @@ class YtRepository(private val context: Context) {
         } catch (_: Exception) {}
     }
     /** Historial de descargas (persistido, máx. 50): título, artista, calidad y fecha. */
-    data class DlRecord(val title: String, val artist: String, val high: Boolean, val at: Long)
+    data class DlRecord(val title: String, val artist: String, val high: Boolean, val at: Long, val id: String = "")
 
     fun getDlHistory(): List<DlRecord> {
         return try {
@@ -268,7 +283,7 @@ class YtRepository(private val context: Context) {
             (0 until arr.length()).mapNotNull { i ->
                 try {
                     val o = arr.getJSONObject(i)
-                    DlRecord(o.getString("t"), o.optString("a", ""), o.optBoolean("h", true), o.optLong("at", 0))
+                    DlRecord(o.getString("t"), o.optString("a", ""), o.optBoolean("h", true), o.optLong("at", 0), o.optString("id", ""))
                 } catch (_: Exception) { null }
             }
         } catch (_: Exception) { emptyList() }
@@ -276,9 +291,12 @@ class YtRepository(private val context: Context) {
 
     fun pushDlHistory(track: YtTrack, high: Boolean) {
         try {
-            val list = (listOf(DlRecord(track.title, track.artist, high, System.currentTimeMillis())) + getDlHistory()).take(50)
+            // Deduplica por tema (antes cada re-descarga duplicaba la fila).
+            val list = (listOf(DlRecord(track.title, track.artist, high, System.currentTimeMillis(), track.id)) + getDlHistory())
+                .distinctBy { if (it.id.isNotBlank()) "id:${it.id}" else "t:${it.title}|${it.artist}|${it.high}" }
+                .take(50)
             val arr = org.json.JSONArray()
-            list.forEach { arr.put(org.json.JSONObject().put("t", it.title).put("a", it.artist).put("h", it.high).put("at", it.at)) }
+            list.forEach { arr.put(org.json.JSONObject().put("t", it.title).put("a", it.artist).put("h", it.high).put("at", it.at).put("id", it.id)) }
             prefs().edit().putString("dlhist", arr.toString()).apply()
         } catch (_: Exception) {}
     }
@@ -309,7 +327,7 @@ class YtRepository(private val context: Context) {
     suspend fun download(track: YtTrack, onProgress: (Float) -> Unit, high: Boolean = true): Uri =
         withContext(Dispatchers.IO) {
             val audio = bestAudio(track.url, high)
-            val fileName = sanitize("${track.title} - ${track.artist.ifBlank { "YouTube" }}") + "." + audio.ext
+            val fileName = fileNamePara(track) + "." + audio.ext
             val resolver = context.contentResolver
             if (Build.VERSION.SDK_INT < 29) {
                 try {
@@ -465,6 +483,12 @@ class YtRepository(private val context: Context) {
     ): Long = withContext(Dispatchers.IO) {
         val c = openConn(url)
         c.connect()
+        // Un 403 aquí es HTML de error, no audio: antes se guardaba como tema válido.
+        val code = try { c.responseCode } catch (_: Exception) { -1 }
+        if (code == 403 || code == 404 || code == 410) {
+            try { c.disconnect() } catch (_: Exception) {}
+            throw DlUrlExpiredException("CDN devolvió $code")
+        }
         val len = c.contentLengthLong.takeIf { it > 0 } ?: -1L
         // Sin tamaño no hay forma de reanudar: se reescribe desde cero. Antes se
         // agregaba al final y el archivo quedaba con el doble de bytes.
@@ -474,6 +498,7 @@ class YtRepository(private val context: Context) {
             c.inputStream.use { inp ->
                 val buf = ByteArray(64 * 1024)
                 while (true) {
+                    coroutineContext.ensureActive()
                     val n = inp.read(buf)
                     if (n < 0) break
                     out.write(buf, 0, n)
@@ -508,7 +533,14 @@ class YtRepository(private val context: Context) {
         while (true) {
             try {
                 val c = openConn(url, "bytes=$from-$to")
-                if (c.responseCode != HttpURLConnection.HTTP_PARTIAL) {
+                val rc = try { c.responseCode } catch (ce: kotlinx.coroutines.CancellationException) { throw ce } catch (_: Exception) { -1 }
+                // 403 = URL firmada muerta: reintentar el mismo rango es quemar
+                // requests. Se propaga para re-resolver el enlace una sola vez.
+                if (rc == 403 || rc == 404 || rc == 410) {
+                    c.disconnect()
+                    throw DlUrlExpiredException("rango rechazado con $rc")
+                }
+                if (rc != HttpURLConnection.HTTP_PARTIAL) {
                     c.disconnect()
                     error("El servidor no aceptó Range")
                 }
@@ -527,6 +559,9 @@ class YtRepository(private val context: Context) {
                 c.disconnect()
                 return@withContext
             } catch (e: Exception) {
+                // Pausar/cancelar en pleno trozo tardaba hasta 5 reintentos en
+                // sentirse: la cancelación siempre pasa de largo.
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 attempt++
                 if (attempt >= 3 && depth < 3 && (to - from) > 512_000L) {
                     // Reintentar el resto en dos mitades más pequeñas
@@ -589,6 +624,7 @@ class YtRepository(private val context: Context) {
                 (bmp.height * escala).toInt().coerceAtLeast(1), true
             ) else bmp
             val dir = File(context.filesDir, "dlart").apply { mkdirs() }
+            trimDir(dir, 200)
             val f = File(dir, "${clave.hashCode()}.jpg")
             f.outputStream().use { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
             if (out !== bmp) bmp.recycle()
@@ -610,6 +646,47 @@ class YtRepository(private val context: Context) {
                 )
             )
         } catch (_: Exception) {}
+    }
+
+    /** Poda un directorio de caché dejando los [keep] archivos más recientes. */
+    private fun trimDir(dir: File, keep: Int) {
+        try {
+            val files = dir.listFiles()?.sortedByDescending { it.lastModified() } ?: return
+            files.drop(keep).forEach { try { it.delete() } catch (_: Exception) {} }
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Limpia descargas marcadas IS_PENDING que quedaron colgadas (la app murió
+     * entre insert y update): son invisibles para siempre si nadie las borra.
+     */
+    suspend fun cleanupStalePending(): Int = withContext(Dispatchers.IO) {
+        if (Build.VERSION.SDK_INT < 29) return@withContext 0
+        var n = 0
+        try {
+            val resolver = context.contentResolver
+            resolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                arrayOf(MediaStore.Audio.Media._ID),
+                "${MediaStore.Audio.Media.IS_PENDING}=1 AND ${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?",
+                arrayOf("%Music/Melodia%"),
+                null
+            )?.use { c ->
+                val ids = mutableListOf<Long>()
+                val ci = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                while (c.moveToNext()) ids += c.getLong(ci)
+                ids.forEach { id ->
+                    try {
+                        if (resolver.delete(
+                            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                            "${MediaStore.Audio.Media._ID}=?",
+                            arrayOf(id.toString())
+                        ) > 0) n++
+                    } catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) {}
+        n
     }
 
     /** Trae los temas de una playlist de YouTube (título + hasta 100 temas, varias páginas). */
@@ -669,11 +746,15 @@ class YtRepository(private val context: Context) {
      * le incrusta título, artista, letra y carátula en el propio archivo.
      * Si el etiquetado falla, la descarga se conserva igual.
      */
+    /** Nombre único por descarga: lleva el id para no colisionar ni con MediaStore. */
+    fun fileNamePara(track: YtTrack): String =
+        sanitize("${track.title} - ${track.artist.ifBlank { "YouTube" }}") + " [" + track.id.take(16).replace(Regex("[^A-Za-z0-9_-]"), "") + "]"
+
     suspend fun storeDownload(
         track: YtTrack, high: Boolean, audio: YtAudio, part: File,
         lyrics: String? = null, artBytes: ByteArray? = null, artMime: String? = null
     ): Uri = withContext(Dispatchers.IO) {
-        val fileName = sanitize("${track.title} - ${track.artist.ifBlank { "YouTube" }}") + "." + audio.ext
+        val fileName = fileNamePara(track) + "." + audio.ext
         val resolver = context.contentResolver
         if (Build.VERSION.SDK_INT < 29) {
             try {

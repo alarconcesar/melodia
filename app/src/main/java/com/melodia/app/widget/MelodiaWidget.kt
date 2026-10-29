@@ -19,6 +19,33 @@ class MelodiaWidget : AppWidgetProvider() {
         refresh(ctx)
     }
 
+    /**
+     * Los botones pasaban por getService directo: con el servicio muerto (tras
+     * reinicio, sin haber abierto la app) el tap fallaba en silencio. Ahora
+     * pasan por el receiver, que intenta arrancar el servicio y, si no puede,
+     * abre la app para que el usuario retome desde ahí.
+     */
+    override fun onReceive(ctx: Context, intent: Intent) {
+        super.onReceive(ctx, intent)
+        val act = intent.action ?: return
+        if (act !in ROUTED) return
+        try {
+            androidx.core.content.ContextCompat.startForegroundService(
+                ctx, Intent(ctx, MelodiaPlaybackService::class.java).setAction(act)
+            )
+        } catch (_: Exception) {
+            try {
+                ctx.startActivity(
+                    Intent(ctx, MainActivity::class.java).apply {
+                        action = Intent.ACTION_MAIN
+                        addCategory(Intent.CATEGORY_LAUNCHER)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
     companion object {
         @Volatile private var title = "Melodia"
         @Volatile private var artist = "Tu música"
@@ -47,14 +74,20 @@ class MelodiaWidget : AppWidgetProvider() {
                 )
                 val b = art
                 if (b != null) {
-                    try { rv.setImageViewBitmap(R.id.w_art, b) } catch (_: Exception) {}
+                    try {
+                        val pig = if (b.width > 192 || b.height > 192) {
+                            val k = 192f / maxOf(b.width, b.height)
+                            Bitmap.createScaledBitmap(b, (b.width * k).toInt().coerceAtLeast(1), (b.height * k).toInt().coerceAtLeast(1), true)
+                        } else b
+                        rv.setImageViewBitmap(R.id.w_art, pig)
+                    } catch (_: Exception) {}
                 } else {
                     try { rv.setImageViewResource(R.id.w_art, R.drawable.ic_notif_music) } catch (_: Exception) {}
                 }
-                rv.setOnClickPendingIntent(R.id.w_prev, svc(ctx, MelodiaPlaybackService.ACTION_PREV, 1))
-                rv.setOnClickPendingIntent(R.id.w_play, svc(ctx, MelodiaPlaybackService.ACTION_TOGGLE, 2))
-                rv.setOnClickPendingIntent(R.id.w_next, svc(ctx, MelodiaPlaybackService.ACTION_NEXT, 3))
-                rv.setOnClickPendingIntent(R.id.w_sleep, svc(ctx, MelodiaPlaybackService.ACTION_SLEEP, 5))
+                rv.setOnClickPendingIntent(R.id.w_prev, route(ctx, MelodiaPlaybackService.ACTION_PREV, 1))
+                rv.setOnClickPendingIntent(R.id.w_play, route(ctx, MelodiaPlaybackService.ACTION_TOGGLE, 2))
+                rv.setOnClickPendingIntent(R.id.w_next, route(ctx, MelodiaPlaybackService.ACTION_NEXT, 3))
+                rv.setOnClickPendingIntent(R.id.w_sleep, route(ctx, MelodiaPlaybackService.ACTION_SLEEP, 5))
                 try {
                     rv.setProgressBar(R.id.w_progress, 1000, if (dur > 0) ((pos.toFloat() / dur) * 1000).toInt().coerceIn(0, 1000) else 0, false)
                 } catch (_: Exception) {}
@@ -77,10 +110,18 @@ class MelodiaWidget : AppWidgetProvider() {
         private val UNSET: Bitmap? = null
         private fun undefined(): Bitmap? = UNSET
 
-        private fun svc(ctx: Context, action: String, code: Int): PendingIntent {
-            return PendingIntent.getService(
+        /** Acciones que pasan por el receiver (con fallback a abrir la app). */
+        internal val ROUTED = setOf(
+            MelodiaPlaybackService.ACTION_TOGGLE,
+            MelodiaPlaybackService.ACTION_PREV,
+            MelodiaPlaybackService.ACTION_NEXT,
+            MelodiaPlaybackService.ACTION_SLEEP
+        )
+
+        private fun route(ctx: Context, action: String, code: Int): PendingIntent {
+            return PendingIntent.getBroadcast(
                 ctx, code,
-                Intent(ctx, MelodiaPlaybackService::class.java).setAction(action),
+                Intent(ctx, MelodiaWidget::class.java).setAction(action),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         }
