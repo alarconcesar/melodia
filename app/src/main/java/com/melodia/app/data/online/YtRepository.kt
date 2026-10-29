@@ -612,6 +612,26 @@ class YtRepository(private val context: Context) {
     private fun artistaDe(track: YtTrack): String =
         track.artist.trim().ifBlank { "YouTube" }
 
+    /** Versión pública (sin red) para historial y UI. */
+    fun artistFor(track: YtTrack): String = artistaDe(track)
+
+    /**
+     * Artista con resolución real: si el item no trae canal, se consulta
+     * iTunes Search por título (dato canónico, no deducción del título).
+     * Solo se acepta con título coincidente; si no, "YouTube".
+     */
+    suspend fun resolveArtist(track: YtTrack, artRepo: com.melodia.app.data.art.ArtworkRepository): String =
+        withContext(Dispatchers.IO) {
+            val directo = track.artist.trim()
+            if (directo.isNotBlank()) return@withContext directo
+            try {
+                val r = kotlinx.coroutines.withTimeoutOrNull(4_000L) {
+                    artRepo.fetchArtist(track.title, "")
+                }
+                r?.trim()?.takeIf { it.isNotBlank() } ?: "YouTube"
+            } catch (_: Exception) { "YouTube" }
+        }
+
     /** Guarda la carátula en disco y devuelve su file:// (independiente de MediaStore). */
     private fun guardarPortada(bytes: ByteArray?, clave: String): String? {
         if (bytes == null || bytes.isEmpty()) return null
@@ -689,6 +709,122 @@ class YtRepository(private val context: Context) {
         n
     }
 
+    /** Artista/título incrustados en el propio archivo (sin adivinar nada). */
+    private fun embeddedArtist(uri: Uri): String? {
+        var r: android.media.MediaMetadataRetriever? = null
+        return try {
+            r = android.media.MediaMetadataRetriever()
+            try {
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { fd ->
+                    r.setDataSource(fd.fileDescriptor)
+                }
+            } catch (_: Exception) { return null }
+            r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                ?.trim()?.takeIf { it.isNotBlank() && it != "<unknown>" }
+        } catch (_: Exception) { null } finally {
+            try { r?.release() } catch (_: Exception) {}
+        }
+    }
+
+    private fun esArtistaBasura(a: String): Boolean {
+        val t = a.trim()
+        return t.isBlank() || t == "<unknown>" || t.equals("Desconocido", true) || t.equals("YouTube", true)
+    }
+
+    /**
+     * Repara fichas de descargas con artista vacío o "YouTube": primero lo que
+     * dice la fila de MediaStore, luego lo incrustado en el archivo, y solo al
+     * final iTunes (máx. 25 consultas de red por pasada). Idempotente: lo ya
+     * arreglado se salta, así converge en varios arranques sin castigar.
+     *
+     * Devuelve cuántas fichas escribió.
+     */
+    suspend fun repairDownloadMeta(
+        artRepo: com.melodia.app.data.art.ArtworkRepository,
+        meta: com.melodia.app.data.DownloadMetaStore,
+        maxRed: Int = 25
+    ): Int = withContext(Dispatchers.IO) {
+        var escritas = 0
+        var redUsada = 0
+        try {
+            val resolver = context.contentResolver
+            val sel: String
+            val args: Array<String>?
+            if (Build.VERSION.SDK_INT >= 29) {
+                sel = "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
+                args = arrayOf("%Music/Melodia%")
+            } else {
+                sel = "${MediaStore.Audio.Media.DATA} LIKE ?"
+                args = arrayOf("%/Melodia/%")
+            }
+            val cols = arrayOf(
+                MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.DISPLAY_NAME,
+                MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.ARTIST,
+                MediaStore.Audio.Media.ALBUM
+            )
+            resolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, cols, sel, args, null
+            )?.use { c ->
+                val iId = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                val iName = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+                val iTitle = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                val iArtist = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                val iAlbum = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+                while (c.moveToNext()) {
+                    try {
+                        val name = try { c.getString(iName) ?: "" } catch (_: Exception) { "" }
+                        if (name.isBlank()) continue
+                        val existente = try { meta.get(name) } catch (_: Exception) { null }
+                        val rowArtist = try { c.getString(iArtist) ?: "" } catch (_: Exception) { "" }
+                        // Ficha sana (con artista real) y fila sana: nada que hacer.
+                        if (existente != null && !esArtistaBasura(existente.artist)) continue
+                        val rowTitle = (try { c.getString(iTitle) ?: "" } catch (_: Exception) { "" }).ifBlank {
+                            name.substringBeforeLast('.')
+                        }
+                        val rowAlbum = try { c.getString(iAlbum) ?: "" } catch (_: Exception) { "" }
+                        var artista: String? = null
+                        if (!esArtistaBasura(rowArtist)) artista = rowArtist.trim()
+                        if (artista == null) {
+                            val id = try { c.getLong(iId) } catch (_: Exception) { -1L }
+                            val uri = android.content.ContentUris.withAppendedId(
+                                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
+                            )
+                            artista = embeddedArtist(uri)
+                        }
+                        if (artista == null && redUsada < maxRed) {
+                            redUsada++
+                            artista = try {
+                                kotlinx.coroutines.withTimeoutOrNull(4_000L) {
+                                    artRepo.fetchArtist(rowTitle, "")
+                                }?.trim()?.takeIf { it.isNotBlank() }
+                            } catch (_: Exception) { null }
+                            // Si la red falló, la próxima pasada lo reintenta.
+                            if (artista == null) continue
+                        }
+                        if (artista == null) continue
+                        try {
+                            meta.put(
+                                name,
+                                com.melodia.app.data.DownloadMetaStore.Meta(
+                                    title = existente?.title?.ifBlank { rowTitle } ?: rowTitle,
+                                    artist = artista,
+                                    album = existente?.album?.ifBlank {
+                                        rowAlbum.ifBlank { rowTitle }
+                                    } ?: rowAlbum.ifBlank { rowTitle },
+                                    artPath = existente?.artPath
+                                )
+                            )
+                            escritas++
+                        } catch (_: Exception) {}
+                    } catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) {}
+        escritas
+    }
+
     /** Trae los temas de una playlist de YouTube (título + hasta 100 temas, varias páginas). */
     suspend fun playlistTracks(url: String): Pair<String, List<YtTrack>> = withContext(Dispatchers.IO) {
         ensure()
@@ -752,7 +888,8 @@ class YtRepository(private val context: Context) {
 
     suspend fun storeDownload(
         track: YtTrack, high: Boolean, audio: YtAudio, part: File,
-        lyrics: String? = null, artBytes: ByteArray? = null, artMime: String? = null
+        lyrics: String? = null, artBytes: ByteArray? = null, artMime: String? = null,
+        artistOverride: String? = null
     ): Uri = withContext(Dispatchers.IO) {
         val fileName = fileNamePara(track) + "." + audio.ext
         val resolver = context.contentResolver
@@ -761,7 +898,8 @@ class YtRepository(private val context: Context) {
                 File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Melodia").mkdirs()
             } catch (_: Exception) {}
         }
-        val artista = artistaDe(track)
+        val ov = artistOverride?.trim()
+        val artista = if (ov.isNullOrBlank()) artistaDe(track) else ov
         val titulo = track.title
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
@@ -801,7 +939,31 @@ class YtRepository(private val context: Context) {
                 values.put(MediaStore.Audio.Media.IS_PENDING, 0)
                 resolver.update(uri, values, null, null)
             }
-            guardarMeta(fileName, track, artista, titulo, artBytes)
+            // Re-afirmar tras reescribir el archivo: en algunos equipos el
+            // re-escaneo posterior pisa los metadatos con lo que trae el
+            // archivo. La fila manda, no el escáner.
+            try {
+                resolver.update(
+                    uri,
+                    ContentValues().apply {
+                        put(MediaStore.Audio.Media.TITLE, titulo)
+                        put(MediaStore.Audio.Media.ARTIST, artista)
+                        put(MediaStore.Audio.Media.ALBUM, titulo)
+                    },
+                    null as String?, null as Array<String>?
+                )
+            } catch (_: Exception) {}
+            // Clave con el nombre REAL en MediaStore (si el sistema renombró
+            // por colisión, la ficha con el nombre pedido quedaba huérfana).
+            val claveReal = try {
+                resolver.query(uri, arrayOf(MediaStore.Audio.Media.DISPLAY_NAME), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0) else null
+                }
+            } catch (_: Exception) { null }
+            guardarMeta(if (claveReal.isNullOrBlank()) fileName else claveReal, track, artista, titulo, artBytes)
+            if (claveReal != null && claveReal != fileName) {
+                guardarMeta(fileName, track, artista, titulo, artBytes)
+            }
             uri
         } catch (e: Exception) {
             try { resolver.delete(uri, null, null) } catch (_: Exception) {}

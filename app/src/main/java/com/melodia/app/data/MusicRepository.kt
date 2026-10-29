@@ -113,6 +113,15 @@ class MusicRepository(context: Context, private val dlMeta: DownloadMetaStore = 
         try { MediaStore.createDeleteRequest(resolver, pendientes).intentSender } catch (_: Exception) { null }
     }
 
+    /**
+     * Repara fichas de descargas sin artista real (fila → archivo → iTunes).
+     * Devuelve cuántas fichas escribió.
+     */
+    suspend fun repairDownloadMeta(
+        yt: com.melodia.app.data.online.YtRepository,
+        artRepo: com.melodia.app.data.art.ArtworkRepository
+    ): Int = yt.repairDownloadMeta(artRepo, dlMeta)
+
     /** Limpia fichas de descargas cuyos archivos ya no existen. */
     fun sweepDownloadMeta(existingNames: Set<String>) {
         try { dlMeta.sweep(existingNames) } catch (_: Exception) {}

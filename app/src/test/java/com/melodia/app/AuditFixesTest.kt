@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.melodia.app.data.groupAlbums
+import com.melodia.app.data.art.normTitle
+import com.melodia.app.data.art.titlesMatch
 import com.melodia.app.data.model.Song
 import com.melodia.app.data.online.DlUrlExpiredException
 import com.melodia.app.data.online.YtErrors
@@ -90,6 +92,33 @@ class AuditFixesTest {
     fun mismoAlbumMismoArtistaSigueJunto() {
         val songs = listOf(song(1, artist = "Muse"), song(2, artist = "Muse"))
         assertEquals(1, groupAlbums(songs).size)
+    }
+
+    // ── Normalización de títulos (iTunes) ──────────────────────────
+    @Test
+    fun coletillasNoRompeneElMatch() {
+        assertEquals("toco madera", normTitle("Toco madera (Official Video)"))
+        assertEquals("tema", normTitle("[Lyric] Tema - HD"))
+    }
+
+    @Test
+    fun elMismoTemaMatcheaAunqueVengaSucio() {
+        assertTrue(titlesMatch("Toco madera", "Toco Madera"))
+        assertTrue(titlesMatch("Amor Eterno", "amor eterno (official audio)"))
+    }
+
+    @Test
+    fun temasDistintosNoMatchean() {
+        assertTrue(!titlesMatch("Amor", "Amor - Remix"))
+        assertTrue(!titlesMatch("Sol", "Luna"))
+        assertTrue(!titlesMatch("", "Algo"))
+    }
+
+    @Test
+    fun artistaVacioEsYouTube() {
+        val yt = YtRepository(ctx())
+        assertEquals("YouTube", yt.artistFor(YtTrack("x", "T", "", 1, null, "u")))
+        assertEquals("Muse", yt.artistFor(YtTrack("x", "T", "Muse", 1, null, "u")))
     }
 
     // ── Errores ───────────────────────────────────────────────────

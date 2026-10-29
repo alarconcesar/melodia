@@ -9,6 +9,28 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
+/**
+ * Normaliza un título para comparar ("Tema (Official Video)" → "tema").
+ * Quita paréntesis/corchetes, coletillas típicas y puntuación.
+ */
+fun normTitle(t: String): String {
+    var s = t.lowercase()
+    s = s.replace(Regex("\\s*[\\[(].*?[\\])]"), " ")
+    s = s.replace(Regex("\\b(official|video|audio|lyric|lyrics|music|clip|hq|hd|visualizer|cover|remastered|remaster|version)\\b"), " ")
+    s = s.replace(Regex("[^a-z0-9áéíóúñü ]"), " ")
+    return s.replace(Regex("\\s+"), " ").trim()
+}
+
+/** true si los títulos hablan del mismo tema (igualdad o contención sana). */
+fun titlesMatch(a: String, b: String): Boolean {
+    val x = normTitle(a)
+    val y = normTitle(b)
+    if (x.isBlank() || y.isBlank()) return false
+    if (x == y) return true
+    val (corto, largo) = if (x.length <= y.length) x to y else y to x
+    return corto.length >= 4 && largo.contains(corto) && corto.length.toFloat() / largo.length >= 0.5f
+}
+
 /** Carátulas de iTunes Search API (sin key) para temas sin arte local. */
 class ArtworkRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("melodia_art", Context.MODE_PRIVATE)
@@ -23,6 +45,48 @@ class ArtworkRepository(private val context: Context) {
         return try {
             if (!prefs.contains(k)) null
             else prefs.getString(k, null)?.ifBlank { null }.also { mem[k] = it }
+        } catch (_: Exception) { null }
+    }
+
+    /**
+     * Artista canónico vía iTunes Search (sin key): se acepta solo si el título
+     * coincide ([titlesMatch]) y, con pista del canal, el artista encaja con
+     * ella. Sin match seguro se devuelve null (mejor "YouTube" que inventar).
+     */
+    suspend fun fetchArtist(title: String, hint: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val h = hint.trim()
+            val q = if (h.isBlank() || h.equals("YouTube", true)) title else "$title $h"
+            val url = URL(
+                "https://itunes.apple.com/search?term=${URLEncoder.encode(q, "UTF-8")}" +
+                    "&media=music&entity=song&limit=5"
+            )
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8000; readTimeout = 8000
+                setRequestProperty("User-Agent", "Melodia/1.0")
+            }
+            try {
+                if (conn.responseCode != 200) return@withContext null
+                val arr = JSONObject(conn.inputStream.bufferedReader().readText())
+                    .optJSONArray("results") ?: return@withContext null
+                val hn = h.lowercase()
+                var fallback: String? = null
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val itunesTitle = o.optString("trackName", "")
+                    val itunesArtist = o.optString("artistName", "").trim()
+                    if (itunesArtist.isBlank() || !titlesMatch(title, itunesTitle)) continue
+                    if (fallback == null) fallback = itunesArtist
+                    // Con pista del canal se exige que encaje (en ambos sentidos).
+                    if (hn.isBlank() || hn == "youtube") return@withContext itunesArtist
+                    val an = itunesArtist.lowercase()
+                    if (an.contains(hn) || hn.contains(an)) return@withContext itunesArtist
+                }
+                // Sin pista útil, el primer título coincidente vale.
+                if ((h.isBlank() || h.equals("YouTube", true))) fallback else null
+            } finally {
+                try { conn.disconnect() } catch (_: Exception) {}
+            }
         } catch (_: Exception) { null }
     }
 

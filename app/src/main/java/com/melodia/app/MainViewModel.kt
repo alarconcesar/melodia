@@ -235,6 +235,17 @@ class MainViewModel(
                 try { java.io.File(it.dataPath).name } catch (_: Exception) { null } }.toSet())
             } catch (_: Exception) {}
         }
+        // Descargas viejas sin artista: se reparan desde la fila, el archivo o
+        // iTunes (máx. 25 consultas de red por arranque; converge sola).
+        viewModelScope.launch {
+            try {
+                val n = withContext(Dispatchers.IO) { repo.repairDownloadMeta(yt, artRepo) }
+                if (n > 0) {
+                    _dlHistory.value = yt.getDlHistory()
+                    reload()
+                }
+            } catch (_: Exception) {}
+        }
         // Letras: cargar automáticamente al cambiar de tema
         viewModelScope.launch {
             currentSong.collect { s -> if (s != null) loadLyrics(s) }
@@ -248,6 +259,10 @@ class MainViewModel(
             // Letra y carátula se buscan EN PARALELO y con tope de tiempo: antes
             // eran dos esperas de red en fila y la descarga "terminaba" segundos
             // antes de aparecer en el historial.
+            val artistaR = async {
+                try { yt.resolveArtist(track, artRepo) }
+                catch (_: Exception) { yt.artistFor(track) }
+            }
             val letra = async {
                 try {
                     val l = withContext(Dispatchers.IO) {
@@ -265,13 +280,16 @@ class MainViewModel(
             }
             val lyricText = letra.await()
             val art = arte.await()
+            val artista = artistaR.await()
             // Además de incrustarla en el m4a, queda como carátula local del
             // tema: si el etiquetado falla, la biblioteca igual muestra la suya.
             try { withContext(Dispatchers.IO) { artRepo.saveLocal(track.artist, track.title, art) } } catch (_: Exception) {}
-            withContext(Dispatchers.IO) { yt.storeDownload(track, high, audio, part, lyricText, art, null) }
+            withContext(Dispatchers.IO) {
+                yt.storeDownload(track, high, audio, part, lyricText, art, null, artista)
+            }
             // Primero el historial (es lo que mira el usuario), después la biblioteca.
             try {
-                yt.pushDlHistory(track, high)
+                yt.pushDlHistory(track.copy(artist = artista), high)
                 _dlHistory.value = yt.getDlHistory()
             } catch (_: Exception) {}
             reload()
