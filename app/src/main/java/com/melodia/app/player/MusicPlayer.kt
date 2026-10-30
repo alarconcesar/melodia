@@ -55,6 +55,8 @@ class MusicPlayer(private val context: Context) {
     var onStreamError: ((positionMs: Long) -> Unit)? = null
     private var streamRetries = 0
     private val maxStreamRetries = 2
+    /** El stream murió y ya no hay reintento (URL muerta + red caída): avisar. */
+    var onStreamDead: (() -> Unit)? = null
     /** Un archivo local borrado/movido: la app avisa y salta al siguiente. */
     var onUnplayable: ((id: Long) -> Unit)? = null
     private var errorSkips = 0
@@ -119,7 +121,13 @@ class MusicPlayer(private val context: Context) {
                             if (streamRetries < maxStreamRetries) {
                                 streamRetries++
                                 onStreamError?.invoke(p.currentPosition.coerceAtLeast(0))
+                            } else {
+                                try { onStreamDead?.invoke() } catch (_: Exception) {}
                             }
+                        } else {
+                            // Otro fallo (red caída, BT cortado) en stream: avisar
+                            // en vez de quedar parado sin mensaje.
+                            try { onStreamDead?.invoke() } catch (_: Exception) {}
                         }
                         return
                     }
@@ -141,6 +149,8 @@ class MusicPlayer(private val context: Context) {
     fun initialize() {
         if (bound) return
         try {
+            // Si quedó un bind muerto, se suelta antes de reintentar.
+            try { context.unbindService(connection) } catch (_: Exception) {}
             // Solo bind al abrir: el foreground + notificación se activan al sonar
             val intent = Intent(context, MelodiaPlaybackService::class.java)
             bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
@@ -351,6 +361,26 @@ class MusicPlayer(private val context: Context) {
     private fun applyPendingRestore(p: ExoPlayer) {
         val r = pendingRestore ?: return
         pendingRestore = null
+        // Headless en curso (Auto/Bluetooth reanudó solo sobre este mismo
+        // ExoPlayer): NO se hace setMediaItems (cortaría lo que suena con
+        // playWhenReady=false). Solo se sincroniza queueIds con el timeline.
+        try {
+            if (p.isPlaying && p.mediaItemCount > 0) {
+                val ids = (0 until p.mediaItemCount).mapNotNull { i ->
+                    try { p.getMediaItemAt(i).mediaId.toLongOrNull() } catch (_: Exception) { null }
+                }
+                if (ids.isNotEmpty()) {
+                    queueIds = ids.toMutableList()
+                    updateState()
+                }
+                return
+            }
+        } catch (_: Exception) {}
+        if (queueIds.isNotEmpty() && r.ids.isEmpty()) {
+            // Ya había cola viva y el restore venía vacío: no se pisa.
+            updateState()
+            return
+        }
         try {
             val pares = r.ids.mapNotNull { id -> songMap[id]?.let { id to buildItem(it) } }
             if (pares.isEmpty()) return
@@ -392,8 +422,14 @@ class MusicPlayer(private val context: Context) {
     }
 
     // ── Tono (pitch) y velocidad ──
+    // Persisten en prefs (se cargan junto a `prefs`, más abajo): la cola
+    // restaurada tras muerte del proceso sonaba a 1x sin aviso.
     private var pitch = 1f
     private var speed = 1f
+    private fun cargarPitchSpeed(p: android.content.SharedPreferences) {
+        try { pitch = p.getFloat("pitch", 1f).coerceIn(0.25f, 2f) } catch (_: Exception) {}
+        try { speed = p.getFloat("speed", 1f).coerceIn(0.25f, 2f) } catch (_: Exception) {}
+    }
 
     private fun applyParams() {
         try {
@@ -402,9 +438,21 @@ class MusicPlayer(private val context: Context) {
         } catch (e: Exception) { Log.e("MusicPlayer", "params fail", e) }
     }
 
-    fun setPitch(p: Float) { pitch = p.coerceIn(0.25f, 2f); applyParams() }
-    fun setSpeed(s: Float) { speed = s.coerceIn(0.25f, 2f); applyParams() }
-    fun resetPitchSpeed() { pitch = 1f; speed = 1f; applyParams() }
+    fun setPitch(p: Float) {
+        pitch = p.coerceIn(0.25f, 2f)
+        try { prefs.edit().putFloat("pitch", pitch).apply() } catch (_: Exception) {}
+        applyParams()
+    }
+    fun setSpeed(s: Float) {
+        speed = s.coerceIn(0.25f, 2f)
+        try { prefs.edit().putFloat("speed", speed).apply() } catch (_: Exception) {}
+        applyParams()
+    }
+    fun resetPitchSpeed() {
+        pitch = 1f; speed = 1f
+        try { prefs.edit().remove("pitch").remove("speed").apply() } catch (_: Exception) {}
+        applyParams()
+    }
 
     /** IDs de la cola actual (copia). */
     fun queueIds(): List<Long> = try { queueIds.toList() } catch (_: Exception) { emptyList() }
@@ -416,6 +464,7 @@ class MusicPlayer(private val context: Context) {
     fun removeAt(index: Int): Boolean {
         return try {
             val p = exo ?: return false
+            ensureRestore(p)
             if (index !in queueIds.indices) return false
             val id = queueIds[index]
             val tl = timelineIndexOf(id, index)
@@ -437,6 +486,7 @@ class MusicPlayer(private val context: Context) {
     fun moveItem(from: Int, to: Int): Boolean {
         return try {
             val p = exo ?: return false
+            ensureRestore(p)
             if (from !in queueIds.indices || to !in queueIds.indices || from == to) return false
             val tlFrom = timelineIndexOf(queueIds[from], from)
             val tlTo = timelineIndexOf(queueIds[to], to)
@@ -460,6 +510,7 @@ class MusicPlayer(private val context: Context) {
     fun clearQueueKeepCurrent(): Boolean {
         return try {
             val p = exo ?: return false
+            ensureRestore(p)
             val cur = p.currentMediaItemIndex
             if (cur < 0 || cur >= p.mediaItemCount) return false
             val total = p.mediaItemCount
@@ -486,11 +537,38 @@ class MusicPlayer(private val context: Context) {
             if (p.isPlaying) { pauseForFade(); p.pause() } else p.play()
         } catch (_: Exception) {}
     }
-    fun next() { ensureBound(); val p = exo; if (p != null) ensureRestore(p); jumpWithFade { try { exo?.seekToNextMediaItem() } catch (_: Exception) {} } }
-    fun prev() { ensureBound(); val p = exo; if (p != null) ensureRestore(p); jumpWithFade { try { exo?.seekToPreviousMediaItem() } catch (_: Exception) {} } }
+    fun next() {
+        ensureBound()
+        val p = exo ?: run { addPending { next() }; return }
+        ensureRestore(p)
+        // Sin a dónde ir no hay fundido: el dip a silencio sin cambio confunde.
+        if (!puedeAvanzar()) return
+        jumpWithFade { try { exo?.seekToNextMediaItem() } catch (_: Exception) {} }
+    }
+    fun prev() {
+        ensureBound()
+        val p = exo ?: run { addPending { prev() }; return }
+        ensureRestore(p)
+        if (!puedeRetroceder()) return
+        jumpWithFade { try { exo?.seekToPreviousMediaItem() } catch (_: Exception) {} }
+    }
+    /** ¿Hay siguiente/anterior según repeat (sin repeat no se sale de los bordes)? */
+    private fun puedeAvanzar(): Boolean {
+        return try {
+            val p = exo ?: return false
+            p.repeatMode != Player.REPEAT_MODE_OFF || p.currentMediaItemIndex < p.mediaItemCount - 1
+        } catch (_: Exception) { false }
+    }
+    private fun puedeRetroceder(): Boolean {
+        return try {
+            val p = exo ?: return false
+            p.repeatMode != Player.REPEAT_MODE_OFF || p.currentMediaItemIndex > 0 || p.currentPosition > 3_000
+        } catch (_: Exception) { false }
+    }
 
     // ── Fundido entre canciones (activable) ──
     private val prefs = context.getSharedPreferences("melodia_player", Context.MODE_PRIVATE)
+        .also { cargarPitchSpeed(it) }
     var crossfade: Boolean = prefs.getBoolean("xfade", false)
         private set
     var crossfadeSecs: Int = prefs.getInt("xfade_secs", 3)
@@ -501,7 +579,13 @@ class MusicPlayer(private val context: Context) {
     fun setCrossfade(v: Boolean) {
         crossfade = v
         prefs.edit().putBoolean("xfade", v).apply()
-        if (!v) { try { exo?.volume = 1f } catch (_: Exception) {} }
+        if (!v) {
+            // Con una rampa en vuelo el job viejo seguía escribiendo volumen→0
+            // sobre el tema nuevo. Se cancela y se restaura.
+            try { fadeJob?.cancel() } catch (_: Exception) {}
+            fadedOut = false
+            try { exo?.volume = 1f } catch (_: Exception) {}
+        }
         updateState()
     }
 
@@ -511,7 +595,11 @@ class MusicPlayer(private val context: Context) {
         updateState()
     }
 
-    private fun rampVolume(to: Float, ms: Long, then: (() -> Unit)? = null) {
+    private fun rampVolume(
+        to: Float, ms: Long,
+        then: (() -> Unit)? = null,
+        onCancel: (() -> Unit)? = null
+    ) {
         fadeJob?.cancel()
         fadeJob = scope.launch {
             try {
@@ -525,8 +613,20 @@ class MusicPlayer(private val context: Context) {
                     delay(stepMs)
                 }
                 then?.invoke()
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                // La rampa murió a mitad: el que la pidió decide (el salto del
+                // crossfade se ejecuta igual, una sola vez).
+                try { onCancel?.invoke() } catch (_: Exception) {}
+                throw ce
             } catch (_: Exception) {}
         }
+    }
+
+    /** Instante del último salto manual (seek/next/prev): distingue repeat-one real. */
+    var ultimoSaltoManualMs: Long = 0L
+        private set
+    private fun marcarSalto() {
+        ultimoSaltoManualMs = android.os.SystemClock.elapsedRealtime()
     }
 
     /** Fundido de salida automático al acercarse el final del tema. */
@@ -547,19 +647,26 @@ class MusicPlayer(private val context: Context) {
 
     private fun jumpWithFade(jump: () -> Unit) {
         try {
+            // Se ejecuta una sola vez, gane la rampa o la cancelación: antes el
+            // salto vivía en el `then` y pausar/buscar en 250 ms lo tragaba.
+            val ya = java.util.concurrent.atomic.AtomicBoolean(false)
+            fun saltarUnaVez() { if (ya.compareAndSet(false, true)) { try { jump() } catch (_: Exception) {} } }
             if (!crossfade) {
                 // Sin crossfade no hay rampas: cualquier resto en vuelo se corta
                 // antes de saltar (si no, el tema nuevo heredaba el fundido).
                 try { fadeJob?.cancel() } catch (_: Exception) {}
                 fadedOut = false
                 try { exo?.volume = 1f } catch (_: Exception) {}
-                jump(); return
+                saltarUnaVez(); return
             }
-            rampVolume(0f, 250) {
-                try { jump() } catch (_: Exception) {}
-                fadedOut = false
-                rampVolume(1f, 1200)
-            }
+            rampVolume(0f, 250,
+                then = {
+                    saltarUnaVez()
+                    fadedOut = false
+                    rampVolume(1f, 1200)
+                },
+                onCancel = { saltarUnaVez() }
+            )
         } catch (_: Exception) { try { jump() } catch (_: Exception) {} }
     }
 
@@ -598,13 +705,23 @@ class MusicPlayer(private val context: Context) {
         try { exo?.volume = 1f } catch (_: Exception) {}
         fadedOut = false
     }
-    fun toggleShuffle() { try { exo?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled; updateState() } } catch (_: Exception) {} }
+    fun toggleShuffle() {
+        ensureBound()
+        if (exo == null) { addPending { toggleShuffle() }; return }
+        try { exo?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled; updateState() } } catch (_: Exception) {}
+    }
     fun cycleRepeat() {
+        ensureBound()
+        if (exo == null) { addPending { cycleRepeat() }; return }
         try { exo?.let { it.repeatMode = when (it.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF }; updateState() } } catch (_: Exception) {}
     }
     fun seekTo(f: Float) {
         ensureBound()
-        try { exo?.let {
+        val p0 = exo
+        if (p0 == null) { addPending { seekTo(f) }; return }
+        marcarSalto()
+        try {
+            p0.let {
             ensureRestore(it)
             val d = try { it.duration } catch (_: Exception) { androidx.media3.common.C.TIME_UNSET }
             // Sin duración conocida la fracción no significa nada: no saltar al inicio.
@@ -616,7 +733,11 @@ class MusicPlayer(private val context: Context) {
     /** Salto relativo en ms (doble toque ±10 s en la carátula). */
     fun seekBy(ms: Long) {
         ensureBound()
-        try { exo?.let {
+        val p0 = exo
+        if (p0 == null) { addPending { seekBy(ms) }; return }
+        marcarSalto()
+        try {
+            p0.let {
             ensureRestore(it)
             val d = try { it.duration } catch (_: Exception) { androidx.media3.common.C.TIME_UNSET }
             val target = it.currentPosition + ms

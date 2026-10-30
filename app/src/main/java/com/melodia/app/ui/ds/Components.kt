@@ -223,7 +223,9 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
                 Text(
                     text = action, style = Ds.Sub,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable(onClick = onAction).padding(4.dp)
+                    modifier = Modifier.clickable(
+                        role = androidx.compose.ui.semantics.Role.Button, onClick = onAction
+                    ).padding(4.dp)
                 )
             } else {
                 Text(text = action, style = Ds.Sub, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -542,7 +544,8 @@ fun EmptyState(
                 action,
                 style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
                 color = cs.primary,
-                modifier = Modifier.clip(CircleShape).clickable(onClick = onAction)
+                modifier = Modifier.clip(CircleShape)
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onAction)
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             )
         }

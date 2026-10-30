@@ -58,7 +58,7 @@ import com.melodia.app.ui.ds.MicroLabel
  * flotante donde no cabía nada.
  */
 @Composable
-fun DownloadsScreen(vm: MainViewModel, onClose: () -> Unit) {
+fun DownloadsScreen(vm: MainViewModel, onClose: () -> Unit, onPlayRecord: (YtRepository.DlRecord) -> Unit = {}) {
     val jobs by vm.dlJobs.collectAsState()
     val hist by vm.dlHistory.collectAsState()
     DownloadsScreenContent(
@@ -70,7 +70,8 @@ fun DownloadsScreen(vm: MainViewModel, onClose: () -> Unit) {
         onPause = { vm.pauseDl(it) },
         onResume = { vm.resumeDl(it) },
         onCancel = { vm.cancelDl(it) },
-        onClearHistory = { vm.clearDlHistory() }
+        onClearHistory = { vm.clearDlHistory() },
+        onPlayRecord = onPlayRecord
     )
 }
 
@@ -85,7 +86,8 @@ fun DownloadsScreenContent(
     onPause: (String) -> Unit,
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
-    onClearHistory: () -> Unit
+    onClearHistory: () -> Unit,
+    onPlayRecord: (YtRepository.DlRecord) -> Unit = {}
 ) {
     val cs = MaterialTheme.colorScheme
     // DONE queda visible unos segundos como "Guardada": antes la tarjeta
@@ -169,7 +171,12 @@ fun DownloadsScreenContent(
                     }
                 }
                 itemsIndexed(history, key = { i, r -> "hist-$i-${r.at}-${r.title}" }) { _, r ->
-                    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { onPlayRecord(r) })
+                            .padding(horizontal = 4.dp)
+                    ) {
                         Text(
                             r.title, style = Ds.Body, color = cs.onBackground,
                             maxLines = 1, overflow = TextOverflow.Ellipsis

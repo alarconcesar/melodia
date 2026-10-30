@@ -91,6 +91,21 @@ class AppContainer(context: Context) {
             val cm = appContext.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
             val net = cm.activeNetwork ?: return false
             val caps = cm.getNetworkCapabilities(net) ?: return false
+            if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
+            ) return false
+            // VPN: manda la red subyacente (VPN sobre WiFi no es "datos").
+            if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) {
+                for (n in cm.allNetworks) {
+                    if (n == net) continue
+                    val c = try { cm.getNetworkCapabilities(n) } catch (_: Exception) { null } ?: continue
+                    if (!c.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)) continue
+                    if (c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
+                    if (c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+                        c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
+                    ) return false
+                }
+            }
             !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
         } catch (_: Exception) { false }
     }

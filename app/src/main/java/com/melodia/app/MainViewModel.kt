@@ -240,13 +240,17 @@ class MainViewModel(
                     escuchandoDesde = ahora
                 } else if (id == escuchandoId && id > 0 && pos < ultimaPos - 2_000) {
                     // Repeat-one: la posición volvió atrás = una vuelta entera.
-                    val dur = songs.value.find { it.id == id }?.durationMs ?: 0L
-                    registrar = Triple(id, ahora - escuchandoDesde, dur)
+                    // Un salto manual (seek, prev, doble-toque) también rebobina:
+                    // no cuenta como escucha.
+                    if (ahora - player.ultimoSaltoManualMs > 3_000) {
+                        val dur = songs.value.find { it.id == id }?.durationMs ?: 0L
+                        registrar = Triple(id, ahora - escuchandoDesde, dur)
+                    }
                     escuchandoDesde = ahora
                 }
                 ultimaPos = pos
                 registrar?.let { (previo, ms, dur) ->
-                    viewModelScope.launch { stats.recordHeard(previo, ms, dur) }
+                    if (previo > 0) viewModelScope.launch { stats.recordHeard(previo, ms, dur) }
                 }
                 if (id > 0 || id == YT_STREAM_ID) _currentId.value = id
                 // Sin cola local visible no hay nada que reanudar después.
@@ -255,6 +259,9 @@ class MainViewModel(
         }
         // Tema local irreproducible (borrado/movido): el player ya saltó al
         // siguiente; aquí solo se avisa con palabras normales.
+        player.onStreamDead = {
+            _ytError.value = "No se pudo recuperar el audio. Reintenta en un momento."
+        }
         player.onUnplayable = { id ->
             val nombre = songs.value.find { it.id == id }?.title?.take(40) ?: "Ese audio"
             _notice.value = "“$nombre” ya no está en el dispositivo — se saltó"
@@ -320,7 +327,8 @@ class MainViewModel(
             val artista = artistaR.await()
             // Además de incrustarla en el m4a, queda como carátula local del
             // tema: si el etiquetado falla, la biblioteca igual muestra la suya.
-            try { withContext(Dispatchers.IO) { artRepo.saveLocal(track.artist, track.title, art) } } catch (_: Exception) {}
+            // Con el artista resuelto (el crudo no matchea las lecturas).
+            try { withContext(Dispatchers.IO) { artRepo.saveLocal(artista, track.title, art) } } catch (_: Exception) {}
             withContext(Dispatchers.IO) {
                 yt.storeDownload(track, high, audio, part, lyricText, art, null, artista)
             }
@@ -613,9 +621,7 @@ class MainViewModel(
             val saved = try {
                 withContext(Dispatchers.IO) {
                     val pid = lists.createPlaylist(name)
-                    var n = 0
-                    songs.forEach { s -> if (lists.addToPlaylist(pid, s)) n++ }
-                    n
+                    lists.addAllToPlaylist(pid, songs)
                 }
             } catch (_: Exception) { 0 }
             onDone(saved)
@@ -720,8 +726,15 @@ class MainViewModel(
     fun toggleCrossfade() { player.setCrossfade(!player.state.value.crossfade) }
     fun setCrossfadeSecs(s: Int) { player.setCrossfadeSecs(s) }
 
-    fun toggleFav(id: Long) { viewModelScope.launch { lists.toggleFav(id, _favIds.value.contains(id)) } }
-    fun createPlaylist(name: String, onDone: (Long) -> Unit = {}) { viewModelScope.launch { val id = lists.createPlaylist(name); onDone(id) } }
+    fun toggleFav(id: Long) { viewModelScope.launch { lists.toggleFavFresh(id) } }
+    fun createPlaylist(name: String, onDone: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val limpio = name.trim().take(60)
+            if (limpio.isBlank()) { onDone(-1); return@launch }
+            val id = lists.createPlaylist(limpio)
+            onDone(id)
+        }
+    }
     // ── Selección múltiple (borrar varios temas) ──
     private val _selecting = MutableStateFlow(false)
     val selecting: StateFlow<Boolean> = _selecting
@@ -1129,10 +1142,13 @@ class MainViewModel(
 
     fun loadMoreYt() {
         if (_ytMoreLoading.value || !_ytHasMore.value) return
+        val gen = searchGen
         viewModelScope.launch {
             _ytMoreLoading.value = true
             try {
                 val extra = withContext(Dispatchers.IO) { yt.more() }
+                // Si hubo una búsqueda en medio, esta página es de la anterior.
+                if (gen != searchGen) return@launch
                 if (extra.isNotEmpty()) {
                     val known = _ytResults.value.map { it.key }.toSet()
                     _ytResults.value = _ytResults.value + extra.filter { !known.contains(it.key) }
@@ -1234,19 +1250,19 @@ class MainViewModel(
         val tracks: List<YtTrack> = emptyList(),
         val error: String? = null,
         val truncated: Boolean = false
-    ) {
-        /** Tamaño estimado de bajarla entera (m4a ~2 MB/min). */
-        fun estimadoMb(): Long = tracks.sumOf { it.durationSec.coerceAtLeast(0) } / 30
-    }
+    )
 
     private val _ytPreview = MutableStateFlow<YtPreview?>(null)
     val ytPreview: StateFlow<YtPreview?> = _ytPreview
 
+    private var previewGen = 0
     fun openYtCollection(col: com.melodia.app.data.online.YtSearchItem.Collection) {
         _ytPreview.value = YtPreview(title = col.title, url = col.url, loading = true)
+        val gen = ++previewGen
         viewModelScope.launch {
             try {
                 val (title, tracks, recortada) = withContext(Dispatchers.IO) { yt.playlistTracks(col.url) }
+                if (gen != previewGen) return@launch
                 _ytPreview.value = YtPreview(
                     title = title.ifBlank { col.title }, url = col.url,
                     tracks = tracks, error = if (tracks.isEmpty()) "La lista no trae temas visibles" else null,
@@ -1254,6 +1270,7 @@ class MainViewModel(
                 )
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
+                if (gen != previewGen) return@launch
                 _ytPreview.value = YtPreview(
                     title = col.title, url = col.url,
                     error = errMsg(t, "No se pudo abrir la lista")
@@ -1347,6 +1364,10 @@ class MainViewModel(
             .map { it.track }
             .filter { t -> dlJobs.value.none { it.track.id == t.id } }
         if (list.isEmpty()) return
+        if (pideConfirmacion(list.size)) {
+            _pendingCol.value = PendingCol("Resultados de la búsqueda", list, _ytHighQuality.value, false)
+            return
+        }
         dl.enqueueAll(list, _ytHighQuality.value)
     }
 
@@ -1413,6 +1434,15 @@ class MainViewModel(
 
     fun downloadYt(track: YtTrack, high: Boolean = _ytHighQuality.value) {
         dl.enqueue(track, high)
+    }
+
+    /** Re-escucha un tema del historial (la url firmada puede haber vencido). */
+    fun playHistoryRecord(r: YtRepository.DlRecord) {
+        if (r.url.isBlank()) {
+            _notice.value = "Esa descarga ya no tiene enlace: busca el tema en Online"
+            return
+        }
+        playYt(YtTrack(r.id.ifBlank { "hist-${r.at}" }, r.title, r.artist, -1, null, r.url))
     }
 
     fun pauseDl(id: String) = dl.pause(id)

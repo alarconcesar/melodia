@@ -285,8 +285,11 @@ class YtRepository(private val context: Context) {
             prefs().edit().putString("history", arr.toString()).apply()
         } catch (_: Exception) {}
     }
-    /** Historial de descargas (persistido, máx. 50): título, artista, calidad y fecha. */
-    data class DlRecord(val title: String, val artist: String, val high: Boolean, val at: Long, val id: String = "")
+    /** Historial de descargas (persistido, máx. 50): con url para re-escuchar. */
+    data class DlRecord(
+        val title: String, val artist: String, val high: Boolean, val at: Long,
+        val id: String = "", val url: String = ""
+    )
 
     fun getDlHistory(): List<DlRecord> {
         return try {
@@ -294,7 +297,7 @@ class YtRepository(private val context: Context) {
             (0 until arr.length()).mapNotNull { i ->
                 try {
                     val o = arr.getJSONObject(i)
-                    DlRecord(o.getString("t"), o.optString("a", ""), o.optBoolean("h", true), o.optLong("at", 0), o.optString("id", ""))
+                    DlRecord(o.getString("t"), o.optString("a", ""), o.optBoolean("h", true), o.optLong("at", 0), o.optString("id", ""), o.optString("u", ""))
                 } catch (_: Exception) { null }
             }
         } catch (_: Exception) { emptyList() }
@@ -303,11 +306,11 @@ class YtRepository(private val context: Context) {
     fun pushDlHistory(track: YtTrack, high: Boolean) {
         try {
             // Deduplica por tema (antes cada re-descarga duplicaba la fila).
-            val list = (listOf(DlRecord(track.title, track.artist, high, System.currentTimeMillis(), track.id)) + getDlHistory())
+            val list = (listOf(DlRecord(track.title, track.artist, high, System.currentTimeMillis(), track.id, track.url)) + getDlHistory())
                 .distinctBy { if (it.id.isNotBlank()) "id:${it.id}" else "t:${it.title}|${it.artist}|${it.high}" }
                 .take(50)
             val arr = org.json.JSONArray()
-            list.forEach { arr.put(org.json.JSONObject().put("t", it.title).put("a", it.artist).put("h", it.high).put("at", it.at).put("id", it.id)) }
+            list.forEach { arr.put(org.json.JSONObject().put("t", it.title).put("a", it.artist).put("h", it.high).put("at", it.at).put("id", it.id).put("u", it.url)) }
             prefs().edit().putString("dlhist", arr.toString()).apply()
         } catch (_: Exception) {}
     }
@@ -767,6 +770,11 @@ class YtRepository(private val context: Context) {
         }
     }
 
+    /** Cursor persistido del repair: cada pasada arranca donde terminó la anterior. */
+    private var repairCursor: Int
+        get() = try { prefs().getInt("repair_idx", 0) } catch (_: Exception) { 0 }
+        set(v) { try { prefs().edit().putInt("repair_idx", v).apply() } catch (_: Exception) {} }
+
     private fun esArtistaBasura(a: String): Boolean {
         val t = a.trim()
         return t.isBlank() || t == "<unknown>" || t.equals("Desconocido", true) || t.equals("YouTube", true)
@@ -787,6 +795,10 @@ class YtRepository(private val context: Context) {
     ): Int = withContext(Dispatchers.IO) {
         var escritas = 0
         var redUsada = 0
+        // Se juntan las filas y se rota: las primeras irresolubles no bloquean
+        // para siempre a las de atrás.
+        data class FilaRep(val id: Long, val name: String, val title: String, val artist: String, val album: String)
+        val filas = mutableListOf<FilaRep>()
         try {
             val resolver = context.contentResolver
             val sel: String
@@ -808,7 +820,8 @@ class YtRepository(private val context: Context) {
                 MediaStore.Audio.Media.ALBUM
             )
             resolver.query(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, cols, sel, args, null
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, cols, sel, args,
+                "${MediaStore.Audio.Media._ID} ASC"
             )?.use { c ->
                 val iId = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                 val iName = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
@@ -819,51 +832,63 @@ class YtRepository(private val context: Context) {
                     try {
                         val name = try { c.getString(iName) ?: "" } catch (_: Exception) { "" }
                         if (name.isBlank()) continue
-                        val existente = try { meta.get(name) } catch (_: Exception) { null }
-                        val rowArtist = try { c.getString(iArtist) ?: "" } catch (_: Exception) { "" }
-                        // Ficha sana (con artista real) y fila sana: nada que hacer.
-                        if (existente != null && !esArtistaBasura(existente.artist)) continue
-                        val rowTitle = (try { c.getString(iTitle) ?: "" } catch (_: Exception) { "" }).ifBlank {
-                            name.substringBeforeLast('.')
-                        }
-                        val rowAlbum = try { c.getString(iAlbum) ?: "" } catch (_: Exception) { "" }
-                        var artista: String? = null
-                        if (!esArtistaBasura(rowArtist)) artista = rowArtist.trim()
-                        if (artista == null) {
-                            val id = try { c.getLong(iId) } catch (_: Exception) { -1L }
-                            val uri = android.content.ContentUris.withAppendedId(
-                                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
-                            )
-                            artista = embeddedArtist(uri)
-                        }
-                        if (artista == null && redUsada < maxRed) {
-                            redUsada++
-                            artista = try {
-                                kotlinx.coroutines.withTimeoutOrNull(4_000L) {
-                                    artRepo.fetchArtist(rowTitle, "")
-                                }?.trim()?.takeIf { it.isNotBlank() }
-                            } catch (_: Exception) { null }
-                            // Si la red falló, la próxima pasada lo reintenta.
-                            if (artista == null) continue
-                        }
-                        if (artista == null) continue
-                        try {
-                            meta.put(
-                                name,
-                                com.melodia.app.data.DownloadMetaStore.Meta(
-                                    title = existente?.title?.ifBlank { rowTitle } ?: rowTitle,
-                                    artist = artista,
-                                    album = existente?.album?.ifBlank {
-                                        rowAlbum.ifBlank { rowTitle }
-                                    } ?: rowAlbum.ifBlank { rowTitle },
-                                    artPath = existente?.artPath
-                                )
-                            )
-                            escritas++
-                        } catch (_: Exception) {}
+                        filas += FilaRep(
+                            try { c.getLong(iId) } catch (_: Exception) { -1L },
+                            name,
+                            (try { c.getString(iTitle) ?: "" } catch (_: Exception) { "" }).ifBlank {
+                                name.substringBeforeLast('.')
+                            },
+                            try { c.getString(iArtist) ?: "" } catch (_: Exception) { "" },
+                            try { c.getString(iAlbum) ?: "" } catch (_: Exception) { "" }
+                        )
                     } catch (_: Exception) {}
                 }
             }
+            if (filas.isEmpty()) return@withContext 0
+            val ordered = if (repairCursor in filas.indices) filas.drop(repairCursor) + filas.take(repairCursor) else filas
+            var vistas = 0
+            for (f in ordered) {
+                vistas++
+                try {
+                    val existente = try { meta.get(f.name) } catch (_: Exception) { null }
+                    // Ficha sana (con artista real): nada que hacer.
+                    if (existente != null && !esArtistaBasura(existente.artist)) continue
+                    var artista: String? = null
+                    if (!esArtistaBasura(f.artist)) artista = f.artist.trim()
+                    if (artista == null) {
+                        val uri = android.content.ContentUris.withAppendedId(
+                            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, f.id
+                        )
+                        artista = embeddedArtist(uri)
+                    }
+                    if (artista == null && redUsada < maxRed) {
+                        redUsada++
+                        artista = try {
+                            kotlinx.coroutines.withTimeoutOrNull(4_000L) {
+                                artRepo.fetchArtist(f.title, "")
+                            }?.trim()?.takeIf { it.isNotBlank() }
+                        } catch (_: Exception) { null }
+                        // Si la red falló, la próxima pasada lo reintenta.
+                        if (artista == null) continue
+                    }
+                    if (artista == null) continue
+                    try {
+                        meta.put(
+                            f.name,
+                            com.melodia.app.data.DownloadMetaStore.Meta(
+                                title = existente?.title?.ifBlank { f.title } ?: f.title,
+                                artist = artista,
+                                album = existente?.album?.ifBlank {
+                                    f.album.ifBlank { f.title }
+                                } ?: f.album.ifBlank { f.title },
+                                artPath = existente?.artPath
+                            )
+                        )
+                        escritas++
+                    } catch (_: Exception) {}
+                } catch (_: Exception) {}
+            }
+            repairCursor = (repairCursor + vistas) % filas.size
         } catch (_: Exception) {}
         escritas
     }

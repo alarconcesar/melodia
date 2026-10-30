@@ -143,6 +143,14 @@ class AuditFixesTest {
 
     // ── Errores ───────────────────────────────────────────────────
     @Test
+    fun historialGuardaUrlParaReproducir() {
+        val yt = YtRepository(ctx())
+        yt.pushDlHistory(YtTrack("v1", "Tema", "Artista", 200, null, "https://youtu.be/v1"), true)
+        val hist = yt.getDlHistory()
+        assertEquals("https://youtu.be/v1", hist.firstOrNull { it.id == "v1" }?.url)
+    }
+
+    @Test
     fun enlaceVencidoTieneMensajePropio() {
         val msg = YtErrors.message(DlUrlExpiredException("CDN devolvió 403"), "genérico")
         assertTrue(msg.contains("venció") || msg.contains("Venció"))

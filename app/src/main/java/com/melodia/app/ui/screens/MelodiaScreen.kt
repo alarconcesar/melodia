@@ -33,6 +33,8 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -41,6 +43,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
 import dev.chrisbanes.haze.haze
 import androidx.compose.foundation.layout.Arrangement
@@ -263,6 +266,25 @@ fun MelodiaScreen(vm: MainViewModel) {
     // Denegar el permiso NO es éxito: solo se limpia la selección cuando el
     // sistema confirma (RESULT_OK). Si se deniega, se recarga igual para que la
     // lista vuelva a mostrar los archivos (siguen ahí) y se mantiene la selección.
+    val pendingCol by vm.pendingCol.collectAsState()
+    pendingCol?.let { pc ->
+        AlertDialog(
+            onDismissRequest = { vm.clearPendingCol() },
+            title = { Text("Bajar con datos móviles", color = cs.onBackground) },
+            text = {
+                Text(
+                    "«${pc.title}» son ${pc.tracks.size} temas (~${com.melodia.app.ui.screens.estimadoColMb(pc.tracks)} MB)" +
+                        (if (pc.truncated) ", y la lista viene recortada" else "") +
+                        ". ¿Los bajas igual?",
+                    style = Ds.Body, color = cs.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.confirmPendingCol(); vm.openDownloads() }) { Text("Bajar igual") }
+            },
+            dismissButton = { TextButton(onClick = { vm.clearPendingCol() }) { Text("Cancelar") } }
+        )
+    }
     val notice by vm.notice.collectAsState()
     val ctxToast = LocalContext.current
     LaunchedEffect(notice) {
@@ -402,6 +424,14 @@ fun MelodiaScreen(vm: MainViewModel) {
                 DownloadsButton(dlJobs, onClick = { vm.openDownloads() })
                 IconButton(onClick = { showSettings = true }) {
                     Icon(Icons.Default.Settings, "Ajustes", tint = cs.onSurfaceVariant)
+                }
+            }
+            // Al ocultar la barra (selección u otra pestaña sin texto) se esconde
+            // el teclado: antes quedaba abierto sin campo visible.
+            val focusMan = LocalFocusManager.current
+            LaunchedEffect(selecting, tab, query) {
+                if (selecting || (tab > 1 && query.isBlank())) {
+                    try { focusMan.clearFocus() } catch (_: Exception) {}
                 }
             }
             // ── Search: solo donde filtra (Inicio / Explorar), el resto gana espacio ──
@@ -603,7 +633,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                     interactionSource = remember { MutableInteractionSource() }
                 ) {}
             ) {
-                DownloadsScreen(vm, onClose = vm::closeDownloads)
+                DownloadsScreen(vm, onClose = vm::closeDownloads, onPlayRecord = { vm.playHistoryRecord(it) })
             }
         }
 
@@ -2016,6 +2046,10 @@ private fun NpAction(
         Modifier.clip(RoundedCornerShape(12.dp))
             .background(fondo)
             .then(pressClick(onClick, min = 0.95f))
+            .semantics {
+                contentDescription = label
+                role = Role.Button
+            }
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -2367,14 +2401,16 @@ fun ToggleChip(
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = if (selected) cs.primary.copy(alpha = 0.14f) else cs.surfaceVariant,
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier.clickable(
+            role = androidx.compose.ui.semantics.Role.Button, onClick = onClick
+        )
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
         ) {
             if (icon != null) {
-                Icon(icon, null, Modifier.size(15.dp), tint = if (selected) cs.primary else cs.onSurfaceVariant)
+                Icon(icon, text, Modifier.size(15.dp), tint = if (selected) cs.primary else cs.onSurfaceVariant)
                 Spacer(Modifier.width(6.dp))
             }
             Text(
@@ -2915,6 +2951,17 @@ fun TrackInfoSheet(
                         onClick = onFav
                     )
                     if (song.id != YT_STREAM_ID) {
+                        InfoAction(Icons.Default.PlaylistAdd, "Encolar") {
+                            vm.queueNext(song.id) { ok ->
+                                android.widget.Toast.makeText(
+                                    ctx,
+                                    if (ok) "Sonará a continuación"
+                                    else if (vm.currentSong.value?.id == YT_STREAM_ID) "Estás en online: reproduce un tema local para encolar"
+                                    else "No se pudo encolar",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
                         InfoAction(Icons.Default.Edit, "Editar") { showEdit = true }
                         InfoAction(Icons.Default.Share, "Compartir") { compartir() }
                         InfoAction(Icons.Default.Checklist, "Elegir") {
@@ -2994,7 +3041,9 @@ private fun InfoAction(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.width(68.dp).clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick).padding(vertical = 8.dp)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding(vertical = 8.dp)
+            .semantics { contentDescription = label }
     ) {
         Icon(icon, null, Modifier.size(20.dp), tint = if (active) cs.primary else cs.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))

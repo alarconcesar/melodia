@@ -164,27 +164,6 @@ fun OnlineTab(vm: MainViewModel) {
     )
 
     if (showImport) ImportPlaylistDialog(vm, onClose = { showImport = false }, onQueued = { vm.openDownloads(); showImport = false })
-    val pendingCol by vm.pendingCol.collectAsState()
-    pendingCol?.let { pc ->
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { vm.clearPendingCol() },
-            title = { Text("Bajar con datos móviles", color = MaterialTheme.colorScheme.onBackground) },
-            text = {
-                Text(
-                    "«${pc.title}» son ${pc.tracks.size} temas (~${estimadoColMb(pc.tracks)} MB)" +
-                        (if (pc.truncated) ", y la lista viene recortada" else "") +
-                        ". ¿Los bajas igual?",
-                    style = Ds.Body, color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = { vm.confirmPendingCol(); vm.openDownloads() }) {
-                    Text("Bajar igual")
-                }
-            },
-            dismissButton = { androidx.compose.material3.TextButton(onClick = { vm.clearPendingCol() }) { Text("Cancelar") } }
-        )
-    }
     dlPick?.let { track ->
         QualityDialog(
             track = track,
@@ -783,7 +762,7 @@ fun YtCollectionSheet(vm: MainViewModel) {
                 Text(
                     when {
                         p.loading -> "Cargando temas…"
-                        p.tracks.isNotEmpty() -> "${p.tracks.size} temas"
+                        p.tracks.isNotEmpty() -> "${p.tracks.size} temas" + if (p.truncated) " (lista recortada)" else ""
                         else -> "Playlist o álbum"
                     },
                     style = Ds.Sub, color = cs.onSurfaceVariant

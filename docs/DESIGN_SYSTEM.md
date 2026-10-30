@@ -340,3 +340,26 @@ misma jerarquía que el reproductor.
   calidad que sobrevive a la rotación.
 
 137 tests verdes.
+
+## Auditoría 7.13 (cuarta pasada)
+
+- `swapStream` verificado por id + timeline; refresh cancelable al cambiar.
+- `pendingOps` con tope; next/prev/seek/shuffle/repeat se encolan en frío.
+- Salto a prueba de cancelación (una sola vez) y sin dip en bordes.
+- Rebobinar/prev no cuentan como vuelta de repeat-one (ventana de 3 s).
+- `remove/move/clear` aplican el restore pendiente; pitch/speed persisten.
+- Stream muerto tras reintentos avisa (antes silencio).
+- Headless (Auto/BT) no se corta al abrir la app.
+- Trozo corto verificado; reintento fresco desde cero; webm sin tags fuera;
+  persistencia hasta 100; fetch acotado; 429→ReCaptcha; ENOSPC propio;
+  aviso de recorte; confirmación con datos (preview, colección, import,
+  todo); Range al reanudar; repair cubre SD; sweep con guard de SD.
+- Stats: umbral 30 s sin duración; favs con ids+claves; rename saneado;
+  arte sin delays + cursor rotativo; stats en Default; load() en IO;
+  posición a salvo; letras estables + migración; warm con duración;
+  dataPath con fallback; favs en orden; restore sin duplicados; debounce.
+- UI: diálogo de datos en raíz (cubre Home), truncado visible, roles de
+  accesibilidad, teclado que se esconde, renameId fantasma cerrado, letra
+  con insets, ficha con "Encolar" + salto a artista/álbum.
+
+138 tests verdes.

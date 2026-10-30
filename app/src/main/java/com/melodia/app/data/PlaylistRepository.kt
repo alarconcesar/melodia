@@ -3,6 +3,8 @@ import com.melodia.app.data.local.*
 import com.melodia.app.data.model.Song
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 class PlaylistRepository(private val db: MelodiaDatabase) {
     fun playlists(): Flow<List<PlaylistEntity>> = db.playlistDao().observeAll()
     fun playlistSongs(pid: Long): Flow<List<PlaylistSongEntity>> = db.playlistSongDao().observeSongs(pid)
@@ -21,6 +23,23 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
         db.playlistSongDao().add(PlaylistSongEntity(pid, s.id, pos, s.dataPath, s.title, s.artist, s.album, s.durationMs))
         return true
     }
+    /** Agrega en lote: una transacción, un conteo, sin exists por tema. */
+    @Transaction
+    suspend fun addAllToPlaylist(pid: Long, songs: List<Song>): Int {
+        if (songs.isEmpty()) return 0
+        val ya = try {
+            db.playlistSongDao().idsIn(pid).toSet()
+        } catch (_: Exception) { emptySet() }
+        val base = try { db.playlistSongDao().count(pid) } catch (_: Exception) { 0 }
+        val nuevos = songs.filter { !ya.contains(it.id) }
+        nuevos.forEachIndexed { i, s ->
+            db.playlistSongDao().add(
+                PlaylistSongEntity(pid, s.id, base + i, s.dataPath, s.title, s.artist, s.album, s.durationMs)
+            )
+        }
+        return nuevos.size
+    }
+
     /** Mueve un tema dentro de la playlist (up = hacia arriba). */
     @Transaction
     suspend fun moveSong(pid: Long, sid: Long, up: Boolean) {
@@ -35,6 +54,14 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
     }
     fun allPlaylistSongs(): Flow<List<PlaylistSongEntity>> = db.playlistSongDao().observeAllSongs()
     suspend fun removeFromPlaylist(pid: Long, sid: Long) = db.playlistSongDao().remove(pid, sid)
+    private val favMutex = Mutex()
+    /** Toggle serializado con lectura fresca: el doble tap ya no se come uno. */
+    suspend fun toggleFavFresh(id: Long) {
+        favMutex.withLock {
+            if (db.favoriteDao().existsNow(id)) db.favoriteDao().remove(id)
+            else db.favoriteDao().add(FavoriteEntity(id))
+        }
+    }
     suspend fun toggleFav(id: Long, isFav: Boolean) { if (isFav) db.favoriteDao().remove(id) else db.favoriteDao().add(FavoriteEntity(id)) }
 
     /** Clave estable de un tema entre equipos (minúsculas, espacios colapsados). */

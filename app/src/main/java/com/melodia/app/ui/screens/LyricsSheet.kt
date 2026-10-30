@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,7 +49,10 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
     val lyr by vm.lyrics.collectAsState()
     val state by vm.playerState.collectAsState()
 
-    Column(Modifier.fillMaxSize().background(cs.background).padding(20.dp)) {
+    Column(
+        Modifier.fillMaxSize().background(cs.background)
+            .statusBarsPadding().navigationBarsPadding().padding(20.dp)
+    ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) {
                 Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(28.dp), tint = cs.onBackground)
