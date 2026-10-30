@@ -443,3 +443,15 @@ misma jerarquía que el reproductor.
   error acotado; reverb fuera; respaldo en API <29; swipe sin parpadeo.
 
 141 tests verdes.
+
+## Auditoría 7.22 (décima pasada)
+
+- Overlays vacíos se cierran solos; import no queda huérfano.
+- Back de detalle/filtros solo en su pestaña; detalle fantasma se cierra.
+- Sub-diálogos sobreviven a rotación.
+- Índices al ejecutar; shuffle/repeat con restore; swap retoma solo.
+- Frío re-invoca; borrado/reorden en frío mutan restore.
+- UI tras actual visible; streamDead una vez; playlist por songId.
+- Corazón en stream avisa; fila online con %; AddTo con keys.
+
+141 tests verdes.

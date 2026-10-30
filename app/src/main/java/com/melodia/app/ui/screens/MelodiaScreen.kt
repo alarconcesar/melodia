@@ -401,9 +401,9 @@ fun MelodiaScreen(vm: MainViewModel) {
         BackHandler { showLyrics = false }
     } else if (showPlayer) {
         BackHandler { showPlayer = false }
-    } else if (openPid != null) {
+    } else if (openPid != null && tab == 2) {
         BackHandler { vm.openPl(null) }
-    } else if (folderSel != null || albumSel != null || artistSel != null) {
+    } else if ((folderSel != null || albumSel != null || artistSel != null) && tab == 1) {
         BackHandler { vm.clearFilters() }
     }
 
@@ -565,7 +565,9 @@ fun MelodiaScreen(vm: MainViewModel) {
                                 val list = mine.mapNotNull { byId[it.songId] }
                                 if (list.isNotEmpty()) vm.playListAt(list, 0)
                             })
-                        else PlaylistDetail(
+                        else if (playlists.none { it.id == openPid }) {
+                            LaunchedEffect(openPid) { vm.openPl(null) }
+                        } else PlaylistDetail(
                             playlists.find { it.id == openPid }?.name ?: "Playlist",
                             openSongs, onBack = { vm.openPl(null) },
                             onPlay = { vm.playPlaylistEntities(openSongs, it) },
@@ -608,6 +610,18 @@ fun MelodiaScreen(vm: MainViewModel) {
                 }
             }
             MelodiaPillNav(tab = tab, onTab = { tab = it })
+        }
+        // Sin tema actual el player/letra se cierran solos (si no, queda un
+        // Box vacío que traga todos los toques y parece congelada).
+        LaunchedEffect(showPlayer, current) {
+            if (showPlayer && current == null) {
+                try { showPlayer = false } catch (_: Exception) {}
+            }
+        }
+        LaunchedEffect(showLyrics, current) {
+            if (showLyrics && current == null) {
+                try { showLyrics = false } catch (_: Exception) {}
+            }
         }
         // ── Now Playing (consume todos los toques: nada pasa a la lista) ──
         AnimatedVisibility(
@@ -745,7 +759,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                     if (playlists.isEmpty()) {
                         item { Text("Aún no hay playlists — créala desde la sección Listas", style = Ds.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
-                    items(playlists) { p ->
+                    items(playlists, key = { it.id }) { p ->
                         Row(
                             Modifier.fillMaxWidth().clickable {
                                 vm.addToPlaylist(p.id, s) { ok ->
@@ -1614,11 +1628,19 @@ private fun MiniPlayerHost(
     onOpen: () -> Unit
 ) {
     val st by vm.playerState.collectAsState()
+    val ctxMini = androidx.compose.ui.platform.LocalContext.current
     Box(Modifier.fillMaxWidth()) {
         MiniPlayerDs(
             title = song.title, artist = song.artist, albumId = song.albumId, artUrl = song.artUrl,
             playing = st.isPlaying, progress = st.progress, isFav = isFav,
-            onToggleFav = { if (song.id != YT_STREAM_ID) vm.toggleFav(song.id) },
+            onToggleFav = {
+                if (song.id != YT_STREAM_ID) vm.toggleFav(song.id)
+                else android.widget.Toast.makeText(
+                    ctxMini,
+                    "Los streams no van a favoritos: descarga el tema primero",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            },
             onToggle = { vm.player.toggle() },
             onOpen = onOpen
         )
@@ -1744,7 +1766,7 @@ private fun SeekBar(progress: Float, onSeek: (Float) -> Unit, modifier: Modifier
 fun PlaylistDetail(
     name: String,
     songs: List<com.melodia.app.data.local.PlaylistSongEntity>,
-    onBack: () -> Unit, onPlay: (Int) -> Unit, onShuffle: () -> Unit,
+    onBack: () -> Unit, onPlay: (Long) -> Unit, onShuffle: () -> Unit,
     onMove: (Long, Boolean) -> Unit, onRemove: (Long) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
@@ -1775,7 +1797,7 @@ fun PlaylistDetail(
         }
         itemsIndexed(songs, key = { _, e -> "pl-${e.playlistId}-${e.songId}" }) { idx, e ->
             var menu by remember { mutableStateOf(false) }
-            Row(Modifier.fillMaxWidth().clickable { onPlay(idx) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().clickable { onPlay(e.songId) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("${idx + 1}", style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.width(28.dp))
                 Column(Modifier.weight(1f)) {
                     Text(e.title.ifBlank { "Tema" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
@@ -2284,7 +2306,7 @@ fun BackupSheet(vm: MainViewModel, onDismiss: () -> Unit) {
 fun StatsSheet(vm: MainViewModel, onDismiss: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     val sum by vm.statsSummary.collectAsState()
-    var confirmClear by remember { mutableStateOf(false) }
+    var confirmClear by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Mis estadísticas", color = cs.onBackground) },
@@ -2471,8 +2493,8 @@ fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
     val queue by vm.queueSongs.collectAsState()
     val current by vm.currentSong.collectAsState()
     val playing by vm.playerState.collectAsState()
-    var confirmClear by remember { mutableStateOf(false) }
-    var showSave by remember { mutableStateOf(false) }
+    var confirmClear by rememberSaveable { mutableStateOf(false) }
+    var showSave by rememberSaveable { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -3150,8 +3172,8 @@ fun EqSheet(eq: com.melodia.app.player.EqualizerManager, onClose: () -> Unit) {
     val bass by eq.bassLevel.collectAsState()
     val preset by eq.preset.collectAsState()
     val custom by eq.customPresets.collectAsState()
-    var presetMenu by remember { mutableStateOf(false) }
-    var showSave by remember { mutableStateOf(false) }
+    var presetMenu by rememberSaveable { mutableStateOf(false) }
+    var showSave by rememberSaveable { mutableStateOf(false) }
     val ctxToast = androidx.compose.ui.platform.LocalContext.current
     val freqs = listOf("60Hz", "230Hz", "910Hz", "3.6kHz", "14kHz")
     AlertDialog(

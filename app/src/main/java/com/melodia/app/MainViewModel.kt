@@ -690,10 +690,14 @@ class MainViewModel(
         val l = albumSongs(name).shuffled()
         if (l.isNotEmpty()) emitPlay(l, 0)
     }
-    fun playPlaylistEntities(e: List<PlaylistSongEntity>, idx: Int) {
+    /** El tap suena por songId: la lista filtrada (sin huérfanos) tiene
+     * otros índices que la vista, así que el idx crudo sonaba al vecino. */
+    fun playPlaylistEntities(e: List<PlaylistSongEntity>, songId: Long) {
         val byId = songs.value.associateBy { it.id }
         val list = e.mapNotNull { byId[it.songId] }
-        if (list.isNotEmpty()) emitPlay(list, idx.coerceIn(0, list.size - 1))
+        if (list.isEmpty()) return
+        val idx = list.indexOfFirst { it.id == songId }.takeIf { it >= 0 } ?: 0
+        emitPlay(list, idx)
     }
     fun shufflePlaylistEntities(e: List<PlaylistSongEntity>) {
         val byId = songs.value.associateBy { it.id }
@@ -719,10 +723,11 @@ class MainViewModel(
         // colas mixtas y el estado quedaba sin salida.
         if (_queue.value.any { it.id == YT_STREAM_ID }) { onDone(false); return }
         if (!player.playNext(id)) { onDone(false); return }
-        // La posición la dice el timeline del player, no indexOf (con el tema
-        // duplicado indexOf devuelve la primera copia y la UI diverge).
-        val tl = player.currentTimelineIndex()
-        val at = if (tl >= 0) tl + 1 else (player.restoreIndex() + 1).coerceAtLeast(0)
+        // Detrás del actual visible (igual que el player): el índice de
+        // timeline con shuffle es otro orden y divergía.
+        val curId = player.state.value.currentId
+        val at = _queue.value.indexOfFirst { it.id == curId }.takeIf { it >= 0 }?.plus(1)
+            ?: _queue.value.size
         val q = _queue.value.toMutableList()
         q.add(at.coerceIn(0, q.size), s)
         _queue.value = q
@@ -1259,7 +1264,8 @@ class MainViewModel(
                     if (cur != YT_STREAM_ID) return@launch
                 } catch (_: Exception) { return@launch }
                 val durMs = if (track.durationSec > 3) track.durationSec * 1000L - 2000 else positionMs
-                player.swapStream(audio.url, minOf(positionMs, durMs).coerceAtLeast(0))
+                // autoPlay: el stream venía sonando; sin esto quedaba en pausa muda.
+                player.swapStream(audio.url, minOf(positionMs, durMs).coerceAtLeast(0), autoPlay = true)
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _ytError.value = "No se pudo recuperar el audio. Reintenta en un momento."

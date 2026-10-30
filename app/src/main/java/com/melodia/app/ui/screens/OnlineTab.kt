@@ -129,6 +129,10 @@ fun OnlineTab(vm: MainViewModel) {
         dlPickDur = t?.durationSec ?: -1L; dlPickThumb = t?.thumbUrl; dlPickUrl = t?.url ?: ""
     }
     var showImport by rememberSaveable { mutableStateOf(false) }
+    // Al confirmar con datos se abre Descargas: el diálogo no queda huérfano
+    // detrás (tapaba el aviso de temas encolados).
+    val pendingColState by vm.pendingCol.collectAsState()
+    LaunchedEffect(pendingColState) { if (pendingColState != null) showImport = false }
     LaunchedEffect(Unit) { vm.refreshDlHistory() }
 
     OnlineTabContent(
@@ -499,11 +503,18 @@ fun YtRowFlat(
         }
         if (progress != null) {
             Spacer(Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = progress.coerceIn(0f, 1f),
-                color = cs.primary,
-                modifier = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(2.dp))
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LinearProgressIndicator(
+                    progress = progress.coerceIn(0f, 1f),
+                    color = cs.primary,
+                    modifier = Modifier.weight(1f).height(2.dp).clip(RoundedCornerShape(2.dp))
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "${(progress * 100).toInt()}%", style = Ds.Sub, color = cs.primary,
+                    maxLines = 1
+                )
+            }
         }
     }
 }

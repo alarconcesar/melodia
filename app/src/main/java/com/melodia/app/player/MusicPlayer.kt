@@ -57,6 +57,7 @@ class MusicPlayer(private val context: Context) {
     private val maxStreamRetries = 2
     /** El stream murió y ya no hay reintento (URL muerta + red caída): avisar. */
     var onStreamDead: (() -> Unit)? = null
+    private var streamDeadFired = false
     /** Un archivo local borrado/movido: la app avisa y salta al siguiente. */
     var onUnplayable: ((id: Long) -> Unit)? = null
     private var errorSkips = 0
@@ -124,13 +125,17 @@ class MusicPlayer(private val context: Context) {
                             if (streamRetries < maxStreamRetries) {
                                 streamRetries++
                                 onStreamError?.invoke(p.currentPosition.coerceAtLeast(0))
-                            } else {
+                            } else if (!streamDeadFired) {
+                                streamDeadFired = true
                                 try { onStreamDead?.invoke() } catch (_: Exception) {}
                             }
                         } else {
                             // Otro fallo (red caída, BT cortado) en stream: avisar
                             // en vez de quedar parado sin mensaje.
-                            try { onStreamDead?.invoke() } catch (_: Exception) {}
+                            if (!streamDeadFired) {
+                                streamDeadFired = true
+                                try { onStreamDead?.invoke() } catch (_: Exception) {}
+                            }
                         }
                         return
                     }
@@ -207,6 +212,7 @@ class MusicPlayer(private val context: Context) {
             queueIds = pares.map { it.first }.toMutableList()
             streamRetries = 0
             errorSkips = 0
+            streamDeadFired = false
             pendingRestore = null
             val items = pares.map { it.second }
             val wanted = ids.getOrNull(startIndex)
@@ -311,20 +317,26 @@ class MusicPlayer(private val context: Context) {
 
     /** El tema sonará justo después del actual. */
     fun playNext(id: Long): Boolean {
+        ensureBound()
         val p = exo
-        if (p != null) ensureRestore(p)
+        // En frío se re-invoca al drenar: calcular ahora usaría índices vacíos
+        // y el doble playNext divergía (timeline [B,A] vs [A,B]).
+        if (p == null) { addPending { playNext(id) }; return true }
+        ensureRestore(p)
         // UI: detrás del tema actual visible; timeline: detrás del actual real.
         val tl = currentTimelineIndex()
-        val cur = try { exo?.currentMediaItem?.mediaId?.toLongOrNull() } catch (_: Exception) { null }
+        val cur = try { p.currentMediaItem?.mediaId?.toLongOrNull() } catch (_: Exception) { null }
         val ui = if (cur == null) queueIds.size else queueIds.indexOf(cur).takeIf { it >= 0 } ?: queueIds.size
         return insertAt(id, ui + 1, if (tl < 0) queueIds.size else tl + 1)
     }
 
     /** El tema se agrega al final de la cola. */
     fun addToEnd(id: Long): Boolean {
+        ensureBound()
         val p = exo
-        if (p != null) ensureRestore(p)
-        return insertAt(id, queueIds.size, try { p?.mediaItemCount ?: queueIds.size } catch (_: Exception) { queueIds.size })
+        if (p == null) { addPending { addToEnd(id) }; return true }
+        ensureRestore(p)
+        return insertAt(id, queueIds.size, try { p.mediaItemCount } catch (_: Exception) { queueIds.size })
     }
 
     /** Reproduce un stream online (URL directa de audio). */
@@ -336,6 +348,7 @@ class MusicPlayer(private val context: Context) {
             queueIds = mutableListOf(YT_STREAM_ID)
             streamRetries = 0
             errorSkips = 0
+            streamDeadFired = false
             pendingRestore = null
             val item = MediaItem.Builder()
                 .setUri(url)
@@ -371,11 +384,11 @@ class MusicPlayer(private val context: Context) {
         shuffle: Boolean = false,
         repeatMode: Int = Player.REPEAT_MODE_OFF
     ) {
-        pendingRestore = PendingRestore(ids, startIndex, positionMs, shuffle, repeatMode)
+        pendingRestore = PendingRestore(ids.toMutableList(), startIndex, positionMs, shuffle, repeatMode)
     }
 
     private data class PendingRestore(
-        val ids: List<Long>,
+        val ids: MutableList<Long>,
         val index: Int,
         val positionMs: Long,
         val shuffle: Boolean,
@@ -436,7 +449,7 @@ class MusicPlayer(private val context: Context) {
      * Reemplaza la URL del stream actual conservando la posición y el estado
      * (se usa cuando YouTube invalida la URL y devuelve 403 a mitad de tema).
      */
-    fun swapStream(url: String, positionMs: Long) {
+    fun swapStream(url: String, positionMs: Long, autoPlay: Boolean = false) {
         try {
             val p = exo ?: return
             val old = p.currentMediaItem ?: return
@@ -444,7 +457,7 @@ class MusicPlayer(private val context: Context) {
             val item = old.buildUpon().setUri(url).build()
             p.setMediaItem(item, positionMs.coerceAtLeast(0L))
             p.prepare()
-            if (playing) p.play()
+            if (playing || autoPlay) p.play()
             updateState()
         } catch (e: Exception) { Log.e("MusicPlayer", "swapStream fail", e) }
     }
@@ -491,7 +504,13 @@ class MusicPlayer(private val context: Context) {
      */
     fun removeAt(index: Int): Boolean {
         return try {
-            val p = exo ?: return false
+            val p = exo
+            if (p == null) {
+                val r = pendingRestore ?: return false
+                if (index !in r.ids.indices) return false
+                r.ids.removeAt(index)
+                return true
+            }
             ensureRestore(p)
             if (index !in queueIds.indices) return false
             val id = queueIds[index]
@@ -513,7 +532,14 @@ class MusicPlayer(private val context: Context) {
      */
     fun moveItem(from: Int, to: Int): Boolean {
         return try {
-            val p = exo ?: return false
+            val p = exo
+            if (p == null) {
+                val r = pendingRestore ?: return false
+                if (from !in r.ids.indices || to !in r.ids.indices || from == to) return false
+                val id = r.ids.removeAt(from)
+                r.ids.add(to.coerceIn(0, r.ids.size), id)
+                return true
+            }
             ensureRestore(p)
             if (from !in queueIds.indices || to !in queueIds.indices || from == to) return false
             val tlFrom = timelineIndexOf(queueIds[from], from)
@@ -537,7 +563,14 @@ class MusicPlayer(private val context: Context) {
      */
     fun clearQueueKeepCurrent(): Boolean {
         return try {
-            val p = exo ?: return false
+            val p = exo
+            if (p == null) {
+                val r = pendingRestore ?: return false
+                val id = r.ids.getOrNull(r.index) ?: return false
+                r.ids.clear()
+                r.ids.add(id)
+                return true
+            }
             ensureRestore(p)
             val cur = p.currentMediaItemIndex
             if (cur < 0 || cur >= p.mediaItemCount) return false
@@ -750,12 +783,12 @@ class MusicPlayer(private val context: Context) {
     fun toggleShuffle() {
         ensureBound()
         if (exo == null) { addPending { toggleShuffle() }; return }
-        try { exo?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled; updateState() } } catch (_: Exception) {}
+        try { exo?.let { ensureRestore(it); it.shuffleModeEnabled = !it.shuffleModeEnabled; updateState() } } catch (_: Exception) {}
     }
     fun cycleRepeat() {
         ensureBound()
         if (exo == null) { addPending { cycleRepeat() }; return }
-        try { exo?.let { it.repeatMode = when (it.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF }; updateState() } } catch (_: Exception) {}
+        try { exo?.let { ensureRestore(it); it.repeatMode = when (it.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF }; updateState() } } catch (_: Exception) {}
     }
     fun seekTo(f: Float) {
         ensureBound()
