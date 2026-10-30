@@ -413,3 +413,19 @@ misma jerarquía que el reproductor.
 - Preset duplicado avisa y sanea separadores.
 
 139 tests verdes.
+
+## Auditoría 7.17 (octava pasada)
+
+- Factory usa el constructor completo (confirmación de datos móviles viva).
+- Salto fantasma al buscar/apagar/pausar: eliminado (salto en campo).
+- Restore sobrevive a biblioteca tardía; salto manual solo si salta.
+- Pitch/speed se reaplican al reconectar; presets guardan bandas.
+- Playlist sin posiciones duplicadas; restore tolerante y perezoso.
+- Cola en IO; letra sin duración exige título; sweep en una escritura.
+- Título en blanco no se escribe; miniplayer alterna favoritos.
+- Detalle álbum en orden de disco; calidad/ahorro persisten.
+- NO_EFFECTS apaga pulsación; switch avisa reinicio; IME Buscar.
+- Backup/restore con callback garantizado; artScope se cancela;
+  Handler por lifecycleScope; docstring honesto; sleep con etiqueta.
+
+140 tests verdes.

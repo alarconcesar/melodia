@@ -11,6 +11,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.melodia.app.ui.screens.MelodiaScreen
 import com.melodia.app.ui.theme.MelodiaTheme
 import com.melodia.app.ui.theme.loadUiPrefs
@@ -21,16 +24,16 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO
         else Manifest.permission.READ_EXTERNAL_STORAGE
 
-    private val perm = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) vm.reload()
+    // Un solo diálogo con todo lo pendiente (antes eran 3 launchers en el
+    // mismo frame = cascada de diálogos).
+    private val perms = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
+        try { if (res[audioPerm] == true && ::vm.isInitialized) vm.reload() } catch (_: Exception) {}
     }
     override fun onDestroy() {
         try { com.melodia.app.perf.FrameMonitor.stop() } catch (_: Exception) {}
         super.onDestroy()
     }
 
-    private val notifPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    private val writePerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     @Suppress("UNCHECKED_CAST")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,39 +58,44 @@ class MainActivity : ComponentActivity() {
             this,
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return MainViewModel(c.musicPlayer, c.musicRepository, c.playlistRepo, c.statsRepo, c.sleepTimer, c.ytRepo, c.dlManager, c.lyricsRepo, c.artRepo, c.queueStore) as T
+                    return c.makeMainViewModel() as T
                 }
             }
         )[MainViewModel::class.java]
-        if (ContextCompat.checkSelfPermission(this, audioPerm) != PackageManager.PERMISSION_GRANTED) {
-            perm.launch(audioPerm)
+        val faltantes = buildList {
+            if (ContextCompat.checkSelfPermission(this@MainActivity, audioPerm) != PackageManager.PERMISSION_GRANTED) add(audioPerm)
+            // Android 13+: permiso para mostrar la notificación de reproducción
+            if (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) add(Manifest.permission.POST_NOTIFICATIONS)
+            // Android 8 y anteriores: permiso de escritura para guardar descargas
+            if (Build.VERSION.SDK_INT < 29 &&
+                ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+            ) add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
-        // Android 13+: permiso para mostrar la notificación de reproducción
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        // Android 8 y anteriores: permiso de escritura para guardar descargas
-        if (Build.VERSION.SDK_INT < 29 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-        ) {
-            writePerm.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
+        if (faltantes.isNotEmpty()) perms.launch(faltantes.toTypedArray())
         setContent { MelodiaTheme { MelodiaScreen(vm) } }
-        // Si la app ya arrancó bien 8 s, el crash previo quedó atrás: limpiar el rastro
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
-            { try { CrashScreen.borrar(this) } catch (_: Exception) {} }, 8_000L
-        )
+        // Si la app ya arrancó bien 8 s, el crash previo quedó atrás: limpiar el rastro.
+        // Con el ciclo de vida (no Handler): si se destruye antes, no la retiene.
+        lifecycleScope.launch {
+            try {
+                delay(8_000L)
+                try { CrashScreen.borrar(this@MainActivity) } catch (_: Exception) {}
+            } catch (_: Exception) {}
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        // Si se concedió el permiso desde Ajustes, recargar biblioteca
-        if (ContextCompat.checkSelfPermission(this, audioPerm) == PackageManager.PERMISSION_GRANTED
-            && vm.songs.value.isEmpty()
-        ) {
-            vm.reload()
-        }
+        // Si se concedió el permiso desde Ajustes, recargar biblioteca.
+        // Con guard: en la ruta CrashScreen vm no existe y esto crasheaba.
+        try {
+            if (!::vm.isInitialized) return
+            if (ContextCompat.checkSelfPermission(this, audioPerm) == PackageManager.PERMISSION_GRANTED
+                && vm.songs.value.isEmpty()
+            ) {
+                vm.reload()
+            }
+        } catch (_: Exception) {}
     }
 }

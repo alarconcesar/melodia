@@ -81,6 +81,13 @@ class EqualizerManager(context: Context) {
                     e.usePreset(i.toShort())
                     val nb = e.numberOfBands.coerceAtMost(5).toInt()
                     _bands.value = List(5) { bi -> if (bi < nb) e.getBandLevel(bi.toShort()).toInt() else 0 }
+                    // Persistir: si no, al reiniciar volvían las bandas viejas
+                    // con el nombre del preset nuevo.
+                    try {
+                        val ed = prefs.edit()
+                        _bands.value.forEachIndexed { bi, lvl -> ed.putInt("band$bi", lvl) }
+                        ed.apply()
+                    } catch (_: Exception) {}
                     return
                 }
             }

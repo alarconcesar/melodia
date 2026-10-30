@@ -19,7 +19,7 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
     @Transaction
     suspend fun addToPlaylist(pid: Long, s: Song): Boolean {
         if (db.playlistSongDao().exists(pid, s.id) > 0) return false // sin duplicados
-        val pos = db.playlistSongDao().count(pid)
+        val pos = try { db.playlistSongDao().maxPos(pid) + 1 } catch (_: Exception) { 0 }
         db.playlistSongDao().add(PlaylistSongEntity(pid, s.id, pos, s.dataPath, s.title, s.artist, s.album, s.durationMs))
         return true
     }
@@ -30,7 +30,7 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
         val ya = try {
             db.playlistSongDao().idsIn(pid).toSet()
         } catch (_: Exception) { emptySet() }
-        val base = try { db.playlistSongDao().count(pid) } catch (_: Exception) { 0 }
+        val base = try { db.playlistSongDao().maxPos(pid) + 1 } catch (_: Exception) { 0 }
         val nuevos = songs.filter { !ya.contains(it.id) }
         nuevos.forEachIndexed { i, s ->
             db.playlistSongDao().add(

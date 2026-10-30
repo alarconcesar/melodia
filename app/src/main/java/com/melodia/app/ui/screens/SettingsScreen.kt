@@ -334,6 +334,12 @@ fun SettingsScreen(
                             safeMode = on
                             if (on) com.melodia.app.SafeMode.activarTodo(ctx)
                             else com.melodia.app.SafeMode.apagarTodo(ctx)
+                            try {
+                                android.widget.Toast.makeText(
+                                    ctx, "Se aplica al reiniciar la app",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            } catch (_: Exception) {}
                         }
                     )
                 }

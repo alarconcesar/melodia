@@ -153,6 +153,14 @@ class AuditFixesTest {
     }
 
     @Test
+    fun fileNameParaNoPasa255Bytes() {
+        val yt = YtRepository(ctx())
+        val largo = "日本語のテスト".repeat(12)
+        val nombre = yt.fileNamePara(YtTrack("abc123XYZ-_", largo, "アーティスト", 200, null, ""))
+        assertTrue(nombre.toByteArray(Charsets.UTF_8).size <= 200)
+    }
+
+    @Test
     fun presetDuplicadoNoPisaYSaneaNombre() {
         val eq = com.melodia.app.player.EqualizerManager(ctx())
         assertTrue(eq.saveCustomPreset("Mi Rock"))

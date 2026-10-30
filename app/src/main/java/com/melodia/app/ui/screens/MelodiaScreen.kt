@@ -419,7 +419,11 @@ fun MelodiaScreen(vm: MainViewModel) {
                 if (sleepLeft != null) AssistChip(
                     onClick = { vm.sleep.cancel() },
                     label = { Text("${sleepLeft}m") },
-                    leadingIcon = { Icon(Icons.Default.Timer, null, Modifier.size(14.dp)) }
+                    leadingIcon = { Icon(Icons.Default.Timer, null, Modifier.size(14.dp)) },
+                    modifier = Modifier.semantics {
+                        contentDescription = "Temporizador: quedan $sleepLeft minutos. Toca para cancelar"
+                        role = Role.Button
+                    }
                 )
                 DownloadsButton(dlJobs, onClick = { vm.openDownloads() })
                 IconButton(onClick = { showSettings = true }) {
@@ -449,6 +453,12 @@ fun MelodiaScreen(vm: MainViewModel) {
                     leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
                     trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { vm.setQuery("") }) { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) } },
                     singleLine = true, shape = RoundedCornerShape(Ds.RRow),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Search
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onSearch = { try { focusMan.clearFocus() } catch (_: Exception) {} }
+                    ),
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                         unfocusedBorderColor = Color.Transparent,
                         focusedBorderColor = cs.primary.copy(alpha = 0.45f),
@@ -1141,7 +1151,12 @@ fun ExploreTab(
         }
     }
     if (alName != null) {
-        val mine = remember(all, alName) { all.filter { (it.album.ifBlank { "Sin álbum" }) == alName } }
+        // Mismo orden que vm.playAlbum (AlbumTrackOrder): si no, tocar un tema
+        // y darle a siguiente saltaba a otro vecino distinto del disco.
+        val mine = remember(all, alName) {
+            all.filter { (it.album.ifBlank { "Sin álbum" }) == alName }
+                .sortedWith(com.melodia.app.data.AlbumTrackOrder)
+        }
         LaunchedEffect(mine.isEmpty()) { if (mine.isEmpty()) albumDetail = null }
         if (mine.isNotEmpty()) {
             AlbumDetail(

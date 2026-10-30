@@ -194,7 +194,10 @@ class MainViewModel(
         viewModelScope.launch {
             _queue.map { q -> q.map { it.id } }.distinctUntilChanged().collect {
                 val q = _queue.value
-                if (q.isNotEmpty() && q.none { it.id == YT_STREAM_ID }) queueStore.saveSongs(q)
+                // Fuera del Main: armar el JSON de 5k temas (~1 MB) trababa la UI.
+                if (q.isNotEmpty() && q.none { it.id == YT_STREAM_ID }) {
+                    withContext(kotlinx.coroutines.Dispatchers.Default) { queueStore.saveSongs(q) }
+                }
             }
         }
         viewModelScope.launch {
@@ -865,6 +868,8 @@ class MainViewModel(
 
     // ── Respaldo y restauración (JSON en Descargas/Melodia) ──
     fun backup(ctx: android.content.Context, onDone: (String) -> Unit) {
+        var avisado = false
+        fun fin(m: String) { if (!avisado) { avisado = true; try { onDone(m) } catch (_: Exception) {} } }
         viewModelScope.launch {
             try {
                 val json = withContext(Dispatchers.IO) { lists.exportJson(songs.value) }
@@ -876,19 +881,24 @@ class MainViewModel(
                 val uri = ctx.contentResolver.insert(
                     android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
                 )
-                if (uri == null) { onDone("No se pudo crear el archivo"); return@launch }
+                if (uri == null) { fin("No se pudo crear el archivo"); return@launch }
                 withContext(Dispatchers.IO) {
                     ctx.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
                 }
-                onDone("Respaldo guardado en Descargas/Melodia")
+                fin("Respaldo guardado en Descargas/Melodia")
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
-                onDone("No se pudo crear el respaldo")
+                fin("No se pudo crear el respaldo")
+            } finally {
+                // Si cancelaron a mitad, el diálogo no queda pegado en "Trabajando…".
+                fin("Respaldo cancelado")
             }
         }
     }
 
     fun restore(ctx: android.content.Context, uri: android.net.Uri, onDone: (String) -> Unit) {
+        var avisado = false
+        fun fin(m: String) { if (!avisado) { avisado = true; try { onDone(m) } catch (_: Exception) {} } }
         viewModelScope.launch {
             try {
                 val text = withContext(Dispatchers.IO) {
@@ -903,24 +913,24 @@ class MainViewModel(
                 var pls = 0; var added = 0; var favs = 0
                 val arr = root.optJSONArray("playlists") ?: org.json.JSONArray()
                 for (i in 0 until arr.length()) {
-                    val o = arr.getJSONObject(i)
+                    val o = try { arr.optJSONObject(i) } catch (_: Exception) { null } ?: continue
                     val name = o.optString("name", "Lista").ifBlank { "Lista" }
                     // Si ya existe (misma restauración importada dos veces),
                     // se completa en vez de duplicar la lista.
                     val clave = name.removeSuffix(" (respaldo)").trim().lowercase()
-                    var pid = existentes[clave]?.id ?: lists.createPlaylist("$name (respaldo)").also { pls++ }
+                    var pid: Long? = existentes[clave]?.id
                     // Revalida: si la lista se borró a mitad del restore, el add
                     // dejaría filas huérfanas. Se recrea en ese caso.
-                    if (playlists.value.none { it.id == pid }) {
-                        pid = lists.createPlaylist("$name (respaldo)").also { pls++ }
-                    }
+                    if (pid != null && playlists.value.none { it.id == pid }) pid = null
                     val sarr = o.optJSONArray("songs") ?: org.json.JSONArray()
                     for (j in 0 until sarr.length()) {
-                        val e = sarr.getJSONObject(j)
+                        val e = try { sarr.optJSONObject(j) } catch (_: Exception) { null } ?: continue
                         val match = byPath[e.optString("path")] ?: lib.find {
                             it.title.equals(e.optString("title"), true) &&
                                 it.artist.equals(e.optString("artist"), true)
                         } ?: continue
+                        // Perezoso: sin matches no queda lista vacía huérfana.
+                        if (pid == null) pid = lists.createPlaylist("$name (respaldo)").also { pls++ }
                         if (lists.addToPlaylist(pid, match)) added++
                     }
                 }
@@ -960,10 +970,12 @@ class MainViewModel(
                         lists.toggleFav(cand.id, false); favs++
                     }
                 }
-                onDone("Restaurado: $pls listas, $added temas, $favs favoritos")
+                fin("Restaurado: $pls listas, $added temas, $favs favoritos")
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
-                onDone("Archivo inválido — no se pudo restaurar")
+                fin("Archivo inválido — no se pudo restaurar")
+            } finally {
+                fin("Restauración cancelada")
             }
         }
     }

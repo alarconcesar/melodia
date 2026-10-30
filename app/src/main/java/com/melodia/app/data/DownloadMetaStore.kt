@@ -31,8 +31,12 @@ class DownloadMetaStore(context: Context) {
     /** Borra las fichas de archivos que ya no están (evita prefs eternas). */
     fun sweep(existingNames: Set<String>) {
         try {
-            val all = prefs.all.keys.toList()
-            all.forEach { k -> if (!existingNames.contains(k)) prefs.edit().remove(k).apply() }
+            val ed = prefs.edit()
+            var n = 0
+            for (k in prefs.all.keys) {
+                if (!existingNames.contains(k)) { ed.remove(k); n++ }
+            }
+            if (n > 0) ed.apply()
         } catch (_: Exception) {}
     }
 

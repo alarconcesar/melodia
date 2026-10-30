@@ -18,13 +18,16 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.melodia.app.MainActivity
 import com.melodia.app.R
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
  * Servicio de reproducción con notificación propia estilo Media.
  * - Al abrir la app solo se hace bind (sin foreground, sin ANR).
  * - Al sonar: startForeground + notificación con título/artista/controles.
- * - En pausa: la notificación queda visible (se puede retomar).
+ * - En pausa: al barrer la app el servicio se detiene (la cola persiste y
+ *   la reanudación del sistema la trae de vuelta al reproducir).
  * - Sin cola: se retira la notificación y el servicio se detiene.
  */
 class MelodiaPlaybackService : MediaSessionService() {
@@ -347,6 +350,7 @@ class MelodiaPlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         try { tickWidget?.cancel() } catch (_: Exception) {}
+        try { artScope.cancel() } catch (_: Exception) {}
         try { if (effectSessionOpen) updateEffectSession(false) } catch (_: Exception) {}
         try { session?.player?.removeListener(notifListener) } catch (_: Exception) {}
         session?.run {

@@ -1,6 +1,7 @@
 package com.melodia.app.data.lyrics
 
 import android.content.Context
+import com.melodia.app.data.art.titlesMatch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -83,6 +84,12 @@ class LyricsRepository(context: Context) {
                 val d = try { o.optLong("duration", -1) } catch (_: Exception) { -1L }
                 if (dur > 0 && d > 0 && kotlin.math.abs(d - dur) <= 10) { best = o; break }
                 if (best == null) best = o
+            }
+            // Sin duración no hay forma de desempatar: el primero solo vale si
+            // el título coincide (si no, era la letra de otro tema).
+            if (dur <= 0 && best != null) {
+                val bt = try { best.optString("trackName", "") } catch (_: Exception) { "" }
+                if (!titlesMatch(bt, title)) best = null
             }
             (best?.let { fromJson(it) }) ?: tryClean(artist, title, dur)
         } catch (_: Exception) { tryClean(artist, title, dur) } finally {

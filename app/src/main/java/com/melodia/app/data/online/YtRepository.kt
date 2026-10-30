@@ -322,6 +322,13 @@ class YtRepository(private val context: Context) {
 
     // ── Búsquedas recientes (persistidas, más recientes primero) ──
     private fun prefs() = context.getSharedPreferences("melodia_yt", Context.MODE_PRIVATE)
+
+    var altaCalidad: Boolean
+        get() = try { prefs().getBoolean("alta_calidad", true) } catch (_: Exception) { true }
+        set(v) { try { prefs().edit().putBoolean("alta_calidad", v).apply() } catch (_: Exception) {} }
+    var ahorroDatos: Boolean
+        get() = try { prefs().getBoolean("ahorro_datos", false) } catch (_: Exception) { false }
+        set(v) { try { prefs().edit().putBoolean("ahorro_datos", v).apply() } catch (_: Exception) {} }
     fun getRecent(): List<String> = try {
         prefs().getString("recent", "")!!.split("\n").filter { it.isNotBlank() }.take(6)
     } catch (_: Exception) { emptyList() }

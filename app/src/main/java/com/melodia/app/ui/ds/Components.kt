@@ -179,8 +179,18 @@ fun pressClick(
     role: Role? = null,
     label: String? = null
 ): Modifier {
+    // Modo seguro (NO_EFFECTS): sin animación de escala, solo el click.
+    val safe = com.melodia.app.SafeMode.isOn(
+        androidx.compose.ui.platform.LocalContext.current, com.melodia.app.SafeMode.NO_EFFECTS
+    )
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    if (safe) {
+        return Modifier.clickable(
+            interactionSource = interaction, indication = null,
+            role = role, onClickLabel = label, onClick = onClick
+        )
+    }
     val scale by animateFloatAsState(
         if (pressed) min else 1f,
         // Respuesta de pulsación: rápida y con un rebote apenas perceptible.
@@ -686,10 +696,15 @@ fun MiniPlayerDs(
                     Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
                     Text(artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Sub, color = cs.onSurfaceVariant)
                 }
-                if (isFav) {
+                IconButton(
+                    onClick = onToggleFav,
+                    modifier = Modifier.size(38.dp)
+                ) {
                     Icon(
-                        Icons.Default.Favorite, "En favoritos",
-                        tint = cs.primary, modifier = Modifier.padding(horizontal = 10.dp).size(18.dp)
+                        if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        if (isFav) "Quitar de favoritos" else "Añadir a favoritos",
+                        tint = if (isFav) cs.primary else cs.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
                 Surface(shape = CircleShape, color = cs.primary, modifier = Modifier.size(44.dp).then(pressClick(onToggle))) {

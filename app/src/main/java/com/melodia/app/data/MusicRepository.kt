@@ -57,6 +57,8 @@ class MusicRepository(context: Context, private val dlMeta: DownloadMetaStore = 
 
     /** Edita título/artista/álbum en MediaStore. */
     fun updateMetadata(id: Long, title: String, artist: String, album: String): MetaResult {
+        // La UI bloquea el vacío, pero a prueba de otro llamador.
+        if (title.isBlank()) return MetaResult.Fail
         val uri = android.content.ContentUris.withAppendedId(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id
         )
