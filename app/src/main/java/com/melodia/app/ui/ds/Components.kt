@@ -120,7 +120,8 @@ fun songArtModel(albumId: Long, artUrl: String?): Any? = remember(albumId, artUr
 data class SelectionState(
     val selecting: Boolean = false,
     val selected: Set<Long> = emptySet(),
-    val toggle: (Long) -> Unit = {}
+    val toggle: (Long) -> Unit = {},
+    val start: (Long?) -> Unit = {}
 )
 
 val LocalSelection = androidx.compose.runtime.staticCompositionLocalOf { SelectionState() }
@@ -393,7 +394,7 @@ fun TrackRow(
                     interactionSource = pressSource,
                     indication = null,
                     onClick = { if (selecting) onSelectToggle() else onTap() },
-                    onLongClick = { if (selecting) onSelectToggle() else onLongPress() }
+                    onLongClick = { if (selecting) onLongPress() else selection.start(s.id) }
                 )
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically

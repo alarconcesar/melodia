@@ -392,8 +392,10 @@ fun MelodiaScreen(vm: MainViewModel) {
         )
     }
 
-    // ── Back Android por capas: ajustes → letra → player → detalle → filtro → salir ──
-    if (showSettings) {
+    // ── Back Android por capas: selección → ajustes → letra → player → detalle → filtro → salir ──
+    if (selecting) {
+        BackHandler { vm.clearSelection() }
+    } else if (showSettings) {
         BackHandler { showSettings = false }
     } else if (showLyrics) {
         BackHandler { showLyrics = false }
@@ -541,7 +543,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                 // cuesta frames justo cuando el usuario acaba de tocar.
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.melodia.app.ui.ds.LocalSelection provides
-                        com.melodia.app.ui.ds.SelectionState(selecting, selected, vm::toggleSelected)
+                        com.melodia.app.ui.ds.SelectionState(selecting, selected, vm::toggleSelected, vm::startSelection)
                 ) {
                 androidx.compose.runtime.key(tab) {
                 val t = tab
