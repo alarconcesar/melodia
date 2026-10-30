@@ -54,3 +54,34 @@ object LibraryFilters {
         }
     }
 }
+
+/**
+ * Título/artista listos para mostrar.
+ *
+ * - Quita el sufijo "[videoId]" que queda en el nombre de las descargas.
+ * - Si el artista quedó en "Desconocido"/"YouTube" y el título trae
+ *   "Tema - Artista", lo rescata (así llegan muchas descargas).
+ * Solo estética de lectura: no reescribe el archivo.
+ */
+fun normalizeSongMeta(title: String, artist: String): Pair<String, String> {
+    var t = title.replace(Regex("""\s*\[[A-Za-z0-9_-]{6,16}]\s*$"""), "").trim().ifBlank { title }
+    var a = artist.trim()
+    val basura = a.isBlank() || a.equals("Desconocido", true) ||
+        a.equals("YouTube", true) || a == "<unknown>"
+    if (basura) {
+        val partes = t.split(" - ").map { it.trim() }.filter { it.isNotBlank() }
+        if (partes.size >= 2) {
+            val posible = partes.last()
+            val ruido = listOf(
+                "official video", "video oficial", "official audio", "official music video",
+                "audio", "lyrics", "letra", "hd", "hq", "remastered", "remaster"
+            )
+            if (posible.lowercase() !in ruido && !posible.startsWith("http") && posible.length in 2..48) {
+                a = posible
+                t = partes.dropLast(1).joinToString(" - ").ifBlank { t }
+            }
+        }
+    }
+    if (a.isBlank()) a = "Desconocido"
+    return t to a
+}

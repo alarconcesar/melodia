@@ -224,12 +224,17 @@ class MusicRepository(context: Context, private val dlMeta: DownloadMetaStore = 
                             // artista/álbum al reescribir las etiquetas del m4a.
                             val nombre = try { java.io.File(path).name } catch (_: Exception) { "" }
                             val m = if (nombre.isNotBlank()) dlMeta.get(nombre) else null
-                            if (m == null) base else base.copy(
+                            val conMeta = if (m == null) base else base.copy(
                                 title = m.title.ifBlank { base.title },
                                 artist = m.artist.ifBlank { base.artist },
                                 album = m.album.ifBlank { base.album },
                                 artUrl = m.artPath ?: base.artUrl
                             )
+                            // Última red: si sigue "Desconocido" y el título
+                            // trae "Tema - Artista", se rescata para la UI.
+                            val (tt, aa) = normalizeSongMeta(conMeta.title, conMeta.artist)
+                            if (tt == conMeta.title && aa == conMeta.artist) conMeta
+                            else conMeta.copy(title = tt, artist = aa)
                         }
                     )
                 }

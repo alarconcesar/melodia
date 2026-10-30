@@ -455,3 +455,17 @@ misma jerarquía que el reproductor.
 - Corazón en stream avisa; fila online con %; AddTo con keys.
 
 141 tests verdes.
+
+## Ficha de info 7.23
+
+- Hoja inferior con grabber y scrim (antes: AlertDialog centrado y apretado).
+- Cabecera: arte 76dp + título 2 líneas + artista · álbum.
+- Píldoras de un vistazo: duración · formato · tamaño.
+- Detalles en filas etiqueta/valor; artista y álbum navegables con chevron.
+- Ruta con acción "Copiar ruta".
+- Acciones: Reproducir / A lista + una fila de iconos
+  (Favorito · Siguiente · Al final · Editar · Compartir).
+- "Elegir varios" y "Excluir carpeta" como texto discreto al pie.
+- Fuera el botón "Encolar" duplicado de "Siguiente".
+- `normalizeSongMeta`: limpia el sufijo [videoId] y rescata el artista del
+  título cuando quedó en "Desconocido" (consistente en lista y ficha).

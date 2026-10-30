@@ -153,6 +153,23 @@ class AuditFixesTest {
     }
 
     @Test
+    fun normalizeMetaRescataArtistaDelTitulo() {
+        val (t1, a1) = com.melodia.app.data.normalizeSongMeta(
+            "Como Un Pájaro - Silvana Estrada [lbcqqZ87e4]", "Desconocido"
+        )
+        assertEquals("Como Un Pájaro", t1)
+        assertEquals("Silvana Estrada", a1)
+        // Ruido conocido no se toma como artista.
+        val (t2, a2) = com.melodia.app.data.normalizeSongMeta("Tema - Official Video", "Desconocido")
+        assertEquals("Tema - Official Video", t2)
+        assertEquals("Desconocido", a2)
+        // Artista real no se toca.
+        val (t3, a3) = com.melodia.app.data.normalizeSongMeta("Tema", "Muse")
+        assertEquals("Tema", t3)
+        assertEquals("Muse", a3)
+    }
+
+    @Test
     fun fileNameParaNoPasa255Bytes() {
         val yt = YtRepository(ctx())
         val largo = "日本語のテスト".repeat(12)

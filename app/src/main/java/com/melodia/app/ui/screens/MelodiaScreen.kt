@@ -160,6 +160,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
@@ -2935,163 +2936,223 @@ fun TrackInfoSheet(
             android.widget.Toast.makeText(ctx, "No se pudo compartir", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    AlertDialog(
+    // ── Hoja inferior: cabecera con arte grande, datos en píldoras y
+    // acciones agrupadas por importancia (antes: 8 botones en 3 filas). ──
+    val meta = remember(song.id, song.title, song.artist) {
+        com.melodia.app.data.normalizeSongMeta(song.title, song.artist)
+    }
+    val file = remember(song.dataPath) {
+        try { java.io.File(song.dataPath).takeIf { it.exists() } } catch (_: Exception) { null }
+    }
+    val tamano = remember(file) {
+        val b = try { file?.length() ?: 0L } catch (_: Exception) { 0L }
+        when {
+            b <= 0L -> null
+            b >= 1024L * 1024L -> "%.1f MB".format(b / (1024f * 1024f))
+            else -> "${b / 1024L} KB"
+        }
+    }
+    val formato = remember(song.dataPath) {
+        song.dataPath.substringAfterLast('.', "").uppercase().takeIf { it.length in 2..5 }
+    }
+    Dialog(
         onDismissRequest = onClose,
-        title = {
-            // Cabecera real del tema: arte, título y artista · álbum.
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                SongArt(
-                    albumId = song.albumId, size = 52.dp,
-                    shape = RoundedCornerShape(Ds.RRow), artUrl = song.artUrl, iconSize = 24.dp
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        song.title, style = Ds.Title, color = cs.onBackground,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        listOf(song.artist.ifBlank { "Desconocido" }, song.album.ifBlank { "—" })
-                            .joinToString(" · "),
-                        style = Ds.Sub, color = cs.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        },
-        text = {
-            Column(
-                Modifier.fillMaxWidth().heightIn(max = 400.dp)
-                    .verticalScroll(rememberScrollState())
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false, decorFitsSystemWindows = false
+        )
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            // Scrim: toque fuera = cerrar.
+            Box(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f))
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) { onClose() }
+            )
+            Surface(
+                shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+                color = cs.surface,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                InfoRow("Duración", fmt(song.durationMs))
-                InfoRow("Carpeta", folder)
-                val artistaOk = song.artist.isNotBlank() && !song.artist.equals("Desconocido", true)
-                if (onArtist != null && artistaOk) {
-                    InfoLink("Artista", song.artist) { onArtist(song.artist) }
-                }
-                if (onAlbum != null && song.album.isNotBlank()) {
-                    InfoLink("Álbum", song.album) { onAlbum(song.album) }
-                }
-                InfoRow("Agregado", added)
-                Spacer(Modifier.height(6.dp))
-                Text("Ruta", style = Ds.Micro, color = cs.onSurfaceVariant)
-                Text(
-                    song.dataPath.ifBlank { "—" }, style = Ds.Sub, color = cs.onSurfaceVariant,
-                    maxLines = 3, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = onPlay,
-                        modifier = Modifier.weight(1f).height(44.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Reproducir", maxLines = 1)
-                    }
-                    OutlinedButton(
-                        onClick = onAdd,
-                        modifier = Modifier.weight(1f).height(44.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
-                    ) {
-                        Icon(Icons.Default.PlaylistAdd, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("A lista", maxLines = 1)
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Top
+                Column(
+                    Modifier.fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 10.dp, bottom = 14.dp)
+                        .heightIn(max = 620.dp)
+                        .verticalScroll(rememberScrollState())
                 ) {
-                    InfoAction(
-                        icon = if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        label = "Favorito",
-                        active = isFav,
-                        onClick = onFav
+                    // Grabber
+                    Box(
+                        Modifier.align(Alignment.CenterHorizontally).width(38.dp).height(4.dp)
+                            .clip(CircleShape).background(cs.onSurfaceVariant.copy(alpha = 0.35f))
                     )
-                    if (song.id != YT_STREAM_ID) {
-                        InfoAction(Icons.Default.PlaylistAdd, "Encolar") {
-                            vm.queueNext(song.id) { ok ->
-                                android.widget.Toast.makeText(
-                                    ctx,
-                                    if (ok) "Sonará a continuación"
-                                    else if (vm.currentSong.value?.id == YT_STREAM_ID) "Estás en online: reproduce un tema local para encolar"
-                                    else "No se pudo encolar",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                    Spacer(Modifier.height(16.dp))
+                    // Cabecera
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SongArt(
+                            albumId = song.albumId, size = 76.dp,
+                            shape = RoundedCornerShape(14.dp), artUrl = song.artUrl, iconSize = 30.dp
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                meta.first, style = Ds.Title.copy(fontSize = 18.sp), color = cs.onBackground,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                meta.second, style = Ds.Sub, color = cs.onSurfaceVariant,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
                         }
-                        InfoAction(Icons.Default.Edit, "Editar") { showEdit = true }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    // Píldoras de datos clave: formato, tamaño, duración.
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        InfoPill(fmt(song.durationMs))
+                        formato?.let { InfoPill(it) }
+                        tamano?.let { InfoPill(it) }
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    // Detalles
+                    if (onArtist != null && meta.second.isNotBlank() && !meta.second.startsWith("Desconocido")) {
+                        InfoLine("Artista", meta.second, primary = true) { onArtist(meta.second) }
+                    }
+                    if (onAlbum != null && song.album.isNotBlank() && song.album != "Sin álbum") {
+                        InfoLine("Álbum", song.album, primary = true) { onAlbum(song.album) }
+                    }
+                    InfoLine("Carpeta", folder)
+                    InfoLine("Agregado", added)
+                    // Ruta en bloque aparte, con copiar.
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("ARCHIVO", style = Ds.Micro, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        Text(
+                            "Copiar ruta", style = Ds.Sub, color = cs.primary,
+                            modifier = Modifier.clip(CircleShape)
+                                .clickable(role = Role.Button) {
+                                    try {
+                                        val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                                        cm?.setPrimaryClip(
+                                            android.content.ClipData.newPlainText("ruta", song.dataPath)
+                                        )
+                                        android.widget.Toast.makeText(ctx, "Ruta copiada", android.widget.Toast.LENGTH_SHORT).show()
+                                    } catch (_: Exception) {}
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    Text(
+                        song.dataPath.ifBlank { "—" }, style = Ds.Sub, color = cs.onSurfaceVariant,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    // Acciones primarias
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = onPlay,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(Ds.RChip)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Reproducir", maxLines = 1, fontWeight = FontWeight.SemiBold)
+                        }
+                        OutlinedButton(
+                            onClick = onAdd,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(Ds.RChip)
+                        ) {
+                            Icon(Icons.Default.PlaylistAdd, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("A lista", maxLines = 1)
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    // Acciones frecuentes: una sola fila, sin duplicados.
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        InfoAction(
+                            icon = if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            label = if (isFav) "Favorito" else "Favorito",
+                            active = isFav, onClick = onFav
+                        )
+                        if (song.id != YT_STREAM_ID) {
+                            InfoAction(Icons.Default.QueueMusic, "Siguiente") {
+                                vm.queueFromInfo(song.id, true, ctx) { }
+                            }
+                            InfoAction(Icons.Default.LowPriority, "Al final") {
+                                vm.queueFromInfo(song.id, false, ctx) { }
+                            }
+                            InfoAction(Icons.Default.Edit, "Editar") { showEdit = true }
+                        }
                         InfoAction(Icons.Default.Share, "Compartir") { compartir() }
-                        InfoAction(Icons.Default.Checklist, "Elegir") {
-                            vm.startSelection(song.id)
-                            onClose()
+                    }
+                    // Secundarias, discretas
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (song.id != YT_STREAM_ID) {
+                            Text(
+                                "Elegir varios", style = Ds.Sub, color = cs.onSurfaceVariant,
+                                modifier = Modifier.clip(CircleShape)
+                                    .clickable(role = Role.Button) { vm.startSelection(song.id); onClose() }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
                         }
                         if (song.dataPath.isNotBlank()) {
-                            InfoAction(Icons.Default.FolderOff, "Excluir") {
-                                val carpeta = try { java.io.File(song.dataPath).parent } catch (_: Exception) { null }
-                                if (carpeta != null) {
-                                    vm.setExcludedFolders(vm.excludedFolders.value + carpeta)
-                                    android.widget.Toast.makeText(
-                                        ctx,
-                                        "Carpeta excluida: ${java.io.File(carpeta).name}",
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                    onClose()
-                                }
-                            }
-                        }
-                    }
-                }
-                if (song.id != YT_STREAM_ID) {
-                    Spacer(Modifier.height(10.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                vm.queueNext(song.id) { ok ->
-                                    android.widget.Toast.makeText(
-                                        ctx, if (ok) "Sonará a continuación" else "No se pudo agregar",
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                                onClose()
-                            },
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Icon(Icons.Default.QueueMusic, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Siguiente", maxLines = 1)
-                        }
-                        OutlinedButton(
-                            onClick = {
-                                vm.queueEnd(song.id) { ok ->
-                                    android.widget.Toast.makeText(
-                                        ctx, if (ok) "Agregado al final" else "No se pudo agregar",
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                                onClose()
-                            },
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Icon(Icons.Default.LowPriority, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Al final", maxLines = 1)
+                            Text(
+                                "Excluir carpeta", style = Ds.Sub, color = cs.onSurfaceVariant,
+                                modifier = Modifier.clip(CircleShape)
+                                    .clickable(role = Role.Button) {
+                                        val carpeta = try { java.io.File(song.dataPath).parent } catch (_: Exception) { null }
+                                        if (carpeta != null) {
+                                            vm.setExcludedFolders(vm.excludedFolders.value + carpeta)
+                                            android.widget.Toast.makeText(
+                                                ctx, "Carpeta excluida: ${java.io.File(carpeta).name}",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                            onClose()
+                                        }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
                         }
                     }
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = onClose) { Text("Cerrar") } }
-    )
+        }
+    }
 }
+
+/**
+ * Encola el tema (siguiente o al final) y avisa. Antes había dos botones
+ * distintos ("Encolar" y "Siguiente") que hacían exactamente lo mismo.
+ */
+private fun MainViewModel.queueFromInfo(
+    id: Long, siguiente: Boolean, ctx: android.content.Context, onDone: () -> Unit
+) {
+    val cb: (Boolean) -> Unit = { ok ->
+        val msg = when {
+            ok -> if (siguiente) "Sonará a continuación" else "Agregado al final"
+            currentSong.value?.id == YT_STREAM_ID -> "Estás en online: reproduce un tema local para encolar"
+            else -> "No se pudo encolar"
+        }
+        android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show()
+        onDone()
+    }
+    if (siguiente) queueNext(id, cb) else queueEnd(id, cb)
+}
+
+
 
 /** Acción de la ficha: icono con etiqueta corta debajo, ancho fijo. */
 @Composable
@@ -3104,14 +3165,14 @@ private fun InfoAction(
     val cs = MaterialTheme.colorScheme
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(68.dp).clip(RoundedCornerShape(12.dp))
+        modifier = Modifier.width(60.dp).clip(RoundedCornerShape(12.dp))
             .clickable(
                 role = androidx.compose.ui.semantics.Role.Button,
                 onClickLabel = label, onClick = onClick
             )
-            .padding(vertical = 8.dp)
+            .padding(vertical = 6.dp)
     ) {
-        Icon(icon, null, Modifier.size(20.dp), tint = if (active) cs.primary else cs.onSurfaceVariant)
+        Icon(icon, null, Modifier.size(21.dp), tint = if (active) cs.primary else cs.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
         Text(
             label, style = Ds.Sub,
@@ -3119,6 +3180,52 @@ private fun InfoAction(
             maxLines = 1
         )
     }
+}
+
+/** Fila de detalle de la ficha: etiqueta discreta + valor legible. */
+@Composable
+private fun InfoLine(label: String, value: String, primary: Boolean = false, onTap: (() -> Unit)? = null) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .then(
+                if (onTap != null) Modifier.clip(RoundedCornerShape(8.dp)).clickable(
+                    role = androidx.compose.ui.semantics.Role.Button,
+                    onClickLabel = label, onClick = onTap
+                ) else Modifier
+            )
+            .padding(vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.width(84.dp))
+        Text(
+            value,
+            style = Ds.Body.copy(fontWeight = if (primary) FontWeight.Medium else FontWeight.Normal),
+            color = if (primary) cs.primary else cs.onBackground,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        if (onTap != null) {
+            Icon(
+                Icons.Default.ChevronRight, null, Modifier.size(16.dp),
+                tint = cs.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        }
+    }
+}
+
+/** Píldora de dato clave (duración, formato, tamaño). */
+@Composable
+private fun InfoPill(text: String) {
+    val cs = MaterialTheme.colorScheme
+    Text(
+        text, style = Ds.Sub.copy(fontWeight = FontWeight.Medium), color = cs.onSurfaceVariant,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(Ds.RChip))
+            .background(cs.onSurfaceVariant.copy(alpha = 0.12f))
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    )
 }
 
 @Composable
