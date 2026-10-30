@@ -95,6 +95,9 @@ object CrashScreen {
             } catch (_: Exception) {}
         }
         boton("Reintentar") {
+            // Si era fallo del contenedor, se reconstruye: recreate() solo no
+            // sirve (Application no se recrea y el error seguía ahí = bucle).
+            try { (ctx.applicationContext as? MelodiaApp)?.reintentarContenedor() } catch (_: Exception) {}
             borrar(ctx)
             activity.recreate()
         }

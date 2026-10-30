@@ -79,6 +79,12 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             // de nuevo (antes se ignoraba en silencio durante 8 s).
             _jobs.value.find { it.track.id == track.id && it.status == DlStatus.DONE }?.let { done ->
                 _jobs.value = _jobs.value.filterNot { it.track.id == done.track.id }
+                // El worker viejo sigue en running hasta su delay(8s): se
+                // expulsa para que el guard de abajo no trague el re-encolado.
+                // Al cancelarse, su filterNot final no corre (Cancellation).
+                synchronized(running) { running.remove(track.id) }?.let { rezagado ->
+                    scope.launch { try { rezagado.cancelAndJoin() } catch (_: Exception) {} }
+                }
             }
             _jobs.value.find { it.track.id == track.id }?.let { cur ->
                 // Misma pista, otra calidad, sin worker en vuelo: se cambia en
@@ -87,6 +93,9 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
                     (cur.status == DlStatus.QUEUED || cur.status == DlStatus.PAUSED || cur.status == DlStatus.ERROR)
                 ) {
                     update(track.id) { it.copy(track = track, high = high, downloaded = 0, total = 0, error = null) }
+                    // El .part lleva sufijo por calidad: el de la otra queda
+                    // huérfano y el dir no tiene trim. Se borra aquí.
+                    try { partFile(track.id, !high).delete() } catch (_: Exception) {}
                     persist()
                     resume(track.id)
                 }

@@ -640,7 +640,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                     interactionSource = remember { MutableInteractionSource() }
                 ) {}
             ) {
-                DownloadsScreen(vm, onClose = vm::closeDownloads, onPlayRecord = { vm.playHistoryRecord(it) })
+                DownloadsScreen(vm, onClose = vm::closeDownloads, onPlayRecord = { vm.playHistoryRecord(it); vm.closeDownloads() })
             }
         }
 
@@ -3118,6 +3118,7 @@ fun EqSheet(eq: com.melodia.app.player.EqualizerManager, onClose: () -> Unit) {
     val custom by eq.customPresets.collectAsState()
     var presetMenu by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
+    val ctxToast = androidx.compose.ui.platform.LocalContext.current
     val freqs = listOf("60Hz", "230Hz", "910Hz", "3.6kHz", "14kHz")
     AlertDialog(
         onDismissRequest = onClose,
@@ -3193,7 +3194,10 @@ fun EqSheet(eq: com.melodia.app.player.EqualizerManager, onClose: () -> Unit) {
     )
     if (showSave) {
         TextDialog("Guardar preset", "", onDismiss = { showSave = false }) {
-            eq.saveCustomPreset(it); showSave = false
+            if (eq.saveCustomPreset(it)) showSave = false
+            else android.widget.Toast.makeText(
+                ctxToast, "Ese nombre ya existe o no vale", android.widget.Toast.LENGTH_SHORT
+            ).show()
         }
     }
 }

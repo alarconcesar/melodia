@@ -400,3 +400,16 @@ misma jerarquía que el reproductor.
   renameId se cierra; % exacto en texto.
 
 138 tests verdes.
+
+## Auditoría 7.16 (séptima pasada)
+
+- playYt fallido restaura la cola previa (sin cola fantasma).
+- Export en una sola lectura; restore revalida el pid.
+- Selección limpia el filtro; warm sin duración no calienta; letras LRU.
+- Reintentar reconstruye el contenedor (fin del bucle).
+- Bind muerto se reintenta cada 10 s; error-salto solo si puede avanzar.
+- Re-encolar DONE en ventana de 8 s funciona; cambio de calidad sin huérfanos.
+- Fila online con estado "resolviendo"; historial cierra Descargas.
+- Preset duplicado avisa y sanea separadores.
+
+139 tests verdes.

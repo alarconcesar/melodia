@@ -92,11 +92,11 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
         // después (p. ej. repairDownloadMeta); con ambos, uno rescata al otro.
         val byId = songs.associateBy { it.id }
         val favKeys = org.json.JSONArray()
+        val favIds = org.json.JSONArray()
         db.favoriteDao().getAllIds().forEach { id ->
+            favIds.put(id)
             byId[id]?.let { favKeys.put(favKey(it.artist, it.title)) }
         }
-        val favIds = org.json.JSONArray()
-        db.favoriteDao().getAllIds().forEach { favIds.put(it) }
         return org.json.JSONObject().put("playlists", arr).put("favs", favKeys).put("favIds", favIds).toString()
     }
 }

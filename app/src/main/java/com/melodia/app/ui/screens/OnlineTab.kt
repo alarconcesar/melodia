@@ -490,6 +490,8 @@ fun YtRowFlat(
             }
             when {
                 busy -> Box(Modifier.padding(horizontal = 8.dp)) { MelodiaSpinner(size = 20.dp, width = 2.dp) }
+                // En cola/resolviendo (progreso 0): spinner, sin botón muerto.
+                progress != null && progress <= 0f -> Box(Modifier.padding(horizontal = 8.dp)) { MelodiaSpinner(size = 20.dp, width = 2.dp) }
                 progress == null -> IconButton(onClick = onDownload, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Download, "Descargar", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
                 }

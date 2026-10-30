@@ -112,13 +112,19 @@ class EqualizerManager(context: Context) {
         } catch (_: Exception) {}
     }
 
-    fun saveCustomPreset(name: String) {
-        val n = name.trim().take(24)
-        if (n.isEmpty()) return
+    /**
+     * Guarda el preset. Devuelve false si el nombre ya existe (no pisa en
+     * silencio) o si está vacío. Los separadores ;|, se quitan porque romperían
+     * el formato de guardado.
+     */
+    fun saveCustomPreset(name: String): Boolean {
+        val n = name.replace(Regex("[;|,\n]"), "").trim().take(24)
+        if (n.isEmpty() || _customPresets.value.containsKey(n)) return false
         val vals = _bands.value.take(5) + _bass.value
         _customPresets.value = _customPresets.value + (n to vals)
         saveCustom()
         _preset.value = n; prefs.edit().putString("preset", n).apply()
+        return true
     }
 
     fun deleteCustomPreset(name: String) {

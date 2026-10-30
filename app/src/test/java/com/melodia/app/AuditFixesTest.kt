@@ -13,6 +13,8 @@ import com.melodia.app.data.online.YtRepository
 import com.melodia.app.data.online.YtTrack
 import com.melodia.app.player.QueueStore
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -148,6 +150,18 @@ class AuditFixesTest {
         yt.pushDlHistory(YtTrack("v1", "Tema", "Artista", 200, null, "https://youtu.be/v1"), true)
         val hist = yt.getDlHistory()
         assertEquals("https://youtu.be/v1", hist.firstOrNull { it.id == "v1" }?.url)
+    }
+
+    @Test
+    fun presetDuplicadoNoPisaYSaneaNombre() {
+        val eq = com.melodia.app.player.EqualizerManager(ctx())
+        assertTrue(eq.saveCustomPreset("Mi Rock"))
+        assertFalse(eq.saveCustomPreset("Mi Rock"))
+        assertFalse(eq.saveCustomPreset("   "))
+        // Separadores que romperían el formato se quitan (no duplica).
+        assertTrue(eq.saveCustomPreset("A;B|C,D"))
+        assertFalse(eq.saveCustomPreset("ABCD"))
+        eq.deleteCustomPreset("Mi Rock"); eq.deleteCustomPreset("ABCD")
     }
 
     @Test

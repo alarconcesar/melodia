@@ -16,6 +16,18 @@ class MelodiaApp : Application(), ImageLoaderFactory {
     var containerError: String? = null
         private set
 
+    /** Reintenta crear el contenedor (lo usa el botón Reintentar). */
+    fun reintentarContenedor(): Boolean {
+        return try {
+            appContainer = AppContainer(this)
+            containerError = null
+            true
+        } catch (t: Throwable) {
+            containerError = "Fallo al preparar la app:\n${t.stackTraceToString()}"
+            false
+        }
+    }
+
     companion object {
         const val CRASH_FILE = "last_crash.txt"
     }

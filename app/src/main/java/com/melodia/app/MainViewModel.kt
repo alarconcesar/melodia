@@ -420,12 +420,15 @@ class MainViewModel(
     private suspend fun delayWarmLyric(track: YtTrack) {
         try {
             kotlinx.coroutines.delay(2500)
+            // Sin duración conocida no se calienta: ganaría el primer homónimo
+            // aunque sea otra variante (la duración -1 salta el chequeo).
+            if (track.durationSec <= 0) return
             // track ya trae el artista resuelto (canal o iTunes) y se exige
             // duración parecida: dos homónimos ya no calientan la letra ajena.
             val s = songs.value.firstOrNull {
                 it.title.equals(track.title, true) &&
                     (track.artist.isBlank() || it.artist.equals(track.artist, true)) &&
-                    (track.durationSec <= 0 || kotlin.math.abs(it.durationMs / 1000 - track.durationSec) <= 3)
+                    kotlin.math.abs(it.durationMs / 1000 - track.durationSec) <= 3
             } ?: return
             val l = withContext(Dispatchers.IO) {
                 lyricsRepo.get(s.artist, s.title, s.album, s.durationMs / 1000, "id:${s.id}")
@@ -752,6 +755,9 @@ class MainViewModel(
     val selected: StateFlow<Set<Long>> = _selected
 
     fun startSelection(id: Long? = null) {
+        // El buscador se oculta en selección pero el filtro seguía vivo: "Todo"
+        // marcaba solo lo filtrado sin avisar. Se limpia al entrar.
+        if (_query.value.isNotBlank()) _query.value = ""
         _selecting.value = true
         if (id != null && id != YT_STREAM_ID) _selected.value = _selected.value + id
     }
@@ -902,7 +908,12 @@ class MainViewModel(
                     // Si ya existe (misma restauración importada dos veces),
                     // se completa en vez de duplicar la lista.
                     val clave = name.removeSuffix(" (respaldo)").trim().lowercase()
-                    val pid = existentes[clave]?.id ?: lists.createPlaylist("$name (respaldo)").also { pls++ }
+                    var pid = existentes[clave]?.id ?: lists.createPlaylist("$name (respaldo)").also { pls++ }
+                    // Revalida: si la lista se borró a mitad del restore, el add
+                    // dejaría filas huérfanas. Se recrea en ese caso.
+                    if (playlists.value.none { it.id == pid }) {
+                        pid = lists.createPlaylist("$name (respaldo)").also { pls++ }
+                    }
                     val sarr = o.optJSONArray("songs") ?: org.json.JSONArray()
                     for (j in 0 until sarr.length()) {
                         val e = sarr.getJSONObject(j)
@@ -1243,6 +1254,10 @@ class MainViewModel(
             )
             _currentTrack.value = track
             _streamSong.value = pendiente
+            // Cola previa a salvo: si el audio no resuelve, se restaura (si no,
+            // la cola fantasma bloqueaba toda operación hasta sonar un local).
+            val colaPrevia = _queue.value.filter { it.id != YT_STREAM_ID }
+            val idPrevio = _currentId.value.takeIf { it != YT_STREAM_ID }
             _queue.value = listOf(pendiente)
             _currentId.value = YT_STREAM_ID
             // La letra que ya se resolvió con el pendiente se muda a la clave
@@ -1264,6 +1279,10 @@ class MainViewModel(
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _ytError.value = errMsg(t, "No se pudo reproducir — reintenta")
+                // Se restaura lo que sonaba (la cola fantasma se descarta).
+                _streamSong.value = null
+                _queue.value = colaPrevia
+                if (idPrevio != null) _currentId.value = idPrevio
             } finally {
                 if (_busyYt.value == track.id) _busyYt.value = null
             }
@@ -1353,7 +1372,10 @@ class MainViewModel(
     }
     private val _lyrics = MutableStateFlow<LyricsUi>(LyricsUi.Idle)
     val lyrics: StateFlow<LyricsUi> = _lyrics
-    private val lyricsMem = mutableMapOf<String, LyricsUi>()
+    // LRU: el acierto reencola (antes el warm expulsaba la letra en pantalla).
+    private val lyricsMem = object : LinkedHashMap<String, LyricsUi>(48, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, LyricsUi>?): Boolean = size > 40
+    }
     private var lyricsJob: kotlinx.coroutines.Job? = null
 
     fun loadLyrics(s: Song, force: Boolean = false) {
@@ -1376,8 +1398,7 @@ class MainViewModel(
                     got.plain != null -> LyricsUi.Plain(got.plain)
                     else -> LyricsUi.None
                 }
-                lyricsMem[key] = ui
-                if (lyricsMem.size > 40) lyricsMem.remove(lyricsMem.keys.first())
+                lyricsMem[key] = ui // removeEldestEntry poda a 40 solo.
                 _lyrics.value = ui
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t

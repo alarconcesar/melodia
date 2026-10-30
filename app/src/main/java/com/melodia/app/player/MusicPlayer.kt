@@ -134,7 +134,7 @@ class MusicPlayer(private val context: Context) {
                     // Local irreproducible: avisar y saltar al siguiente (con tope).
                     errorSkips++
                     try { onUnplayable?.invoke(id) } catch (_: Exception) {}
-                    if (errorSkips <= MAX_ERROR_SKIPS) {
+                    if (errorSkips <= MAX_ERROR_SKIPS && p.hasNextMediaItem()) {
                         try {
                             expectErrorTransition = true
                             p.seekToNextMediaItem(); p.prepare(); p.play()
@@ -170,7 +170,17 @@ class MusicPlayer(private val context: Context) {
     }
 
     /** Bindea el servicio al primer uso (el arranque de la app no lo toca). */
-    private fun ensureBound() { if (!bound) initialize() }
+    private var ultimoBindMs = 0L
+    private fun ensureBound() {
+        if (!bound) { ultimoBindMs = System.currentTimeMillis(); initialize(); return }
+        // Bind muerto (dijo true pero onServiceConnected nunca llegó): reintento
+        // con calma en vez de encolar pendientes mudos para siempre.
+        if (exo == null && System.currentTimeMillis() - ultimoBindMs > 10_000) {
+            ultimoBindMs = System.currentTimeMillis()
+            bound = false
+            initialize()
+        }
+    }
 
     /**
      * Acciones pendientes mientras el servicio conecta. Es una COLA: antes era
