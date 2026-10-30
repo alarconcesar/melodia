@@ -788,6 +788,9 @@ class MainViewModel(
         _selected.value = emptySet()
     }
 
+    /** Quita las marcas pero sigue en modo selección (botón "Nada"). */
+    fun clearSelectionIds() { _selected.value = emptySet() }
+
     /** Borra los temas marcados; si el sistema pide confirmación, la entrega. */
     fun deleteSelected(onNeedsConfirm: (android.content.IntentSender) -> Unit = {}) {
         val ids = _selected.value.toList()

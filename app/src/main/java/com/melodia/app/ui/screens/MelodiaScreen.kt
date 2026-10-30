@@ -84,6 +84,9 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Edit
@@ -482,38 +485,87 @@ fun MelodiaScreen(vm: MainViewModel) {
                     modifier = Modifier.padding(start = 20.dp)
                 )
             }
-            // ── Barra de selección múltiple ──
-            if (selecting) {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 6.dp, bottom = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // ── Barra de selección múltiple: entra deslizándose, con el
+            // contador animado y acciones como botones reales ──
+            AnimatedVisibility(
+                visible = selecting,
+                enter = androidx.compose.animation.fadeIn(tween(160)) +
+                    androidx.compose.animation.slideInVertically(tween(220, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) { -it / 3 },
+                exit = androidx.compose.animation.fadeOut(tween(140)) +
+                    androidx.compose.animation.slideOutVertically(tween(160)) { -it / 3 }
+            ) {
+                val visibleSel = when (tab) {
+                    0 -> homeSongs
+                    3 -> favSongs
+                    else -> songs
+                }
+                val todos = visibleSel.isNotEmpty() && selected.size >= visibleSel.size &&
+                    visibleSel.all { it.id in selected }
+                Surface(
+                    shape = RoundedCornerShape(Ds.RCard),
+                    color = cs.surfaceVariant.copy(alpha = 0.92f),
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 4.dp)
                 ) {
-                    Text(
-                        "${selected.size} ${if (selected.size == 1) "seleccionado" else "seleccionados"}",
-                        style = Ds.Body, color = cs.onBackground, modifier = Modifier.weight(1f)
-                    )
-                    val visibleSel = when (tab) {
-                        0 -> homeSongs
-                        3 -> favSongs
-                        else -> songs
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Contador en cápsula: cambia con un desliz vertical.
+                        Box(
+                            Modifier.size(30.dp).clip(CircleShape)
+                                .background(if (selected.isEmpty()) cs.onSurfaceVariant.copy(alpha = 0.18f) else cs.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.animation.AnimatedContent(
+                                targetState = selected.size,
+                                transitionSpec = {
+                                    (androidx.compose.animation.slideInVertically(tween(180)) { it / 2 } +
+                                        androidx.compose.animation.fadeIn(tween(180))) togetherWith
+                                        (androidx.compose.animation.slideOutVertically(tween(160)) { -it / 2 } +
+                                            androidx.compose.animation.fadeOut(tween(140)))
+                                },
+                                label = "selcount"
+                            ) { n ->
+                                Text(
+                                    if (n > 99) "99+" else "$n",
+                                    style = Ds.Sub.copy(fontWeight = FontWeight.SemiBold),
+                                    color = if (selected.isEmpty()) cs.onSurfaceVariant else cs.onPrimary,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            if (selected.size == 1) "seleccionado" else "seleccionados",
+                            style = Ds.Sub, color = cs.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        // Acciones
+                        SelAction(
+                            icon = if (todos) Icons.Default.DoneAll else Icons.Default.SelectAll,
+                            label = if (todos) "Nada" else "Todo",
+                            enabled = visibleSel.isNotEmpty()
+                        ) {
+                            if (todos) vm.clearSelectionIds() else vm.selectAll(visibleSel.map { it.id })
+                        }
+                        SelAction(
+                            icon = Icons.Default.DeleteOutline,
+                            label = "Borrar",
+                            enabled = selected.isNotEmpty(),
+                            danger = true
+                        ) { showDeleteConfirm = true }
+                        IconButton(
+                            onClick = { vm.clearSelection() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close, "Cancelar selección",
+                                Modifier.size(18.dp), tint = cs.onSurfaceVariant
+                            )
+                        }
                     }
-                    Text(
-                        "Todo", style = Ds.Sub, color = cs.primary,
-                        modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) {
-                            vm.selectAll(visibleSel.map { it.id })
-                        }.padding(6.dp)
-                    )
-                    Text(
-                        "Borrar", style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
-                        color = if (selected.isEmpty()) cs.onSurfaceVariant else cs.error,
-                        modifier = Modifier.clickable(enabled = selected.isNotEmpty(), role = androidx.compose.ui.semantics.Role.Button) {
-                            showDeleteConfirm = true
-                        }.padding(6.dp)
-                    )
-                    Text(
-                        "Cancelar", style = Ds.Sub, color = cs.onSurfaceVariant,
-                        modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) { vm.clearSelection() }.padding(6.dp)
-                    )
                 }
             }
 
@@ -3153,6 +3205,32 @@ private fun MainViewModel.queueFromInfo(
 }
 
 
+
+/** Acción compacta de la barra de selección: icono + etiqueta, con estado. */
+@Composable
+private fun SelAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    enabled: Boolean = true,
+    danger: Boolean = false,
+    onClick: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val tint = when {
+        !enabled -> cs.onSurfaceVariant.copy(alpha = 0.38f)
+        danger -> cs.error
+        else -> cs.primary
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(56.dp).clip(RoundedCornerShape(10.dp))
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = label, onClick = onClick)
+            .padding(vertical = 4.dp)
+    ) {
+        Icon(icon, null, Modifier.size(20.dp), tint = tint)
+        Text(label, style = Ds.Micro, color = tint, maxLines = 1)
+    }
+}
 
 /** Acción de la ficha: icono con etiqueta corta debajo, ancho fijo. */
 @Composable

@@ -279,7 +279,12 @@ fun TrackRow(
     val selection = LocalSelection.current
     val selecting = selection.selecting
     val selected = selection.selected.contains(s.id)
-    val onSelectToggle = { selection.toggle(s.id) }
+    // Tic táctil al marcar: el modo de selección se siente físico.
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val onSelectToggle = {
+        try { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) } catch (_: Exception) {}
+        selection.toggle(s.id)
+    }
     val cs = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     val rowCtx = LocalContext.current.applicationContext
@@ -294,6 +299,19 @@ fun TrackRow(
     val rowScale by animateFloatAsState(
         if (rowPressed) 0.985f else 1f, spring(stiffness = 1200f, dampingRatio = 0.8f), label = "rowpress"
     )
+    // Selección: fondo tenue que aparece con tween y check que entra con
+    // spring desde 0.6 (antes aparecía de golpe, sin transición).
+    val selBg by animateColorAsState(
+        if (selected) cs.primary.copy(alpha = 0.10f) else Color.Transparent,
+        tween(180), label = "selbg"
+    )
+    val selScale = remember { Animatable(1f) }
+    LaunchedEffect(selected, selecting) {
+        if (selected) {
+            selScale.snapTo(0.6f)
+            selScale.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 700f))
+        }
+    }
     // El corazón late al marcar: aparece pequeño y crece con spring.
     val heart = remember { Animatable(1f) }
     LaunchedEffect(isFav) {
@@ -341,6 +359,7 @@ fun TrackRow(
         Row(
             modifier = Modifier.fillMaxWidth()
                 .graphicsLayer { scaleX = rowScale; scaleY = rowScale }
+                .background(selBg)
                 .offset { IntOffset(dragX.roundToInt(), 0) }
                 .then(
                     if (safeGestures || selecting) Modifier else Modifier.pointerInput(Unit) {
@@ -418,27 +437,47 @@ fun TrackRow(
                 style = Ds.Sub, color = cs.onSurfaceVariant
             )
         }
-        if (selecting) {
+        // Ranura derecha con transición: el check de selección y el corazón
+        // se cruzan con fade en vez de aparecer/desaparecer de golpe.
+        androidx.compose.animation.Crossfade(
+            targetState = when {
+                selecting -> 2
+                isFav -> 1
+                else -> 0
+            },
+            animationSpec = tween(160),
+            label = "slotrow"
+        ) { modo ->
             Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                Icon(
-                    if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    if (selected) "Seleccionado" else "Sin seleccionar",
-                    tint = if (selected) cs.primary else cs.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        } else if (isFav) {
-            // Solo se marca lo que es favorito, y el corazón quita.
-            Box(
-                Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onFav),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Favorite, "Quitar de favoritos",
-                    tint = cs.primary,
-                    modifier = Modifier.size(18.dp)
-                        .graphicsLayer { scaleX = heart.value; scaleY = heart.value }
-                )
+                when (modo) {
+                    2 -> {
+                        if (selected) {
+                            // Halo suave detrás del check marcado.
+                            Box(
+                                Modifier.size(22.dp).clip(CircleShape)
+                                    .background(cs.primary.copy(alpha = 0.16f))
+                            )
+                        }
+                        Icon(
+                            if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                            if (selected) "Seleccionado" else "Sin seleccionar",
+                            tint = if (selected) cs.primary else cs.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                                .graphicsLayer { scaleX = selScale.value; scaleY = selScale.value }
+                        )
+                    }
+                    1 -> Box(
+                        Modifier.fillMaxSize().clip(CircleShape).clickable(onClick = onFav),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Favorite, "Quitar de favoritos",
+                            tint = cs.primary,
+                            modifier = Modifier.size(18.dp)
+                                .graphicsLayer { scaleX = heart.value; scaleY = heart.value }
+                        )
+                    }
+                }
             }
         }
         // La ficha con su botón propio: info, encolar, editar, compartir y

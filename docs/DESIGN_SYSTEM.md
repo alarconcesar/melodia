@@ -469,3 +469,12 @@ misma jerarquía que el reproductor.
 - Fuera el botón "Encolar" duplicado de "Siguiente".
 - `normalizeSongMeta`: limpia el sufijo [videoId] y rescata el artista del
   título cuando quedó en "Desconocido" (consistente en lista y ficha).
+
+## Selección múltiple 7.24
+
+- Barra flotante que entra deslizándose (fade 160 + slide 220); contador en
+  cápsula con AnimatedContent vertical; acciones icono+etiqueta
+  (Todo/Nada · Borrar · Cerrar) con estados deshabilitados visibles.
+- Fila marcada: fondo acento al 10 % (tween 180), check con spring desde
+  0.6 + halo, crossfade 160 en la ranura derecha (check ⇄ corazón).
+- Haptics al marcar (LongPress como "tic").
