@@ -83,13 +83,12 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
                 }
             }
             is MainViewModel.LyricsUi.Synced -> {
+                // Clave por tema: si no, hereda el scroll del tema anterior.
+                androidx.compose.runtime.key(s.id) {
                 val lines = l.lines
                 val pos = state.positionMs
                 val idx = lines.indexOfLast { it.ms <= pos + 300 }.coerceAtLeast(0)
                 val listState = rememberLazyListState()
-                androidx.compose.runtime.LaunchedEffect(s.id) {
-                    try { listState.scrollToItem(0) } catch (_: Exception) {}
-                }
                 LaunchedEffect(idx) {
                     // Si el usuario está leyendo otras estrofas (scrolleando),
                     // no se le arranca la lista de las manos cada 3 segundos.
@@ -122,6 +121,7 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
                                 .padding(vertical = if (cur) 10.dp else 7.dp)
                         )
                     }
+                }
                 }
             }
             is MainViewModel.LyricsUi.Plain -> {

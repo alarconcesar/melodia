@@ -911,12 +911,14 @@ class YtRepository(private val context: Context) {
         val out = mutableListOf<YtTrack>()
         var page = ex.initialPage
         var rounds = 0
+        var parcial = false
         while (true) {
             out += mapItems(page.items).filterIsInstance<YtSearchItem.Track>().map { it.track }
             if (out.size >= MAX_COLLECTION_TRACKS || !page.hasNextPage() || rounds++ >= 4) break
-            page = ex.getPage(page.nextPage)
+            // Si la siguiente página falla, lo juntado no se pierde.
+            page = try { ex.getPage(page.nextPage) } catch (_: Exception) { parcial = true; break }
         }
-        val recortado = page.hasNextPage() || out.size > MAX_COLLECTION_TRACKS
+        val recortado = parcial || page.hasNextPage() || out.size > MAX_COLLECTION_TRACKS
         // Lo que llega de una playlist suele venir sin artista y con el canal
         // pegado al título ("Tema - Canal Oficial"). Se limpia aquí, antes de
         // descargar, para que el archivo y la biblioteca queden bien.
@@ -963,8 +965,15 @@ class YtRepository(private val context: Context) {
      * Si el etiquetado falla, la descarga se conserva igual.
      */
     /** Nombre único por descarga: lleva el id para no colisionar ni con MediaStore. */
-    fun fileNamePara(track: YtTrack): String =
-        sanitize("${track.title} - ${track.artist.ifBlank { "YouTube" }}") + " [" + track.id.take(16).replace(Regex("[^A-Za-z0-9_-]"), "") + "]"
+    fun fileNamePara(track: YtTrack): String {
+        val base = sanitize("${track.title} - ${track.artist.ifBlank { "YouTube" }}") +
+            " [" + track.id.take(16).replace(Regex("[^A-Za-z0-9_-]"), "") + "]"
+        // El límite real es 255 BYTES (CJK = 3 B, emoji = 4 B por letra).
+        if (base.toByteArray(Charsets.UTF_8).size <= 200) return base
+        var end = base.length
+        while (end > 16 && base.substring(0, end).toByteArray(Charsets.UTF_8).size > 200) end--
+        return base.substring(0, end).trim()
+    }
 
     suspend fun storeDownload(
         track: YtTrack, high: Boolean, audio: YtAudio, part: File,

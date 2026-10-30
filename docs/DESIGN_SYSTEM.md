@@ -385,3 +385,18 @@ misma jerarquía que el reproductor.
   restore $name validado; sweep con guard de SD.
 
 138 tests verdes.
+
+## Auditoría 7.15 (sexta pasada)
+
+- Pausa sincrónica antes de cancelar (reanudar-todo tras pausar-todo funciona).
+- Encolar cambia de calidad en el sitio (antes se ignoraba en silencio).
+- Descargar-todo filtra por id+calidad.
+- Refresh recorta a variante más corta; zombi START_STICKY se detiene.
+- Notificación sin spam en BUFFERING; carátula local en fondo con caché.
+- Widget con barra viva cada 2 s + escalado cacheado.
+- crossfadeSecs con clamp; restore valida ids contra títulos;
+  playlistTracks devuelve parcial; fileName por bytes;
+  Online exige 2 letras; Synced con key; buscador solo donde filtra;
+  renameId se cierra; % exacto en texto.
+
+138 tests verdes.

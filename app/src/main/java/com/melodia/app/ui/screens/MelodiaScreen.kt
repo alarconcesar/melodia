@@ -435,7 +435,14 @@ fun MelodiaScreen(vm: MainViewModel) {
                 }
             }
             // ── Search: solo donde filtra (Inicio / Explorar), el resto gana espacio ──
-            AnimatedVisibility(visible = !selecting && (tab <= 1 || query.isNotBlank())) {
+            // Al salir de Inicio/Explorar se limpia: en Listas/Favs/Online no
+            // filtra nada y solo ocupaba espacio (en Online duplicaba).
+            LaunchedEffect(tab) {
+                if (tab > 1 && query.isNotBlank()) {
+                    try { vm.setQuery("") } catch (_: Exception) {}
+                }
+            }
+            AnimatedVisibility(visible = !selecting && tab <= 1) {
                 OutlinedTextField(
                     value = query, onValueChange = vm::setQuery,
                     placeholder = { Text("Buscar temas, álbumes, artistas", style = Ds.Body, maxLines = 1) },
@@ -691,8 +698,13 @@ fun MelodiaScreen(vm: MainViewModel) {
 
     if (showCreate) TextDialog("Nueva playlist", "", onDismiss = { showCreate = false }) { vm.createPlaylist(it) { showCreate = false } }
     renameId?.let { pid ->
-        TextDialog("Renombrar", playlists.find { it.id == pid }?.name ?: "", onDismiss = { renameId = null }) {
-            vm.renamePlaylist(pid, it); renameId = null
+        val cur = playlists.find { it.id == pid }
+        if (cur == null) {
+            LaunchedEffect(pid) { renameId = null }
+        } else {
+            TextDialog("Renombrar", cur.name, onDismiss = { renameId = null }) {
+                vm.renamePlaylist(pid, it); renameId = null
+            }
         }
     }
     showAddTo?.let { s ->

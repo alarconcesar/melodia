@@ -573,7 +573,7 @@ class MusicPlayer(private val context: Context) {
         .also { cargarPitchSpeed(it) }
     var crossfade: Boolean = prefs.getBoolean("xfade", false)
         private set
-    var crossfadeSecs: Int = prefs.getInt("xfade_secs", 3)
+    var crossfadeSecs: Int = prefs.getInt("xfade_secs", 3).coerceIn(1, 12)
         private set
     private var fadeJob: Job? = null
     private var fadedOut = false

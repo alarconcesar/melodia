@@ -80,7 +80,19 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             _jobs.value.find { it.track.id == track.id && it.status == DlStatus.DONE }?.let { done ->
                 _jobs.value = _jobs.value.filterNot { it.track.id == done.track.id }
             }
-            if (_jobs.value.any { it.track.id == track.id } || running.containsKey(track.id)) return
+            _jobs.value.find { it.track.id == track.id }?.let { cur ->
+                // Misma pista, otra calidad, sin worker en vuelo: se cambia en
+                // el sitio en vez de ignorarse en silencio.
+                if (cur.high != high && !running.containsKey(track.id) &&
+                    (cur.status == DlStatus.QUEUED || cur.status == DlStatus.PAUSED || cur.status == DlStatus.ERROR)
+                ) {
+                    update(track.id) { it.copy(track = track, high = high, downloaded = 0, total = 0, error = null) }
+                    persist()
+                    resume(track.id)
+                }
+                return
+            }
+            if (running.containsKey(track.id)) return
             _jobs.value += DlJob(track, high, DlStatus.QUEUED)
             persist()
             running[track.id] = scope.launch {
@@ -95,13 +107,14 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
     }
 
     fun pause(id: String) {
+        // Estado primero (sincrónico): un resume() que llegue en medio ya lo ve.
+        update(id) { j ->
+            if (j.status == DlStatus.ACTIVE || j.status == DlStatus.QUEUED)
+                j.copy(status = DlStatus.PAUSED) else j
+        }
+        persist()
         scope.launch {
-            synchronized(running) { running.remove(id) }?.cancelAndJoin()
-            update(id) { j ->
-                if (j.status == DlStatus.ACTIVE || j.status == DlStatus.QUEUED)
-                    j.copy(status = DlStatus.PAUSED) else j
-            }
-            persist()
+            try { synchronized(running) { running.remove(id) }?.cancelAndJoin() } catch (_: Exception) {}
         }
     }
 

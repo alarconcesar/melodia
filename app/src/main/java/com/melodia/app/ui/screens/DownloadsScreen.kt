@@ -256,7 +256,8 @@ private fun DlJobCard(
                         modifier = Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp))
                     )
                     Spacer(Modifier.width(10.dp))
-                    Text("${(avance * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
+                    // El número es exacto; la barra va suavizada (avance).
+                    Text("${(job.progress * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
                 }
             }
         }

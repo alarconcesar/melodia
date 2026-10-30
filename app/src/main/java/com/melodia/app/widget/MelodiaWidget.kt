@@ -51,17 +51,35 @@ class MelodiaWidget : AppWidgetProvider() {
         @Volatile private var artist = "Tu música"
         @Volatile private var playing = false
         @Volatile private var art: Bitmap? = null
+        @Volatile private var artScaled: Bitmap? = null
         @Volatile private var pos: Long = 0L
         @Volatile private var dur: Long = 0L
+        private var artScaledFor: Bitmap? = null
+
+        /** Solo avanza la barra (ticker del servicio): sin re-escalar arte. */
+        fun tick(ctx: Context, posMs: Long, durMs: Long) {
+            pos = posMs
+            dur = durMs
+            push(ctx)
+        }
 
         fun refresh(ctx: Context, t: String? = null, a: String? = null, p: Boolean? = null, bitmap: Bitmap? = undefined(), posMs: Long? = null, durMs: Long? = null) {
             try {
                 if (t != null) title = t
                 if (a != null) artist = a
                 if (p != null) playing = p
-                if (bitmap !== UNSET) art = bitmap
+                if (bitmap !== UNSET) {
+                    art = bitmap
+                    artScaled = null
+                }
                 if (posMs != null) pos = posMs
                 if (durMs != null) dur = durMs
+                push(ctx)
+            } catch (_: Exception) {}
+        }
+
+        private fun push(ctx: Context) {
+            try {
                 val mgr = AppWidgetManager.getInstance(ctx)
                 val ids = mgr.getAppWidgetIds(ComponentName(ctx, MelodiaWidget::class.java))
                 if (ids.isEmpty()) return
@@ -72,15 +90,23 @@ class MelodiaWidget : AppWidgetProvider() {
                     R.id.w_play,
                     if (playing) R.drawable.ic_notif_pause else R.drawable.ic_notif_play
                 )
-                val b = art
-                if (b != null) {
-                    try {
-                        val pig = if (b.width > 192 || b.height > 192) {
+                var pig = artScaled
+                if (art == null) {
+                    artScaled = null
+                    pig = null
+                } else if (pig == null || artScaledFor !== art) {
+                    pig = try {
+                        val b = art!!
+                        if (b.width > 192 || b.height > 192) {
                             val k = 192f / maxOf(b.width, b.height)
                             Bitmap.createScaledBitmap(b, (b.width * k).toInt().coerceAtLeast(1), (b.height * k).toInt().coerceAtLeast(1), true)
                         } else b
-                        rv.setImageViewBitmap(R.id.w_art, pig)
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) { null }
+                    artScaled = pig
+                    artScaledFor = art
+                }
+                if (pig != null) {
+                    try { rv.setImageViewBitmap(R.id.w_art, pig) } catch (_: Exception) {}
                 } else {
                     try { rv.setImageViewResource(R.id.w_art, R.drawable.ic_notif_music) } catch (_: Exception) {}
                 }

@@ -42,9 +42,14 @@ class MelodiaPlaybackService : MediaSessionService() {
         override fun onIsPlayingChanged(v: Boolean) {
             updateNotification()
             updateEffectSession(v)
+            if (v) arrancarTickWidget() else pararTickWidget()
         }
         override fun onMediaItemTransition(m: androidx.media3.common.MediaItem?, r: Int) { updateNotification() }
-        override fun onPlaybackStateChanged(s: Int) { updateNotification() }
+        override fun onPlaybackStateChanged(s: Int) {
+            // BUFFERING flapea con READY en cada micro-corte: reconstruir ahí
+            // es spam de notificaciones y binder. READY/ENDED/IDLE sí importan.
+            if (s != Player.STATE_BUFFERING) updateNotification()
+        }
     }
 
     // ── Sesión de efectos de audio (ecualizadores externos, ReplayGain) ──
@@ -180,7 +185,12 @@ class MelodiaPlaybackService : MediaSessionService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         try {
-            when (intent?.action) {
+            if (intent?.action == null && (session?.player?.mediaItemCount ?: 0) == 0) {
+            // El sistema nos revivió sin nada que reproducir: fuera.
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        when (intent?.action) {
                 ACTION_TOGGLE -> try { (application as com.melodia.app.MelodiaApp).appContainer.musicPlayer.toggle() } catch (_: Exception) {}
                 ACTION_NEXT -> try { (application as com.melodia.app.MelodiaApp).appContainer.musicPlayer.next() } catch (_: Exception) {}
                 ACTION_PREV -> try { (application as com.melodia.app.MelodiaApp).appContainer.musicPlayer.prev() } catch (_: Exception) {}
@@ -314,7 +324,29 @@ class MelodiaPlaybackService : MediaSessionService() {
         }
     }
 
+    // ── Barra del widget: avanza cada 2 s solo mientras suena ──
+    private var tickWidget: kotlinx.coroutines.Job? = null
+    private fun arrancarTickWidget() {
+        if (tickWidget != null) return
+        tickWidget = artScope.launch {
+            try {
+                while (true) {
+                    kotlinx.coroutines.delay(2000)
+                    val p = session?.player
+                    val dur = try { p?.duration?.takeIf { it > 0 } ?: 0L } catch (_: Exception) { 0L }
+                    val pos = try { p?.currentPosition?.coerceAtLeast(0) ?: 0L } catch (_: Exception) { 0L }
+                    try { com.melodia.app.widget.MelodiaWidget.tick(this@MelodiaPlaybackService, pos, dur) } catch (_: Exception) {}
+                }
+            } catch (_: Exception) {}
+        }
+    }
+    private fun pararTickWidget() {
+        try { tickWidget?.cancel() } catch (_: Exception) {}
+        tickWidget = null
+    }
+
     override fun onDestroy() {
+        try { tickWidget?.cancel() } catch (_: Exception) {}
         try { if (effectSessionOpen) updateEffectSession(false) } catch (_: Exception) {}
         try { session?.player?.removeListener(notifListener) } catch (_: Exception) {}
         session?.run {
@@ -359,11 +391,23 @@ class MelodiaPlaybackService : MediaSessionService() {
                 }
                 null
             } else {
+                // Clave en caché: se devuelve al instante; si cambió, se carga
+                // en fondo y se re-notifica al terminar (nada bloquea el main).
+                if (key == artKey) return artBmp
                 artKey = key
                 artBmp = null
                 val sid = mediaId?.toLongOrNull() ?: return null
                 if (sid <= 0) return null
-                localAlbumArt(sid)
+                artScope.launch {
+                    try {
+                        val bmp = localAlbumArt(sid)
+                        if (bmp != null && artKey == key) {
+                            artBmp = bmp
+                            updateNotification()
+                        }
+                    } catch (_: Exception) {}
+                }
+                null
             }
         } catch (_: Exception) { null }
     }

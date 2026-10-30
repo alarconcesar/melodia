@@ -926,17 +926,27 @@ class MainViewModel(
                     }
                 }
                 val farr = root.optJSONArray("favs") ?: org.json.JSONArray()
+                // Títulos con clave: ancla para validar ids numéricos (los ids
+                // de MediaStore colisionan entre teléfonos distintos).
+                val titulosClave = HashSet<String>()
                 for (i in 0 until farr.length()) {
                     val match = emparejar(farr.opt(i)) ?: continue
+                    titulosClave.add(byId[match.id]?.title?.lowercase().orEmpty())
                     if (vistos.add(match.id) && !_favIds.value.contains(match.id)) {
                         lists.toggleFav(match.id, false); favs++
                     }
                 }
                 val iarr = root.optJSONArray("favIds") ?: org.json.JSONArray()
                 for (i in 0 until iarr.length()) {
-                    val match = emparejar(iarr.opt(i)) ?: byId[iarr.optLong(i, -1)] ?: continue
-                    if (vistos.add(match.id) && !_favIds.value.contains(match.id)) {
-                        lists.toggleFav(match.id, false); favs++
+                    val raw = iarr.opt(i)
+                    val cand = emparejar(raw) ?: (byId[iarr.optLong(i, -1)]?.takeIf {
+                        // Sin claves (respaldo viejo): se acepta como antes.
+                        // Con claves: solo si el título coincide (mismo teléfono,
+                        // artista corregido después). Si no, es de otro equipo.
+                        titulosClave.isEmpty() || it.title.lowercase() in titulosClave
+                    }) ?: continue
+                    if (vistos.add(cand.id) && !_favIds.value.contains(cand.id)) {
+                        lists.toggleFav(cand.id, false); favs++
                     }
                 }
                 onDone("Restaurado: $pls listas, $added temas, $favs favoritos")
@@ -1104,6 +1114,11 @@ class MainViewModel(
     fun searchYt(q: String = _ytQuery.value) {
         val query = q.trim()
         if (query.isBlank()) return
+        if (query.length < 2) {
+            _ytError.value = "Escribe al menos 2 letras para buscar"
+            _ytErrorRetry.value = false
+            return
+        }
         searchJob?.cancel() // evita que una búsqueda anterior pise a la nueva
         val gen = ++searchGen
         searchJob = viewModelScope.launch {
@@ -1198,7 +1213,8 @@ class MainViewModel(
                     val cur = player.state.value.currentId
                     if (cur != YT_STREAM_ID) return@launch
                 } catch (_: Exception) { return@launch }
-                player.swapStream(audio.url, positionMs)
+                val durMs = if (track.durationSec > 3) track.durationSec * 1000L - 2000 else positionMs
+                player.swapStream(audio.url, minOf(positionMs, durMs).coerceAtLeast(0))
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 _ytError.value = "No se pudo recuperar el audio. Reintenta en un momento."
@@ -1374,7 +1390,7 @@ class MainViewModel(
     fun downloadAllYt() {
         val list = _ytResults.value.filterIsInstance<com.melodia.app.data.online.YtSearchItem.Track>()
             .map { it.track }
-            .filter { t -> dlJobs.value.none { it.track.id == t.id } }
+            .filter { t -> dlJobs.value.none { it.track.id == t.id && it.high == _ytHighQuality.value } }
         if (list.isEmpty()) return
         if (pideConfirmacion(list.size)) {
             _pendingCol.value = PendingCol("Resultados de la búsqueda", list, _ytHighQuality.value, false)
@@ -1447,6 +1463,7 @@ class MainViewModel(
     fun downloadYt(track: YtTrack, high: Boolean = _ytHighQuality.value) {
         dl.enqueue(track, high)
     }
+
 
     /** Re-escucha un tema del historial (la url firmada puede haber vencido). */
     fun playHistoryRecord(r: YtRepository.DlRecord) {
