@@ -680,7 +680,9 @@ fun MelodiaScreen(vm: MainViewModel) {
                                 vm.addToPlaylist(p.id, s) { ok ->
                                     android.widget.Toast.makeText(
                                         appCtx,
-                                        if (ok) "Agregada a ${p.name}" else "Ya está en ${p.name}",
+                                        if (ok) "Agregada a ${p.name}"
+                                        else if (s.id == YT_STREAM_ID) "El tema online no va a playlists: descárgalo primero"
+                                        else "Ya está en ${p.name}",
                                         android.widget.Toast.LENGTH_SHORT
                                     ).show()
                                 }
@@ -2471,15 +2473,14 @@ fun QueueSheetContent(
     val isStream = queue.any { it.id == YT_STREAM_ID }
     val curIdx = queue.indexOfFirst { it.id == currentId }
     val actual = queue.getOrNull(curIdx)
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = if (curIdx > 2) curIdx - 2 else 0
-    )
-    // Al avanzar la cola con la hoja abierta, el índice inicial queda obsoleto.
-    // Si el usuario no scrolleó lejos, se acompaña al tema actual.
+    // La lista ya arranca en el siguiente tema: el índice inicial es 0.
+    val listState = rememberLazyListState()
+    // Al avanzar la cola con la hoja abierta se vuelve arriba (donde está el
+    // próximo tema), salvo que el usuario haya scrolleado lejos.
     LaunchedEffect(curIdx) {
         try {
             if (curIdx >= 0 && listState.firstVisibleItemIndex <= 2) {
-                listState.scrollToItem((curIdx - 2).coerceAtLeast(0))
+                listState.scrollToItem(0)
             }
         } catch (_: Exception) {}
     }

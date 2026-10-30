@@ -83,7 +83,7 @@ class AppContainer(context: Context) {
     val queueStore = com.melodia.app.player.QueueStore(appContext)
     val sleepTimer: SleepTimer by lazy {
         lateinit var t: SleepTimer
-        t = SleepTimer { try { musicPlayer.fadePause(stillActive = { t.isActive() }) } catch (_: Exception) {} }
+        t = SleepTimer { try { musicPlayer.fadePause(stillActive = { t.consumeExpire() }) } catch (_: Exception) {} }
         t
     }
     fun makeMainViewModel() = MainViewModel(musicPlayer, musicRepository, playlistRepo, statsRepo, sleepTimer, ytRepo, dlManager, lyricsRepo, artRepo, queueStore)

@@ -115,6 +115,16 @@ class AuditFixesTest {
     }
 
     @Test
+    fun claveDeFavsIgnoraEspaciosYCase() {
+        val repo = com.melodia.app.data.PlaylistRepository(
+            androidx.room.Room.inMemoryDatabaseBuilder(
+                ctx(), com.melodia.app.data.local.MelodiaDatabase::class.java
+            ).allowMainThreadQueries().build()
+        )
+        assertEquals(repo.favKey("  Bad   Bunny", "DtMF"), repo.favKey("bad bunny", "dtmf"))
+    }
+
+    @Test
     fun artistaVacioEsYouTube() {
         val yt = YtRepository(ctx())
         assertEquals("YouTube", yt.artistFor(YtTrack("x", "T", "", 1, null, "u")))

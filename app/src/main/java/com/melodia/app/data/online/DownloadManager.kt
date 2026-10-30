@@ -75,6 +75,11 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
 
     fun enqueue(track: YtTrack, high: Boolean) {
         synchronized(running) {
+            // Si terminó y sigue visible como "Guardada", se retira para bajar
+            // de nuevo (antes se ignoraba en silencio durante 8 s).
+            _jobs.value.find { it.track.id == track.id && it.status == DlStatus.DONE }?.let { done ->
+                _jobs.value = _jobs.value.filterNot { it.track.id == done.track.id }
+            }
             if (_jobs.value.any { it.track.id == track.id } || running.containsKey(track.id)) return
             _jobs.value += DlJob(track, high, DlStatus.QUEUED)
             persist()
@@ -161,7 +166,11 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
      * Transfiere bytes con un audio ya resuelto y cierra el ciclo (DONE/ERROR).
      * Separado para reintentar con un enlace fresco ante 403 sin duplicar código.
      */
-    private suspend fun runJobFresh(track: YtTrack, high: Boolean, audio: YtAudio, fromScratch: Boolean = false) {
+    private suspend fun runJobFresh(
+        track: YtTrack, high: Boolean, audio: YtAudio, fromScratch: Boolean = false,
+        /** Reintentos con enlace fresco ante 403 (más de 2 = el CDN no cede). */
+        fresh: Int = 0
+    ) {
         try {
             val part = partFile(track.id, high)
             if (fromScratch) try { part.delete() } catch (_: Exception) {}
@@ -212,16 +221,17 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             persist()
         } catch (t: Throwable) {
             if (t is kotlinx.coroutines.CancellationException) throw t
-            if (t is DlUrlExpiredException) {
-                // La URL del CDN murió antes de tiempo: un reintento con enlace
-                // fresco, sin castigar al usuario con "reintentar" manual.
-                val fresh = withContext(Dispatchers.IO) {
+            if (t is DlUrlExpiredException && fresh < 2) {
+                // La URL del CDN murió antes de tiempo: reintento con enlace
+                // fresco. Con tope: si el CDN veta de verdad, cae a ERROR en
+                // vez de girar para siempre entre bestAudio y descarga.
+                val newAudio = withContext(Dispatchers.IO) {
                     extractSlots.acquire()
                     try { yt.bestAudio(track.url, high, force = true) }
                     finally { extractSlots.release() }
                 }
                 update(track.id) { it.copy(status = DlStatus.ACTIVE, error = null) }
-                runJobFresh(track, high, fresh)
+                runJobFresh(track, high, newAudio, fresh = fresh + 1)
                 return
             }
             val kept = partFile(track.id, high).let { if (it.exists()) it.length() else 0L }

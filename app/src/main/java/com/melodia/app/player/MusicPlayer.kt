@@ -58,6 +58,8 @@ class MusicPlayer(private val context: Context) {
     /** Un archivo local borrado/movido: la app avisa y salta al siguiente. */
     var onUnplayable: ((id: Long) -> Unit)? = null
     private var errorSkips = 0
+    /** El próximo onMediaItemTransition lo provocó el salto por error: no resetea el tope. */
+    private var expectErrorTransition = false
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -92,7 +94,8 @@ class MusicPlayer(private val context: Context) {
                 updateState()
             }
             override fun onMediaItemTransition(m: MediaItem?, r: Int) {
-            errorSkips = 0
+            if (expectErrorTransition) expectErrorTransition = false
+            else errorSkips = 0
             fadedOut = false
             updateState()
             // Fundido de entrada al cambiar de tema
@@ -120,7 +123,10 @@ class MusicPlayer(private val context: Context) {
                     errorSkips++
                     try { onUnplayable?.invoke(id) } catch (_: Exception) {}
                     if (errorSkips <= MAX_ERROR_SKIPS) {
-                        try { p.seekToNextMediaItem(); p.prepare(); p.play() } catch (_: Exception) {}
+                        try {
+                            expectErrorTransition = true
+                            p.seekToNextMediaItem(); p.prepare(); p.play()
+                        } catch (_: Exception) { expectErrorTransition = false }
                     }
                 } catch (_: Exception) {}
             }
@@ -168,6 +174,7 @@ class MusicPlayer(private val context: Context) {
             if (pares.isEmpty()) return
             queueIds = pares.map { it.first }.toMutableList()
             streamRetries = 0
+            errorSkips = 0
             pendingRestore = null
             val items = pares.map { it.second }
             val wanted = ids.getOrNull(startIndex)
@@ -215,6 +222,12 @@ class MusicPlayer(private val context: Context) {
             .build()
     }
 
+    /** Índice del timeline actual, o -1 si aún no hay player. */
+    fun currentTimelineIndex(): Int = try { exo?.currentMediaItemIndex ?: -1 } catch (_: Exception) { -1 }
+
+    /** Índice a usar al encolar en frío: el del restore pendiente si lo hay. */
+    fun restoreIndex(): Int = pendingRestore?.index ?: currentTimelineIndex()
+
     /** Inserta un tema local en la posición indicada de la cola. */
     private fun insertAt(id: Long, index: Int): Boolean {
         return try {
@@ -255,12 +268,18 @@ class MusicPlayer(private val context: Context) {
 
     /** El tema sonará justo después del actual. */
     fun playNext(id: Long): Boolean {
-        val idx = try { exo?.currentMediaItemIndex ?: -1 } catch (_: Exception) { -1 }
+        val p = exo
+        if (p != null) ensureRestore(p)
+        val idx = currentTimelineIndex()
         return insertAt(id, if (idx < 0) 0 else idx + 1)
     }
 
     /** El tema se agrega al final de la cola. */
-    fun addToEnd(id: Long): Boolean = insertAt(id, queueIds.size)
+    fun addToEnd(id: Long): Boolean {
+        val p = exo
+        if (p != null) ensureRestore(p)
+        return insertAt(id, queueIds.size)
+    }
 
     /** Reproduce un stream online (URL directa de audio). */
     fun playStream(url: String, title: String, artist: String, artUrl: String? = null) {
@@ -270,6 +289,7 @@ class MusicPlayer(private val context: Context) {
         try {
             queueIds = mutableListOf(YT_STREAM_ID)
             streamRetries = 0
+            errorSkips = 0
             pendingRestore = null
             val item = MediaItem.Builder()
                 .setUri(url)

@@ -68,6 +68,7 @@ class YtRepository(private val context: Context) {
     // ── Paginación: se guarda el extractor y la página siguiente ──
     private var pager: SearchExtractor? = null
     private var next: Page? = null
+    private val pagerLock = Any()
     /** Generación de búsqueda: una búsqueda lenta no debe pisar a una rápida. */
     private var searchGen = 0
     private data class CachedAudio(val audio: YtAudio, val expiresAt: Long)
@@ -96,10 +97,10 @@ class YtRepository(private val context: Context) {
 
     /** Ejecuta la búsqueda y deja listo el paginador. filters=null → índice general. */
     private fun fetchPage(query: String, filters: List<String>?): List<YtSearchItem> {
-        val gen = ++searchGen
+        val gen = synchronized(pagerLock) { ++searchGen }
         val (ex, items) = extract(query, filters)
         // Si otra búsqueda empezó mientras extraíamos, sus resultados mandan.
-        synchronized(this) { if (gen == searchGen) {
+        synchronized(pagerLock) { if (gen == searchGen) {
             pager = ex
             next = try { ex.initialPage.nextPage } catch (_: Exception) { null }
         } }
@@ -135,14 +136,14 @@ class YtRepository(private val context: Context) {
     }
 
     /** Devuelve true si hay más páginas por cargar. */
-    fun hasMore(): Boolean = pager != null && next != null
+    fun hasMore(): Boolean = synchronized(pagerLock) { pager != null && next != null }
 
     suspend fun more(): List<YtSearchItem> = withContext(Dispatchers.IO) {
-        val ex = pager ?: return@withContext emptyList()
-        val np = next ?: return@withContext emptyList()
+        val ex = synchronized(pagerLock) { pager } ?: return@withContext emptyList()
+        val np = synchronized(pagerLock) { next } ?: return@withContext emptyList()
         ensure()
         val page = ex.getPage(np)
-        next = try { page.nextPage } catch (_: Exception) { null }
+        synchronized(pagerLock) { next = try { page.nextPage } catch (_: Exception) { null } }
         mapItems(page.items)
     }
 
@@ -633,7 +634,7 @@ class YtRepository(private val context: Context) {
         }
 
     /** Guarda la carátula en disco y devuelve su file:// (independiente de MediaStore). */
-    private fun guardarPortada(bytes: ByteArray?, clave: String): String? {
+    private fun guardarPortada(bytes: ByteArray?, clave: String, trim: Boolean = true): String? {
         if (bytes == null || bytes.isEmpty()) return null
         return try {
             val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
@@ -644,7 +645,7 @@ class YtRepository(private val context: Context) {
                 (bmp.height * escala).toInt().coerceAtLeast(1), true
             ) else bmp
             val dir = File(context.filesDir, "dlart").apply { mkdirs() }
-            trimDir(dir, 200)
+            if (trim) trimDir(dir, 200)
             val f = File(dir, "${clave.hashCode()}.jpg")
             f.outputStream().use { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
             if (out !== bmp) bmp.recycle()
@@ -653,7 +654,10 @@ class YtRepository(private val context: Context) {
     }
 
     /** Deja la copia propia de metadatos que manda al leer la biblioteca. */
-    private fun guardarMeta(fileName: String, track: YtTrack, artista: String, titulo: String, artBytes: ByteArray?) {
+    private fun guardarMeta(
+        fileName: String, track: YtTrack, artista: String, titulo: String,
+        artBytes: ByteArray? = null, artPath: String? = null
+    ) {
         try {
             val meta = com.melodia.app.data.DownloadMetaStore(context)
             meta.put(
@@ -662,7 +666,7 @@ class YtRepository(private val context: Context) {
                     title = titulo,
                     artist = artista,
                     album = titulo,
-                    artPath = guardarPortada(artBytes, fileName)
+                    artPath = artPath ?: guardarPortada(artBytes, fileName)
                 )
             )
         } catch (_: Exception) {}
@@ -869,8 +873,10 @@ class YtRepository(private val context: Context) {
                 "User-Agent",
                 "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
             )
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 20_000
+            // Cortos: quien llama pone withTimeoutOrNull(4 s) y el hilo IO
+            // no debe seguir bloqueado 15+20 s cuando ya se abandonó.
+            conn.connectTimeout = 4_000
+            conn.readTimeout = 6_000
             conn.connect()
             if (conn.responseCode !in 200..299) return@withContext null
             conn.inputStream.use { it.readBytes() }.takeIf { it.size in 1..4_000_000 }
@@ -960,9 +966,10 @@ class YtRepository(private val context: Context) {
                     if (c.moveToFirst()) c.getString(0) else null
                 }
             } catch (_: Exception) { null }
-            guardarMeta(if (claveReal.isNullOrBlank()) fileName else claveReal, track, artista, titulo, artBytes)
+            val rutaArte = guardarPortada(artBytes, fileName)
+            guardarMeta(if (claveReal.isNullOrBlank()) fileName else claveReal, track, artista, titulo, null, rutaArte)
             if (claveReal != null && claveReal != fileName) {
-                guardarMeta(fileName, track, artista, titulo, artBytes)
+                guardarMeta(fileName, track, artista, titulo, null, rutaArte)
             }
             uri
         } catch (e: Exception) {

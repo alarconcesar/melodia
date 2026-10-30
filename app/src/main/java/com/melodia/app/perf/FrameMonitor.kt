@@ -16,7 +16,7 @@ object FrameMonitor {
     private var count = 0
     private var index = 0
     private var lastNanos = 0L
-    private var running = false
+    @Volatile private var running = false
 
     @Volatile
     private var current = "Inicio"

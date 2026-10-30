@@ -151,10 +151,17 @@ class MelodiaPlaybackService : MediaSessionService() {
         }
         if (items.isEmpty()) return null
         val idx = playable.indexOfFirst { it.id == snap.songs.getOrNull(snap.index)?.id }
+        // La posición no puede pasar la duración real (igual que en el restore
+        // normal: si no, la reanudación arranca al final o en ENDED).
+        val at = if (idx >= 0) idx else 0
+        val dur = playable.getOrNull(at)?.durationMs ?: 0L
+        val pos = snap.positionMs.coerceAtLeast(0L).let { v ->
+            if (dur > 3_000L) v.coerceAtMost(dur - 2_000L) else v
+        }
         return MediaSession.MediaItemsWithStartPosition(
             items,
-            if (idx >= 0) idx else 0,
-            snap.positionMs
+            at,
+            pos
         )
     }
 
@@ -172,9 +179,9 @@ class MelodiaPlaybackService : MediaSessionService() {
         super.onStartCommand(intent, flags, startId)
         try {
             when (intent?.action) {
-                ACTION_TOGGLE -> session?.player?.let { if (it.isPlaying) it.pause() else it.play() }
-                ACTION_NEXT -> session?.player?.seekToNextMediaItem()
-                ACTION_PREV -> session?.player?.seekToPreviousMediaItem()
+                ACTION_TOGGLE -> try { (application as com.melodia.app.MelodiaApp).appContainer.musicPlayer.toggle() } catch (_: Exception) {}
+                ACTION_NEXT -> try { (application as com.melodia.app.MelodiaApp).appContainer.musicPlayer.next() } catch (_: Exception) {}
+                ACTION_PREV -> try { (application as com.melodia.app.MelodiaApp).appContainer.musicPlayer.prev() } catch (_: Exception) {}
                 ACTION_STOP -> {
                     session?.player?.let { it.pause(); it.stop() }
                     stopForegroundCompat(true)

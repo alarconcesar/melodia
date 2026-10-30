@@ -274,3 +274,32 @@ misma jerarquía que el reproductor.
   `playerState.map` recordado, SeekBar en un solo gesto + semántica,
   letra que no roba scroll, cola que acompaña al tema actual, keys estables en
   Descargas/PlaylistDetail, `FrameMonitor.stop()`, widget con fallback a la app.
+
+## Auditoría 7.11 (segunda pasada + regresiones de la 7.10)
+
+- El barrido de fichas corría con la biblioteca vacía y las borraba todas
+  (raíz del "todo Desconocido" en algunos equipos): solo barre con carga real
+  y con la lista en mano tras cada recarga.
+- El temporizador nunca pausaba: `job = null` antes de `onExpire()` dejaba
+  `isActive()` en false al final del fundido. Ahora `consumeExpire()` de un
+  solo uso distingue "se cumplió" de "se canceló".
+- Tope de skips real: el salto por error ya no resetea el contador (flag
+  `expectErrorTransition`); `play()`/`playStream()` lo resetean.
+- Notificación por `musicPlayer.toggle/next/prev` (no Exo directo): ya no deja
+  el fade del timer vivo. Reanudación del sistema con posición clampada.
+- 403 con tope (2 reintentos frescos por descarga, contador por llamada, no
+  global); portada generada una vez y reusada en ambas fichas.
+- `fetchArtist` sin pista exige igualdad exacta de título (no contención).
+- Timeouts de red cortos donde hay `withTimeoutOrNull` (el hilo no se queda
+  colgado 8-20 s tras abandonar).
+- `searchGen`/`pager` bajo el mismo lock; `favKey` con espacios colapsados y
+  respaldo con ids + claves; `recordHeard` exige 30 s sin duración.
+- Cola: posiciones por timeline real (`currentTimelineIndex`/`restoreIndex`),
+  nunca `indexOf` (diverge con duplicados).
+- Stats: la pausa congela el reloj, repeat-one cuenta por vueltas (tope =
+  duración), los streams también cuentan.
+- UI: follow de cola sobre la lista recortada (vuelve arriba), SeekBar no
+  roba el scroll vertical, `FrameMonitor.stop()` a prueba de frames en vuelo,
+  "Todo" usa la pestaña donde empezó la selección.
+
+136 tests verdes.

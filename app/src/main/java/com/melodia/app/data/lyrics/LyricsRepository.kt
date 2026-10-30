@@ -32,8 +32,8 @@ class LyricsRepository(context: Context) {
     // ── API ──
     private fun getJson(url: String): JSONObject? {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 12_000
-            readTimeout = 12_000
+            connectTimeout = 5_000
+            readTimeout = 7_000
             setRequestProperty("User-Agent", "Melodia/1.0")
             setRequestProperty("Accept", "application/json")
         }
@@ -67,8 +67,8 @@ class LyricsRepository(context: Context) {
         val q = if (isJunkArtist(artist)) title else "$title $artist"
         val url = "https://lrclib.net/api/search?q=${enc(q)}"
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 12_000
-            readTimeout = 12_000
+            connectTimeout = 5_000
+            readTimeout = 7_000
             setRequestProperty("User-Agent", "Melodia/1.0")
         }
         return try {
@@ -97,8 +97,8 @@ class LyricsRepository(context: Context) {
         val q = if (isJunkArtist(artist)) clean else "$clean $artist"
         val url = "https://lrclib.net/api/search?q=${enc(q)}"
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 12_000
-            readTimeout = 12_000
+            connectTimeout = 5_000
+            readTimeout = 7_000
             setRequestProperty("User-Agent", "Melodia/1.0")
         }
         return try {

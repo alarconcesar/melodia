@@ -14,9 +14,12 @@ class StatsRepository(private val db: MelodiaDatabase) {
      */
     suspend fun recordHeard(songId: Long, listenedMs: Long, durationMs: Long) {
         try {
-            val umbral = minOf(30_000L, (durationMs / 2).coerceAtLeast(0))
+            val umbral = if (durationMs > 0) minOf(30_000L, durationMs / 2) else 30_000L
             if (listenedMs < umbral) return
-            db.statDao().heard(songId, System.currentTimeMillis(), listenedMs.coerceAtLeast(0))
+            // Tope: lo escuchado no pasa la duración (repeat-one cuenta por
+            // vueltas, no acumulando horas en un solo play).
+            val ms = if (durationMs > 0) listenedMs.coerceIn(0, durationMs) else listenedMs.coerceAtLeast(0)
+            db.statDao().heard(songId, System.currentTimeMillis(), ms)
         } catch (_: Exception) {}
     }
 

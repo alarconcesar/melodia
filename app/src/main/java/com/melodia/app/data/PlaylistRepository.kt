@@ -37,9 +37,11 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
     suspend fun removeFromPlaylist(pid: Long, sid: Long) = db.playlistSongDao().remove(pid, sid)
     suspend fun toggleFav(id: Long, isFav: Boolean) { if (isFav) db.favoriteDao().remove(id) else db.favoriteDao().add(FavoriteEntity(id)) }
 
-    /** Clave estable de un tema entre equipos (minúsculas, sin espacios de más). */
-    fun favKey(artist: String, title: String) =
-        artist.trim().lowercase() + "|" + title.trim().lowercase()
+    /** Clave estable de un tema entre equipos (minúsculas, espacios colapsados). */
+    fun favKey(artist: String, title: String): String {
+        fun limpio(s: String) = s.trim().lowercase().replace(Regex("\\s+"), " ")
+        return limpio(artist) + "|" + limpio(title)
+    }
 
     /** Exporta playlists + favoritos a JSON. */
     suspend fun exportJson(songs: List<Song> = emptyList()): String {
@@ -58,14 +60,16 @@ class PlaylistRepository(private val db: MelodiaDatabase) {
             }
             arr.put(org.json.JSONObject().put("name", p.name).put("songs", sarr))
         }
-        // Favoritos con clave estable (artista|título) ADEMÁS del id: el ID de
-        // MediaStore cambia entre teléfonos, y el respaldo solo-ids recuperaba
-        // 0 favs al restaurar en otro equipo.
+        // Favoritos con clave estable (artista|título) Y ADEMÁS el id: el ID
+        // cambia entre teléfonos y la clave falla si el artista se corrigió
+        // después (p. ej. repairDownloadMeta); con ambos, uno rescata al otro.
         val byId = songs.associateBy { it.id }
         val favKeys = org.json.JSONArray()
         db.favoriteDao().getAllIds().forEach { id ->
             byId[id]?.let { favKeys.put(favKey(it.artist, it.title)) }
         }
-        return org.json.JSONObject().put("playlists", arr).put("favs", favKeys).toString()
+        val favIds = org.json.JSONArray()
+        db.favoriteDao().getAllIds().forEach { favIds.put(it) }
+        return org.json.JSONObject().put("playlists", arr).put("favs", favKeys).put("favIds", favIds).toString()
     }
 }

@@ -157,6 +157,12 @@ class MainViewModel(
                 player.setQueue(list)
                 _songs.value = list
                 _loaded.value = true
+                // Barrido con la lista real en mano (nunca con set vacío).
+                try {
+                    repo.sweepDownloadMeta(list.mapNotNull {
+                        try { java.io.File(it.dataPath).name } catch (_: Exception) { null }
+                    }.toSet())
+                } catch (_: Exception) {}
                 maybeRestoreQueue(list)
                 enrichArtwork(list)
             }
@@ -198,22 +204,37 @@ class MainViewModel(
         // Sincronizar UI con el item real de ExoPlayer (next/prev/fin de tema)
         // Estadísticas por ESCUCHA real: se mide cuánto sonó el tema anterior
         // y solo cuenta si pasó el umbral (>=30 s o la mitad en temas cortos).
-        var escuchandoId = -1L
+        var escuchandoId = -2L
         var escuchandoDesde = 0L
+        var ultimaPos = 0L
         viewModelScope.launch {
-            player.state.map { it.currentId to it.isPlaying }.distinctUntilChanged().collect { (id, playing) ->
+            player.state.map { Triple(it.currentId, it.isPlaying, it.positionMs) }.distinctUntilChanged().collect { (id, playing, pos) ->
                 val ahora = System.currentTimeMillis()
-                if (escuchandoId > 0 && id != escuchandoId) {
-                    val ms = ahora - escuchandoDesde
-                    val dur = songs.value.find { it.id == escuchandoId }?.durationMs ?: 0L
-                    val previo = escuchandoId
+                var registrar: Triple<Long, Long, Long>? = null // id, ms, dur
+                if (id != escuchandoId) {
+                    // Cambio de tema: lo que sonó el anterior cuenta.
+                    if (escuchandoId != -2L) {
+                        val ms = ahora - escuchandoDesde
+                        val dur = songs.value.find { it.id == escuchandoId }?.durationMs ?: 0L
+                        registrar = Triple(escuchandoId, ms, dur)
+                    }
+                    escuchandoId = id
+                    escuchandoDesde = ahora
+                } else if (id == escuchandoId && !playing) {
+                    // En pausa el reloj no corre: se congela para no sumar
+                    // los minutos parado al cambiar de tema.
+                    escuchandoDesde = ahora
+                } else if (id == escuchandoId && id > 0 && pos < ultimaPos - 2_000) {
+                    // Repeat-one: la posición volvió atrás = una vuelta entera.
+                    val dur = songs.value.find { it.id == id }?.durationMs ?: 0L
+                    registrar = Triple(id, ahora - escuchandoDesde, dur)
+                    escuchandoDesde = ahora
+                }
+                ultimaPos = pos
+                registrar?.let { (previo, ms, dur) ->
                     viewModelScope.launch { stats.recordHeard(previo, ms, dur) }
                 }
                 if (id > 0 || id == YT_STREAM_ID) _currentId.value = id
-                if (id != escuchandoId) {
-                    escuchandoId = id
-                    escuchandoDesde = ahora
-                }
                 // Sin cola local visible no hay nada que reanudar después.
                 if (id == YT_STREAM_ID) queueStore.savePosition(0L)
             }
@@ -229,10 +250,12 @@ class MainViewModel(
             try { _ytHistory.value = yt.getHistory() } catch (_: Exception) {}
             // Pendientes invisibles de una muerte anterior: se borran una vez.
             try { yt.cleanupStalePending() } catch (_: Exception) {}
-            // Fichas de descargas cuyos archivos ya no existen: se barren con
-            // cada recarga de biblioteca.
-            try { repo.sweepDownloadMeta(songs.value.mapNotNull {
-                try { java.io.File(it.dataPath).name } catch (_: Exception) { null } }.toSet())
+            // Fichas de descargas cuyos archivos ya no existen. OJO: aquí
+            // _songs casi siempre está vacía (la biblioteca carga después);
+            // barrer con set vacío borraría TODAS las fichas. Solo con carga.
+            try {
+                if (_loaded.value) repo.sweepDownloadMeta(songs.value.mapNotNull {
+                    try { java.io.File(it.dataPath).name } catch (_: Exception) { null } }.toSet())
             } catch (_: Exception) {}
         }
         // Descargas viejas sin artista: se reparan desde la fila, el archivo o
@@ -648,10 +671,10 @@ class MainViewModel(
         // colas mixtas y el estado quedaba sin salida.
         if (_queue.value.any { it.id == YT_STREAM_ID }) { onDone(false); return }
         if (!player.playNext(id)) { onDone(false); return }
-        // La posición la dice el player (su índice va en vivo); el state de la
-        // UI llega con retardo y el doble toque rápido la desfasaba.
-        val at = player.queueIds().indexOf(id).takeIf { it >= 0 }
-            ?: ((player.state.value.currentIndex + 1).coerceIn(0, _queue.value.size))
+        // La posición la dice el timeline del player, no indexOf (con el tema
+        // duplicado indexOf devuelve la primera copia y la UI diverge).
+        val tl = player.currentTimelineIndex()
+        val at = if (tl >= 0) tl + 1 else (player.restoreIndex() + 1).coerceAtLeast(0)
         val q = _queue.value.toMutableList()
         q.add(at.coerceIn(0, q.size), s)
         _queue.value = q
@@ -662,7 +685,8 @@ class MainViewModel(
         val s = songs.value.find { it.id == id } ?: run { onDone(false); return }
         if (_queue.value.any { it.id == YT_STREAM_ID }) { onDone(false); return }
         if (!player.addToEnd(id)) { onDone(false); return }
-        val at = player.queueIds().indexOf(id).takeIf { it >= 0 } ?: _queue.value.size
+        // Va al final del timeline real (indexOf falla con duplicados).
+        val at = (player.queueIds().size - 1).takeIf { it >= 0 } ?: _queue.value.size
         val q = _queue.value.toMutableList()
         q.add(at.coerceIn(0, q.size), s)
         _queue.value = q
@@ -722,6 +746,7 @@ class MainViewModel(
     fun setPlaylistCover(id: Long, albumId: Long?) { viewModelScope.launch { lists.setCover(id, albumId) } }
     fun addToPlaylist(pid: Long, s: Song, onResult: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
+            if (s.id == YT_STREAM_ID) { onResult(false); return@launch }
             val ok = lists.addToPlaylist(pid, s)
             onResult(ok)
         }
@@ -817,19 +842,28 @@ class MainViewModel(
                         if (lists.addToPlaylist(pid, match)) added++
                     }
                 }
-                val farr = root.optJSONArray("favs") ?: org.json.JSONArray()
+                val vistos = mutableSetOf<Long>()
                 val byKey = lib.associateBy { lists.favKey(it.artist, it.title) }
                 val byId = lib.associateBy { it.id }
-                val vistos = mutableSetOf<Long>()
-                for (i in 0 until farr.length()) {
-                    val raw = farr.opt(i)
-                    // Respaldo nuevo: "artista|titulo" (estable entre equipos).
-                    // Respaldo viejo: id numérico de MediaStore.
-                    val match = when (raw) {
+                fun emparejar(raw: Any?): com.melodia.app.data.model.Song? {
+                    // Clave "artista|título" (estable entre equipos) o id
+                    // numérico (respaldo viejo / artista corregido después).
+                    return when (raw) {
                         is String -> byKey[raw]
                         is Number -> byId[raw.toLong()]
-                        else -> byId[farr.optLong(i, -1)]
-                    } ?: continue
+                        else -> null
+                    }
+                }
+                val farr = root.optJSONArray("favs") ?: org.json.JSONArray()
+                for (i in 0 until farr.length()) {
+                    val match = emparejar(farr.opt(i)) ?: continue
+                    if (vistos.add(match.id) && !_favIds.value.contains(match.id)) {
+                        lists.toggleFav(match.id, false); favs++
+                    }
+                }
+                val iarr = root.optJSONArray("favIds") ?: org.json.JSONArray()
+                for (i in 0 until iarr.length()) {
+                    val match = emparejar(iarr.opt(i)) ?: byId[iarr.optLong(i, -1)] ?: continue
                     if (vistos.add(match.id) && !_favIds.value.contains(match.id)) {
                         lists.toggleFav(match.id, false); favs++
                     }

@@ -62,7 +62,9 @@ class ArtworkRepository(private val context: Context) {
                     "&media=music&entity=song&limit=5"
             )
             val conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 8000; readTimeout = 8000
+                // Cortos a propósito: quien llama pone withTimeoutOrNull(4 s) y
+                // un hilo bloqueado 8+8 s por intento frena la reparación.
+                connectTimeout = 3000; readTimeout = 4000
                 setRequestProperty("User-Agent", "Melodia/1.0")
             }
             try {
