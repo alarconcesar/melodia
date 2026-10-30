@@ -102,6 +102,10 @@ class MusicPlayer(private val context: Context) {
             if (crossfade) rampVolume(1f, (crossfadeSecs * 1000L).coerceAtMost(3000))
         }
             override fun onPlaybackStateChanged(s: Int) { updateState(); attachEq() }
+            // Auto/Bluetooth cambian aleatorio/repetición por MediaSession: sin
+            // esto la UI y la persistencia se enteraban en el próximo tick.
+            override fun onShuffleModeEnabledChanged(v: Boolean) { updateState() }
+            override fun onRepeatModeChanged(r: Int) { updateState() }
             override fun onAudioSessionIdChanged(id: Int) { try { eq?.attach(id) } catch (_: Exception) {} }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 try {
@@ -163,11 +167,16 @@ class MusicPlayer(private val context: Context) {
      * un slot único y "A continuación" + play rápido en frío perdía los inserts.
      */
     private val pendingOps = ArrayDeque<() -> Unit>()
+    /** Tope de acciones en frío: sin servicio no se acumulan para siempre. */
+    private fun addPending(op: () -> Unit) {
+        if (pendingOps.size >= 50) pendingOps.removeFirstOrNull()
+        pendingOps.add(op)
+    }
 
     fun play(ids: List<Long>, startIndex: Int) {
         ensureBound()
         val p = exo
-        if (p == null) { pendingOps.add { play(ids, startIndex) }; return }
+        if (p == null) { addPending { play(ids, startIndex) }; return }
         try {
             // Solo los ids con item real: si no, queueIds y timeline se desfasan.
             val pares = ids.mapNotNull { id -> songMap[id]?.let { id to buildItem(it) } }
@@ -235,7 +244,7 @@ class MusicPlayer(private val context: Context) {
             val p = exo
             if (p == null) {
                 // Nadie ha reproducido todavía: la cola se aplica al conectar el servicio
-                pendingOps.add { try { insertAt(id, index) } catch (_: Exception) {} }
+                addPending { try { insertAt(id, index) } catch (_: Exception) {} }
                 ensureBound()
                 return true
             }
@@ -285,7 +294,7 @@ class MusicPlayer(private val context: Context) {
     fun playStream(url: String, title: String, artist: String, artUrl: String? = null) {
         ensureBound()
         val p = exo
-        if (p == null) { pendingOps.add { playStream(url, title, artist, artUrl) }; return }
+        if (p == null) { addPending { playStream(url, title, artist, artUrl) }; return }
         try {
             queueIds = mutableListOf(YT_STREAM_ID)
             streamRetries = 0
@@ -471,7 +480,7 @@ class MusicPlayer(private val context: Context) {
     private fun attachEq() { try { exo?.let { eq?.attach(it.audioSessionId) } } catch (_: Exception) {} }
     fun toggle() {
         ensureBound()
-        val p = exo ?: run { pendingOps.add { toggle() }; return }
+        val p = exo ?: run { addPending { toggle() }; return }
         try {
             ensureRestore(p)
             if (p.isPlaying) { pauseForFade(); p.pause() } else p.play()
@@ -538,7 +547,14 @@ class MusicPlayer(private val context: Context) {
 
     private fun jumpWithFade(jump: () -> Unit) {
         try {
-            if (!crossfade) { jump(); return }
+            if (!crossfade) {
+                // Sin crossfade no hay rampas: cualquier resto en vuelo se corta
+                // antes de saltar (si no, el tema nuevo heredaba el fundido).
+                try { fadeJob?.cancel() } catch (_: Exception) {}
+                fadedOut = false
+                try { exo?.volume = 1f } catch (_: Exception) {}
+                jump(); return
+            }
             rampVolume(0f, 250) {
                 try { jump() } catch (_: Exception) {}
                 fadedOut = false

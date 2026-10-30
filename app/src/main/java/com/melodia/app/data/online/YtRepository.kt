@@ -49,6 +49,9 @@ data class YtAudio(val url: String, val ext: String, val mime: String)
  */
 class DlUrlExpiredException(m: String) : java.io.IOException(m)
 
+/** Disco lleno: no es un fallo de red y reintentar no sirve. */
+class DlNoSpaceException(m: String) : java.io.IOException(m)
+
 /** Búsqueda, audio y descarga de YouTube vía NewPipeExtractor (sin API key). */
 class YtRepository(private val context: Context) {
 
@@ -219,10 +222,14 @@ class YtRepository(private val context: Context) {
             val audios: List<AudioStream> = ex.audioStreams
             require(audios.isNotEmpty()) { "Sin audio disponible" }
             val ranked = audios.sortedByDescending { try { it.averageBitrate } catch (_: Exception) { 0 } }
-            val pool = if (high) ranked else ranked.filter {
+            // En estándar se prefieren bitrates modestos, pero SIN recortar la
+            // lista antes de elegir formato: takeLast(2) se comía el m4a y el
+            // archivo quedaba webm sin etiquetas (storeDownload solo taggea m4a).
+            val modest = ranked.filter {
                 try { it.averageBitrate <= 96000 } catch (_: Exception) { true }
-            }.ifEmpty { ranked.takeLast(2) }
-            val pick = pool.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true) }
+            }
+            val pool = if (high) ranked else modest.ifEmpty { ranked.filter { isMp4a(it) }.ifEmpty { ranked } }
+            val pick = pool.firstOrNull { isMp4a(it) }
                 ?: pool.firstOrNull { (try { it.codec } catch (_: Exception) { "" } ?: "").contains("opus", true) }
                 ?: pool.first()
             val isMp4 = (try { pick.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true)
@@ -236,6 +243,9 @@ class YtRepository(private val context: Context) {
                 }
             }
         }
+
+    private fun isMp4a(s: AudioStream): Boolean =
+        (try { s.codec } catch (_: Exception) { "" } ?: "").contains("mp4a", true)
 
     /** Resuelve el audio en segundo plano para que el play sea instantáneo. */
     suspend fun prefetchAudio(videoUrl: String, high: Boolean = true) {
@@ -319,8 +329,10 @@ class YtRepository(private val context: Context) {
         } catch (_: Exception) {}
     }
 
-    private companion object {
-        const val UA =
+    companion object {
+        /** Cuántos temas trae una colección como máximo (YouTube pagina de a ~20-50). */
+        const val MAX_COLLECTION_TRACKS = 100
+        private const val UA =
             "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
     }
 
@@ -443,8 +455,15 @@ class YtRepository(private val context: Context) {
             onProgress(total, total)
             return@withContext total
         }
+        // ENOSPC al pre-alocar: el use cierra solo; se traduce el error para
+        // no mostrar "sin conexión" con WiFi perfecto.
         RandomAccessFile(dest, "rw").use { raf ->
-            raf.setLength(total)
+            try {
+                raf.setLength(total)
+            } catch (e: java.io.IOException) {
+                if ((e.message ?: "").contains("space", true)) throw DlNoSpaceException("Sin espacio en el dispositivo")
+                else throw e
+            }
             val ch = raf.channel
             val partes = partesPara(total - desde)
             val chunk = (total - desde) / partes
@@ -475,14 +494,18 @@ class YtRepository(private val context: Context) {
         total
     }
 
-    /** Servidor sin tamaño conocido: una conexión y sin reanudar. */
+    /**
+     * Servidor sin tamaño conocido: intenta reanudar con Range y, si el
+     * servidor no lo acepta, reescribe desde cero (antes siempre se tiraba
+     * lo bajado y la barra retrocedía al pausar/retomar).
+     */
     private suspend fun streamToFileResume(
         url: String,
         dest: File,
         startAt: Long,
         onProgress: (downloaded: Long, total: Long) -> Unit
     ): Long = withContext(Dispatchers.IO) {
-        val c = openConn(url)
+        val c = if (startAt > 0) openConn(url, "bytes=$startAt-") else openConn(url)
         c.connect()
         // Un 403 aquí es HTML de error, no audio: antes se guardaba como tema válido.
         val code = try { c.responseCode } catch (_: Exception) { -1 }
@@ -490,12 +513,12 @@ class YtRepository(private val context: Context) {
             try { c.disconnect() } catch (_: Exception) {}
             throw DlUrlExpiredException("CDN devolvió $code")
         }
+        // 206 = el servidor aceptó reanudar: se agrega al final.
+        val reanuda = code == HttpURLConnection.HTTP_PARTIAL && startAt > 0 && dest.exists()
         val len = c.contentLengthLong.takeIf { it > 0 } ?: -1L
-        // Sin tamaño no hay forma de reanudar: se reescribe desde cero. Antes se
-        // agregaba al final y el archivo quedaba con el doble de bytes.
-        var read = 0L
+        var read = if (reanuda) dest.length() else 0L
         var lastEmit = 0L
-        java.io.FileOutputStream(dest, false).use { out ->
+        java.io.FileOutputStream(dest, reanuda).use { out ->
             c.inputStream.use { inp ->
                 val buf = ByteArray(64 * 1024)
                 while (true) {
@@ -541,6 +564,10 @@ class YtRepository(private val context: Context) {
                     c.disconnect()
                     throw DlUrlExpiredException("rango rechazado con $rc")
                 }
+                if (rc == 429) {
+                    c.disconnect()
+                    throw org.schabi.newpipe.extractor.exceptions.ReCaptchaException("rate-limited", url)
+                }
                 if (rc != HttpURLConnection.HTTP_PARTIAL) {
                     c.disconnect()
                     error("El servidor no aceptó Range")
@@ -556,13 +583,23 @@ class YtRepository(private val context: Context) {
                         pos += n
                         onBytes(n.toLong())
                     }
+                    // Corte limpio del CDN a mitad de trozo: sin esto el hueco
+                    // quedaba en ceros y se marcaba DONE. Se reintenta.
+                    if (pos <= to) error("trozo incompleto ($pos/$to)")
                 }
                 c.disconnect()
+                // 429 = rate-limit: mensaje honesto en vez de "no aceptó Range".
+                // (Se detecta aquí porque el código ya se leyó arriba.)
                 return@withContext
             } catch (e: Exception) {
                 // Pausar/cancelar en pleno trozo tardaba hasta 5 reintentos en
                 // sentirse: la cancelación siempre pasa de largo.
                 if (e is kotlinx.coroutines.CancellationException) throw e
+                // Disco lleno: reintentar no sirve y el mensaje genérico de red
+                // confunde ("sin conexión" con WiFi perfecto).
+                if (e is java.io.IOException && (e.message ?: "").contains("space", true)) {
+                    throw DlNoSpaceException("Sin espacio en el dispositivo")
+                }
                 attempt++
                 if (attempt >= 3 && depth < 3 && (to - from) > 512_000L) {
                     // Reintentar el resto en dos mitades más pequeñas
@@ -754,9 +791,11 @@ class YtRepository(private val context: Context) {
             val resolver = context.contentResolver
             val sel: String
             val args: Array<String>?
+            // Algunos OEM dejan RELATIVE_PATH nulo en la SD: se cubre con DATA
+            // también (en <29 solo existe DATA).
             if (Build.VERSION.SDK_INT >= 29) {
-                sel = "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
-                args = arrayOf("%Music/Melodia%")
+                sel = "(${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ? OR ${MediaStore.Audio.Media.DATA} LIKE ?)"
+                args = arrayOf("%Music/Melodia%", "%/Melodia/%")
             } else {
                 sel = "${MediaStore.Audio.Media.DATA} LIKE ?"
                 args = arrayOf("%/Melodia/%")
@@ -829,8 +868,8 @@ class YtRepository(private val context: Context) {
         escritas
     }
 
-    /** Trae los temas de una playlist de YouTube (título + hasta 100 temas, varias páginas). */
-    suspend fun playlistTracks(url: String): Pair<String, List<YtTrack>> = withContext(Dispatchers.IO) {
+    /** Trae los temas de una playlist (título, temas y si se recortó a 100). */
+    suspend fun playlistTracks(url: String): Triple<String, List<YtTrack>, Boolean> = withContext(Dispatchers.IO) {
         ensure()
         val ex = yt().getPlaylistExtractor(url)
         ex.fetchPage()
@@ -840,9 +879,10 @@ class YtRepository(private val context: Context) {
         var rounds = 0
         while (true) {
             out += mapItems(page.items).filterIsInstance<YtSearchItem.Track>().map { it.track }
-            if (out.size >= 100 || !page.hasNextPage() || rounds++ >= 4) break
+            if (out.size >= MAX_COLLECTION_TRACKS || !page.hasNextPage() || rounds++ >= 4) break
             page = ex.getPage(page.nextPage)
         }
+        val recortado = page.hasNextPage() || out.size > MAX_COLLECTION_TRACKS
         // Lo que llega de una playlist suele venir sin artista y con el canal
         // pegado al título ("Tema - Canal Oficial"). Se limpia aquí, antes de
         // descargar, para que el archivo y la biblioteca queden bien.
@@ -862,7 +902,7 @@ class YtRepository(private val context: Context) {
                 thumbUrl = t.thumbUrl ?: portada
             )
         }
-        title to limpio
+        Triple(title, limpio, recortado)
     }
 
     /** Descarga bytes crudos (miniatura para incrustar como carátula). */

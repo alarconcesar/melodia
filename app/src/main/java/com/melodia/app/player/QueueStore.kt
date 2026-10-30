@@ -105,11 +105,11 @@ class QueueStore(context: Context) {
         try { prefs.edit().putLong(KEY_POS, positionMs.coerceAtLeast(0L)).apply() } catch (_: Exception) {}
     }
 
-    fun load(): QueueSnapshot? {
-        return try {
-            val raw = prefs.getString(KEY_SONGS, null) ?: return null
+    suspend fun load(): QueueSnapshot? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val raw = prefs.getString(KEY_SONGS, null) ?: return@withContext null
             val arr = JSONArray(raw)
-            if (arr.length() == 0) return null
+            if (arr.length() == 0) return@withContext null
             val songs = (0 until arr.length()).mapNotNull { i ->
                 try {
                     val o = arr.getJSONObject(i)
@@ -129,7 +129,7 @@ class QueueStore(context: Context) {
                     )
                 } catch (_: Exception) { null }
             }
-            if (songs.isEmpty()) return null
+            if (songs.isEmpty()) return@withContext null
             QueueSnapshot(
                 songs = songs,
                 index = prefs.getInt(KEY_INDEX, 0).coerceIn(0, songs.size - 1),

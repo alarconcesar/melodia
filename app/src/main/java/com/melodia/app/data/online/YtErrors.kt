@@ -18,6 +18,8 @@ import org.schabi.newpipe.extractor.search.SearchExtractor
 object YtErrors {
 
     fun message(t: Throwable, fallback: String): String = when (t) {
+        is DlNoSpaceException ->
+            "Sin espacio en el dispositivo — libera espacio y reintenta."
         is DlUrlExpiredException ->
             "El enlace de YouTube venció — reintenta la descarga."
         is SearchExtractor.NothingFoundException ->

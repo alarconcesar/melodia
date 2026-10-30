@@ -86,5 +86,14 @@ class AppContainer(context: Context) {
         t = SleepTimer { try { musicPlayer.fadePause(stillActive = { t.consumeExpire() }) } catch (_: Exception) {} }
         t
     }
-    fun makeMainViewModel() = MainViewModel(musicPlayer, musicRepository, playlistRepo, statsRepo, sleepTimer, ytRepo, dlManager, lyricsRepo, artRepo, queueStore)
+    private fun esRedMedida(): Boolean {
+        return try {
+            val cm = appContext.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            val net = cm.activeNetwork ?: return false
+            val caps = cm.getNetworkCapabilities(net) ?: return false
+            !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+        } catch (_: Exception) { false }
+    }
+
+    fun makeMainViewModel() = MainViewModel(musicPlayer, musicRepository, playlistRepo, statsRepo, sleepTimer, ytRepo, dlManager, lyricsRepo, artRepo, queueStore, ::esRedMedida)
 }

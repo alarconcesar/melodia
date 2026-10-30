@@ -82,6 +82,9 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
                 val pos = state.positionMs
                 val idx = lines.indexOfLast { it.ms <= pos + 300 }.coerceAtLeast(0)
                 val listState = rememberLazyListState()
+                androidx.compose.runtime.LaunchedEffect(s.id) {
+                    try { listState.scrollToItem(0) } catch (_: Exception) {}
+                }
                 LaunchedEffect(idx) {
                     // Si el usuario está leyendo otras estrofas (scrolleando),
                     // no se le arranca la lista de las manos cada 3 segundos.
@@ -109,6 +112,7 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
                                 .clickable {
                                     val d = state.durationMs
                                     if (d > 0) vm.player.seekTo((e.ms.toFloat() / d).coerceIn(0f, 1f))
+                                    else vm.avisar("Aún sin duración: espera a que cargue el tema")
                                 }
                                 .padding(vertical = if (cur) 10.dp else 7.dp)
                         )

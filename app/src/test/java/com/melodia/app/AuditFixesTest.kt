@@ -42,7 +42,7 @@ class AuditFixesTest {
         store.saveSongs(listOf(song(1), song(2)))
         store.saveSongs(emptyList())
         // El JSON viejo se pisa con []: load() ya no devuelve la cola anterior.
-        assertNull(store.load())
+        assertNull(kotlinx.coroutines.runBlocking { store.load() })
     }
 
     @Test
@@ -51,7 +51,7 @@ class AuditFixesTest {
         store.saveSongs(listOf(song(7)))
         ctx().getSharedPreferences("melodia_queue", Context.MODE_PRIVATE)
             .edit().putInt("rep", 99).apply()
-        val snap = store.load()
+        val snap = kotlinx.coroutines.runBlocking { store.load() }
         assertEquals(1, snap?.songs?.size)
         assertEquals(0, snap?.repeatMode)
     }
@@ -129,6 +129,16 @@ class AuditFixesTest {
         val yt = YtRepository(ctx())
         assertEquals("YouTube", yt.artistFor(YtTrack("x", "T", "", 1, null, "u")))
         assertEquals("Muse", yt.artistFor(YtTrack("x", "T", "Muse", 1, null, "u")))
+    }
+
+    @Test
+    fun estimadoDeColeccionEsProporcionalALaDuracion() {
+        val tracks = (1..100).map {
+            YtTrack("id$it", "T$it", "A", 240, null, "u$it")
+        }
+        // 100 temas de 4 min ≈ 800 MB a 2 MB/min.
+        assertEquals(800, com.melodia.app.ui.screens.estimadoColMb(tracks))
+        assertEquals(1, com.melodia.app.ui.screens.estimadoColMb(emptyList()))
     }
 
     // ── Errores ───────────────────────────────────────────────────

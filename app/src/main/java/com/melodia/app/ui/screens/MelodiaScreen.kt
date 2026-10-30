@@ -706,7 +706,10 @@ fun MelodiaScreen(vm: MainViewModel) {
             onPlay = { vm.playSong(s.id, listOf(s)); showInfoId = null },
             onFav = { vm.toggleFav(s.id) },
             onAdd = { showAddToId = s.id; showInfoId = null },
-            onClose = { showInfoId = null }, vm = vm
+            onClose = { showInfoId = null }, vm = vm,
+            // Desde la ficha se salta al detalle que ya existe en Explorar.
+            onArtist = { a -> vm.setArtist(a); tab = 1; showInfoId = null },
+            onAlbum = { a -> vm.setAlbum(a); tab = 1; showInfoId = null }
         )
     }
     if (showSort) {
@@ -793,6 +796,7 @@ fun HomeTab(
     val homeYtLoading by vm.homeYtLoading.collectAsState()
     val homeYtQuery by vm.homeYtQuery.collectAsState()
     val busyYt by vm.busyYt.collectAsState()
+    val loadingColYt by vm.loadingCol.collectAsState()
     val favSongs by vm.favSongs.collectAsState()
     // Estas listas se usan dentro de item{}: se recolectan UNA vez arriba.
     // Antes cada item creaba su propio observer y todo HomeTab se recomponía.
@@ -1045,7 +1049,7 @@ fun HomeTab(
                         )
                         is com.melodia.app.data.online.YtSearchItem.Collection -> YtCollectionRow(
                             item = item,
-                            busy = busyYt == item.key,
+                            busy = busyYt == item.key || loadingColYt == item.key,
                             onOpen = { vm.openYtCollection(item) },
                             onDownload = { vm.downloadYtCollection(item) },
                             modifier = Modifier.padding(horizontal = 20.dp)
@@ -1766,6 +1770,10 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
     var tapMsg by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
     LaunchedEffect(tapMsg) { if (tapMsg != null) { kotlinx.coroutines.delay(900); tapMsg = null } }
+    // El back cierra primero la hoja y después el reproductor: sin esto, con
+    // la cola abierta el back cerraba el player entero (ganaba el BackHandler raíz).
+    if (showQueue) BackHandler { showQueue = false }
+    else if (showPitch) BackHandler { showPitch = false }
     if (showQueue) QueueSheet(vm, onDismiss = { showQueue = false })
     if (showPitch) PitchSheet(vm, state.pitch, state.speed, onDismiss = { showPitch = false })
     val safeFx = remember { SafeMode.isOn(ctx.applicationContext, SafeMode.NO_EFFECTS) }
@@ -2792,7 +2800,13 @@ fun EditMetadataSheet(song: Song, vm: MainViewModel, onDismiss: () -> Unit, onSa
 
 // ── Ficha del tema (long-press): info útil + acciones ────────────
 @Composable
-fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> Unit, onAdd: () -> Unit, onClose: () -> Unit, vm: MainViewModel) {
+fun TrackInfoSheet(
+    song: Song, isFav: Boolean,
+    onPlay: () -> Unit, onFav: () -> Unit, onAdd: () -> Unit, onClose: () -> Unit,
+    vm: MainViewModel,
+    onArtist: ((String) -> Unit)? = null,
+    onAlbum: ((String) -> Unit)? = null
+) {
     val cs = MaterialTheme.colorScheme
     val ctx = LocalContext.current
     var showEdit by rememberSaveable { mutableStateOf(false) }
@@ -2807,16 +2821,20 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
     fun compartir() {
         try {
             val f = java.io.File(song.dataPath)
-            if (f.exists()) {
-                val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.provider", f)
-                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = "audio/*"
-                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                ctx.startActivity(android.content.Intent.createChooser(send, "Compartir"))
+            if (song.dataPath.isBlank() || !f.exists()) {
+                android.widget.Toast.makeText(ctx, "Sin archivo para compartir", android.widget.Toast.LENGTH_SHORT).show()
+                return
             }
-        } catch (_: Exception) {}
+            val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.provider", f)
+            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "audio/*"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            ctx.startActivity(android.content.Intent.createChooser(send, "Compartir"))
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(ctx, "No se pudo compartir", android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
     AlertDialog(
         onDismissRequest = onClose,
@@ -2849,6 +2867,12 @@ fun TrackInfoSheet(song: Song, isFav: Boolean, onPlay: () -> Unit, onFav: () -> 
             ) {
                 InfoRow("Duración", fmt(song.durationMs))
                 InfoRow("Carpeta", folder)
+                if (onArtist != null && song.artist.isNotBlank()) {
+                    InfoLink("Artista", song.artist) { onArtist(song.artist) }
+                }
+                if (onAlbum != null && song.album.isNotBlank()) {
+                    InfoLink("Álbum", song.album) { onAlbum(song.album) }
+                }
                 InfoRow("Agregado", added)
                 Spacer(Modifier.height(6.dp))
                 Text("Ruta", style = Ds.Micro, color = cs.onSurfaceVariant)
@@ -2981,6 +3005,23 @@ private fun InfoAction(
         )
     }
 }
+
+@Composable
+private fun InfoLink(label: String, value: String, onTap: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.width(80.dp))
+        Text(
+            value, style = Ds.Body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+            color = cs.primary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).clickable(
+                role = androidx.compose.ui.semantics.Role.Button,
+                onClick = onTap
+            ).padding(vertical = 2.dp)
+        )
+    }
+}
+
 
 @Composable
 fun InfoRow(label: String, value: String) {

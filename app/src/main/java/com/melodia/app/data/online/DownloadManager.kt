@@ -231,7 +231,7 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
                     finally { extractSlots.release() }
                 }
                 update(track.id) { it.copy(status = DlStatus.ACTIVE, error = null) }
-                runJobFresh(track, high, newAudio, fresh = fresh + 1)
+                runJobFresh(track, high, newAudio, fromScratch = true, fresh = fresh + 1)
                 return
             }
             val kept = partFile(track.id, high).let { if (it.exists()) it.length() else 0L }
@@ -276,7 +276,7 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             // Antes se perdía y el .part quedaba huérfano para siempre.
             _jobs.value
                 .filter { it.status == DlStatus.QUEUED || it.status == DlStatus.PAUSED || it.status == DlStatus.ERROR || it.status == DlStatus.ACTIVE }
-                .take(40)
+                .take(100)
                 .forEach { j ->
                     arr.put(
                         JSONObject()

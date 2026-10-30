@@ -37,6 +37,13 @@ class EqualizerManager(context: Context) {
                 for (i in 0 until nb) {
                     try { e.setBandLevel(i.toShort(), _bands.value.getOrElse(i) { 0 }.coerceIn(-1500, 1500).toShort()) } catch (_: Exception) {}
                 }
+                // Las bandas que la app no maneja (6+) se dejan en flat: si no,
+                // conservan el preset del sistema y suenan sin que la UI lo muestre.
+                try {
+                    for (i in nb until e.numberOfBands) {
+                        try { e.setBandLevel(i.toShort(), 0) } catch (_: Exception) {}
+                    }
+                } catch (_: Exception) {}
             }
             bass = BassBoost(0, newSession).also { it.enabled = _enabled.value; try { it.setStrength(_bass.value.coerceIn(0, 1000).toShort()) } catch (_: Exception) {} }
             reverb = PresetReverb(0, newSession).also { it.enabled = false }

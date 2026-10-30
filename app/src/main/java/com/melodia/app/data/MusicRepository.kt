@@ -212,7 +212,7 @@ class MusicRepository(context: Context, private val dlMeta: DownloadMetaStore = 
                             album = album,
                             albumId = if (iAlbumId >= 0) c.getLong(iAlbumId) else 0L,
                             durationMs = dur,
-                            dataPath = if (iData >= 0) c.getString(iData) ?: "" else "",
+                            dataPath = path,
                             dateAdded = if (iAdded >= 0) c.getLong(iAdded) else 0L,
                             trackNumber = track,
                             discNumber = if (rawTrack > 0) disc else 0,

@@ -134,7 +134,9 @@ class MelodiaPlaybackService : MediaSessionService() {
 
     /** Cola persistida → MediaItems listos para que el sistema reanude. */
     private fun snapshotQueue(): MediaSession.MediaItemsWithStartPosition? {
-        val snap = queueStore.load() ?: return null
+        // load() es suspend (parsea JSON pesado en IO); aquí corre en el hilo
+        // binder de Media3, nunca en Main, así que bloquear es seguro.
+        val snap = kotlinx.coroutines.runBlocking { queueStore.load() } ?: return null
         val playable = snap.songs.filter { it.id != YT_STREAM_ID }
         val items = playable.map { s ->
             androidx.media3.common.MediaItem.Builder()

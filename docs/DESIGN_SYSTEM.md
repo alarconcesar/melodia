@@ -303,3 +303,40 @@ misma jerarquía que el reproductor.
   "Todo" usa la pestaña donde empezó la selección.
 
 136 tests verdes.
+
+## Auditoría 7.12 (tercera pasada)
+
+- `swapStream` verifica que el stream siga siendo el actual (id + timeline):
+  un refresh lento ya no reemplaza el audio del tema nuevo. El refresh se
+  cancela al cambiar de tema.
+- `pendingOps` con tope (50): sin servicio ya no se acumulan lambdas.
+- Apagar el crossfade a mitad de rampa restaura el volumen (el tema nuevo ya
+  no queda mudo); saltar sin crossfade corta restos de fundido.
+- `timelineIndexOf` con duplicados: sin shuffle el índice visible es el real;
+  con shuffle se busca la k-ésima ocurrencia.
+- EQ con >5 bandas: las no manejadas quedan en flat (no heredan presets).
+- Shuffle/repeat externos (Auto/Bluetooth) actualizan el estado al instante.
+- Trozo corto aceptado como éxito: se verifica `pos > to` o se reintenta.
+- Reintento fresco parte de cero (otra variante = otro tamaño).
+- `bestAudio(estándar)` prefiere m4a sin recortar la lista (adiós webm sin tags).
+- Persistencia de cola hasta 100; re-enqueue en ventana DONE.
+- `fetchBytes` con cota + content-type; `mejorMiniatura` descarta no-imágenes.
+- 429 → ReCaptcha (mensaje honesto); ENOSPC con error propio (sin reintentos).
+- `playlistTracks` avisa si recorta; confirmación con datos móviles para
+  listas grandes (estimado en MB, diálogo en Online).
+- `streamToFileResume` intenta Range antes de reescribir.
+- Reparación cubre DATA cuando RELATIVE_PATH es nulo (SD en algunos OEM).
+- `recordHeard` exige 30 s sin duración; `favKey` con espacios colapsados y
+  respaldo con ids + claves; renombrar con trim, tope y sin duplicados.
+- `enrichArtwork` sin delays en caché + arranque rotativo (toda la biblioteca
+  converge); stats en Default; `QueueStore.load` en IO; posición no pisada por
+  streams; letras de stream con clave estable + migración pendiente→resuelto.
+- `delayWarmLyric` con artista resuelto + filtro de duración; `dataPath` con
+  fallback; Favoritos en orden de añadido; restore que reutiliza listas;
+  operaciones de playlist con feedback; setters con debounce.
+- UI: back cierra hojas antes que el player; colección y play con locks
+  separados; tap en letra sin duración avisa; compartir avisa si falla;
+  ficha con salto a artista/álbum; letra que arranca arriba; diálogo de
+  calidad que sobrevive a la rotación.
+
+137 tests verdes.

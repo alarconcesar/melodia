@@ -106,6 +106,7 @@ fun OnlineTab(vm: MainViewModel) {
     val errorRetry by vm.ytErrorRetry.collectAsState()
     val dl by vm.dlProgress.collectAsState()
     val busy by vm.busyYt.collectAsState()
+    val loadingCol by vm.loadingCol.collectAsState()
     val recent by vm.ytRecent.collectAsState()
     val history by vm.ytHistory.collectAsState()
     val hasMore by vm.ytHasMore.collectAsState()
@@ -114,7 +115,19 @@ fun OnlineTab(vm: MainViewModel) {
     val saver by vm.dataSaver.collectAsState()
     val notice by vm.ytMsg.collectAsState()
 
-    var dlPick by remember { mutableStateOf<YtTrack?>(null) }
+    var dlPickId by rememberSaveable { mutableStateOf<String?>(null) }
+    var dlPickTitle by rememberSaveable { mutableStateOf("") }
+    var dlPickArtist by rememberSaveable { mutableStateOf("") }
+    var dlPickDur by rememberSaveable { mutableStateOf(-1L) }
+    var dlPickThumb by rememberSaveable { mutableStateOf<String?>(null) }
+    var dlPickUrl by rememberSaveable { mutableStateOf("") }
+    val dlPick: YtTrack? = dlPickId?.let {
+        YtTrack(it, dlPickTitle, dlPickArtist, dlPickDur, dlPickThumb, dlPickUrl)
+    }
+    fun setDlPick(t: YtTrack?) {
+        dlPickId = t?.id; dlPickTitle = t?.title ?: ""; dlPickArtist = t?.artist ?: ""
+        dlPickDur = t?.durationSec ?: -1L; dlPickThumb = t?.thumbUrl; dlPickUrl = t?.url ?: ""
+    }
     var showImport by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.refreshDlHistory() }
 
@@ -126,6 +139,7 @@ fun OnlineTab(vm: MainViewModel) {
         errorRetry = errorRetry,
         dlProgress = dl,
         busyId = busy,
+        busyColId = loadingCol,
         recent = recent,
         history = history,
         hasMore = hasMore,
@@ -136,7 +150,7 @@ fun OnlineTab(vm: MainViewModel) {
         onSearch = { vm.searchYt() },
         onClearQuery = { vm.setYtQuery("") },
         onPlay = { vm.playYt(it) },
-        onDownload = { dlPick = it },
+        onDownload = { setDlPick(it) },
         onDownloadAll = { vm.downloadAllYt() },
         onLoadMore = { vm.loadMoreYt() },
         onOpenDownloads = { vm.openDownloads() },
@@ -150,6 +164,27 @@ fun OnlineTab(vm: MainViewModel) {
     )
 
     if (showImport) ImportPlaylistDialog(vm, onClose = { showImport = false }, onQueued = { vm.openDownloads(); showImport = false })
+    val pendingCol by vm.pendingCol.collectAsState()
+    pendingCol?.let { pc ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { vm.clearPendingCol() },
+            title = { Text("Bajar con datos móviles", color = MaterialTheme.colorScheme.onBackground) },
+            text = {
+                Text(
+                    "«${pc.title}» son ${pc.tracks.size} temas (~${estimadoColMb(pc.tracks)} MB)" +
+                        (if (pc.truncated) ", y la lista viene recortada" else "") +
+                        ". ¿Los bajas igual?",
+                    style = Ds.Body, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { vm.confirmPendingCol(); vm.openDownloads() }) {
+                    Text("Bajar igual")
+                }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { vm.clearPendingCol() }) { Text("Cancelar") } }
+        )
+    }
     dlPick?.let { track ->
         QualityDialog(
             track = track,
@@ -157,12 +192,16 @@ fun OnlineTab(vm: MainViewModel) {
             onPick = { high ->
                 vm.setYtQuality(high)
                 vm.downloadYt(track, high)
-                dlPick = null
+                setDlPick(null)
             },
-            onDismiss = { dlPick = null }
+            onDismiss = { setDlPick(null) }
         )
     }
 }
+
+/** Estimado de una colección en MB (m4a ~2 MB/min). */
+internal fun estimadoColMb(tracks: List<YtTrack>): Long =
+    (tracks.sumOf { it.durationSec.coerceAtLeast(0) } / 30).coerceAtLeast(1)
 
 /** Contenido sin ViewModel: todo entra por parámetros (testeable en JVM). */
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
@@ -175,6 +214,7 @@ fun OnlineTabContent(
     errorRetry: Boolean,
     dlProgress: Map<String, Float>,
     busyId: String?,
+    busyColId: String? = null,
     recent: List<String>,
     history: List<YtTrack>,
     hasMore: Boolean,
@@ -414,7 +454,7 @@ fun OnlineTabContent(
                             )
                             is YtSearchItem.Collection -> YtCollectionRow(
                                 item = item,
-                                busy = busyId == item.key,
+                                busy = busyId == item.key || busyColId == item.key,
                                 onOpen = { onOpenCollection(item) },
                                 onDownload = { onDownloadCollection(item) }
                             )
@@ -613,7 +653,8 @@ private fun ImportPlaylistDialog(vm: MainViewModel, onClose: () -> Unit, onQueue
                     Text(
                         if (ok) {
                             val parts = imp.split("|")
-                            "«${parts.getOrNull(2) ?: "Playlist"}»: ${parts.getOrNull(1) ?: "?"} temas en cola"
+                            "«${parts.getOrNull(2) ?: "Playlist"}»: ${parts.getOrNull(1) ?: "?"} temas en cola" +
+                                (if (parts.size > 3) " (lista recortada)" else "")
                         } else imp,
                         style = Ds.Sub,
                         color = if (ok) cs.primary else cs.error

@@ -110,7 +110,7 @@ object Mp4Tagger {
                     for (item in childrenOf(data, oldIlst)) {
                         if (item.type == "\u00A9nam" || item.type == "\u00A9ART" ||
                             item.type == "\u00A9alb" || item.type == "covr" ||
-                            item.type == "\u00A9lyr" || item.type == "day"
+                            item.type == "\u00A9lyr"
                         ) continue
                         existing.add(data.copyOfRange(item.start, item.contentEnd))
                     }
@@ -183,8 +183,11 @@ object Mp4Tagger {
             }
         }
         // 5. Autochequeo: el resultado debe re-parsearse y contener ilst
+        // con al menos un ítem (antes solo verificaba que existiera moov).
         val check = findTopLevel(out, "moov") ?: error("verificación fallida")
         require(check.size > 0) { "verificación fallida" }
+        val checkIlst = deepFind(out, check, listOf("udta", "meta", "ilst")).firstOrNull()
+        require(checkIlst != null && checkIlst.size > 8) { "ilst ausente" }
         return out
     }
 

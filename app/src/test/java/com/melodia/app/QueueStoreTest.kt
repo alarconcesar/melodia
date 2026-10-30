@@ -35,7 +35,7 @@ class QueueStoreTest {
         val songs = listOf(song(1, "Uno", 1), song(2, "Dos", 2))
         store.save(songs, index = 1, positionMs = 42_000, shuffle = true, repeatMode = 2)
 
-        val snap = store.load()!!
+        val snap = kotlinx.coroutines.runBlocking { store.load() }!!
         assertEquals(listOf(1L, 2L), snap.songs.map { it.id })
         assertEquals(1, snap.index)
         assertEquals(42_000L, snap.positionMs)
@@ -50,7 +50,7 @@ class QueueStoreTest {
         val store = QueueStore(ctx()).apply { clear() }
         store.save(listOf(song(1, "Uno")), 0, 1_000, false, 0)
         store.savePosition(99_000)
-        val snap = store.load()!!
+        val snap = kotlinx.coroutines.runBlocking { store.load() }!!
         assertEquals(99_000L, snap.positionMs)
         assertEquals(1, snap.songs.size)
     }
@@ -59,27 +59,27 @@ class QueueStoreTest {
     fun indiceFueraDeRangoSeCorrige() {
         val store = QueueStore(ctx()).apply { clear() }
         store.save(listOf(song(1, "Uno"), song(2, "Dos")), index = 99, positionMs = 0, shuffle = false, repeatMode = 0)
-        assertEquals(1, store.load()!!.index)
+        assertEquals(1, kotlinx.coroutines.runBlocking { store.load() }!!.index)
     }
 
     @Test
     fun sinColaGuardadaDevuelveNull() {
         val store = QueueStore(ctx()).apply { clear() }
-        assertNull(store.load())
+        assertNull(kotlinx.coroutines.runBlocking { store.load() })
     }
 
     @Test
     fun noGuardaColasVacias() {
         val store = QueueStore(ctx()).apply { clear() }
         store.save(emptyList(), 0, 0, false, 0)
-        assertNull(store.load())
+        assertNull(kotlinx.coroutines.runBlocking { store.load() })
     }
 
     @Test
     fun jsonCorruptoDevuelveNullSinReventar() {
         val prefs = ctx().getSharedPreferences("melodia_queue", android.content.Context.MODE_PRIVATE)
         prefs.edit().putString("songs", "{esto no es json").apply()
-        assertNull(QueueStore(ctx()).load())
+        assertNull(kotlinx.coroutines.runBlocking { QueueStore(ctx()).load() })
     }
 
     @Test
@@ -90,7 +90,7 @@ class QueueStoreTest {
         arr.put(org.json.JSONObject().put("t", "Sin id")) // inválida
         arr.put(org.json.JSONObject().put("id", 2L).put("t", "Dos").put("p", "/a/2.mp3"))
         prefs.edit().putString("songs", arr.toString()).apply()
-        val snap = QueueStore(ctx()).load()
+        val snap = kotlinx.coroutines.runBlocking { QueueStore(ctx()).load() }
         assertNotNull(snap)
         assertEquals(listOf(1L, 2L), snap!!.songs.map { it.id })
     }
@@ -100,6 +100,6 @@ class QueueStoreTest {
         val prefs = ctx().getSharedPreferences("melodia_queue", android.content.Context.MODE_PRIVATE)
         val arr = org.json.JSONArray().put(org.json.JSONObject().put("t", "Sin id"))
         prefs.edit().putString("songs", arr.toString()).apply()
-        assertNull(QueueStore(ctx()).load())
+        assertNull(kotlinx.coroutines.runBlocking { QueueStore(ctx()).load() })
     }
 }
