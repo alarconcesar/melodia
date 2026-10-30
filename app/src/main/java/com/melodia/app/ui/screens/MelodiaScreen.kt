@@ -2045,11 +2045,7 @@ private fun NpAction(
     Row(
         Modifier.clip(RoundedCornerShape(12.dp))
             .background(fondo)
-            .then(pressClick(onClick, min = 0.95f))
-            .semantics {
-                contentDescription = label
-                role = Role.Button
-            }
+            .then(pressClick(onClick, min = 0.95f, role = Role.Button, label = label))
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -2503,7 +2499,6 @@ fun QueueSheetContent(
     currentId: Long?,
     shuffle: Boolean,
     repeatMode: Int,
-    listMaxHeight: androidx.compose.ui.unit.Dp = 350.dp,
     onPlay: (Int) -> Unit,
     onMove: (Int, Int) -> Unit,
     onRemove: (Int) -> Unit,
@@ -2903,7 +2898,8 @@ fun TrackInfoSheet(
             ) {
                 InfoRow("Duración", fmt(song.durationMs))
                 InfoRow("Carpeta", folder)
-                if (onArtist != null && song.artist.isNotBlank()) {
+                val artistaOk = song.artist.isNotBlank() && !song.artist.equals("Desconocido", true)
+                if (onArtist != null && artistaOk) {
                     InfoLink("Artista", song.artist) { onArtist(song.artist) }
                 }
                 if (onAlbum != null && song.album.isNotBlank()) {
@@ -3041,9 +3037,11 @@ private fun InfoAction(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.width(68.dp).clip(RoundedCornerShape(12.dp))
-            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .clickable(
+                role = androidx.compose.ui.semantics.Role.Button,
+                onClickLabel = label, onClick = onClick
+            )
             .padding(vertical = 8.dp)
-            .semantics { contentDescription = label }
     ) {
         Icon(icon, null, Modifier.size(20.dp), tint = if (active) cs.primary else cs.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))

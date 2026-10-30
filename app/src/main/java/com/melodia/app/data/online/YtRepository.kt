@@ -75,7 +75,10 @@ class YtRepository(private val context: Context) {
     /** Generación de búsqueda: una búsqueda lenta no debe pisar a una rápida. */
     private var searchGen = 0
     private data class CachedAudio(val audio: YtAudio, val expiresAt: Long)
-    private val audioCache = mutableMapOf<String, CachedAudio>()
+    // LRU: al acertar se reencola (FIFO expulsaba URLs frescas en uso).
+    private val audioCache = object : LinkedHashMap<String, CachedAudio>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedAudio>?): Boolean = size > 30
+    }
 
     /**
      * Búsqueda mixta: YouTube devuelve videos y playlists/álbumes en la misma
@@ -453,7 +456,13 @@ class YtRepository(private val context: Context) {
             val final = streamToFileResume(url, dest, startAt, onProgress)
             return@withContext final
         }
-        val desde = startAt.coerceIn(0L, total)
+        var desde = startAt.coerceIn(0L, total)
+        if (desde >= total && startAt > 0) {
+            // El .part es más largo que el total fresco: otra variante.
+            // Truncar y reintentar desde cero en vez de DONE corrupto.
+            try { dest.delete() } catch (_: Exception) {}
+            desde = 0L
+        }
         if (desde >= total) {
             onProgress(total, total)
             return@withContext total
@@ -732,8 +741,8 @@ class YtRepository(private val context: Context) {
             resolver.query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 arrayOf(MediaStore.Audio.Media._ID),
-                "${MediaStore.Audio.Media.IS_PENDING}=1 AND ${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?",
-                arrayOf("%Music/Melodia%"),
+                "${MediaStore.Audio.Media.IS_PENDING}=1 AND (${MediaStore.Audio.Media.RELATIVE_PATH} = ? OR ${MediaStore.Audio.Media.DATA} LIKE ?)",
+                arrayOf("Music/Melodia/", "%/Melodia/%"),
                 null
             )?.use { c ->
                 val ids = mutableListOf<Long>()
@@ -1033,9 +1042,6 @@ class YtRepository(private val context: Context) {
             } catch (_: Exception) { null }
             val rutaArte = guardarPortada(artBytes, fileName)
             guardarMeta(if (claveReal.isNullOrBlank()) fileName else claveReal, track, artista, titulo, null, rutaArte)
-            if (claveReal != null && claveReal != fileName) {
-                guardarMeta(fileName, track, artista, titulo, null, rutaArte)
-            }
             uri
         } catch (e: Exception) {
             try { resolver.delete(uri, null, null) } catch (_: Exception) {}

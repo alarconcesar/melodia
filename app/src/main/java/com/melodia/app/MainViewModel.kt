@@ -164,12 +164,17 @@ class MainViewModel(
                 player.setQueue(list)
                 _songs.value = list
                 _loaded.value = true
-                // Barrido con la lista real en mano (nunca con set vacío).
-                try {
-                    repo.sweepDownloadMeta(list.mapNotNull {
-                        try { java.io.File(it.dataPath).name } catch (_: Exception) { null }
-                    }.toSet())
-                } catch (_: Exception) {}
+                // Barrido con la lista real en mano (nunca con set vacío). Si la
+                // biblioteca se encogió de golpe (SD desmontada), es parcial y
+                // no se toca nada: si no, borraría las fichas de la SD.
+                if (list.size > maxLibSeen) maxLibSeen = list.size
+                if (maxLibSeen < 50 || list.size * 2 >= maxLibSeen) {
+                    try {
+                        repo.sweepDownloadMeta(list.mapNotNull {
+                            try { java.io.File(it.dataPath).name } catch (_: Exception) { null }
+                        }.toSet())
+                    } catch (_: Exception) {}
+                }
                 maybeRestoreQueue(list)
                 enrichArtwork(list)
             }
@@ -543,6 +548,7 @@ class MainViewModel(
 
     fun clearHomeYt() {
         homeYtJob?.cancel()
+        homeYtGen++
         _homeYt.value = emptyList()
         _homeYtLoading.value = false
         _homeYtQuery.value = ""
@@ -613,10 +619,13 @@ class MainViewModel(
         _queue.value = com.melodia.app.player.QueueOps.keepOnly(q, idx)
     }
 
+    private var guardandoCola = false
     /** Guarda la cola actual como playlist nueva, en el mismo orden. */
     fun saveQueueAsPlaylist(name: String, onDone: (Int) -> Unit = {}) {
+        if (guardandoCola) return
         val songs = _queue.value.filter { it.id != YT_STREAM_ID }.distinctBy { it.id }
         if (name.isBlank() || songs.isEmpty()) { onDone(0); return }
+        guardandoCola = true
         viewModelScope.launch {
             val saved = try {
                 withContext(Dispatchers.IO) {
@@ -624,6 +633,7 @@ class MainViewModel(
                     lists.addAllToPlaylist(pid, songs)
                 }
             } catch (_: Exception) { 0 }
+            guardandoCola = false
             onDone(saved)
         }
     }
@@ -941,6 +951,8 @@ class MainViewModel(
     private var artJob: kotlinx.coroutines.Job? = null
     /** Cursor rotativo: cada pasada arranca donde terminó la anterior. */
     private var artCursor = 0
+    /** Máximo de temas visto: si la carga cae muy por debajo, es parcial (SD fuera). */
+    private var maxLibSeen = 0
 
     /** Clave para compartir una portada entre los temas del mismo álbum. */
     private fun albumKey(s: Song): String =
@@ -1279,7 +1291,7 @@ class MainViewModel(
         }
     }
 
-    fun closeYtPreview() { _ytPreview.value = null }
+    fun closeYtPreview() { previewGen++; _ytPreview.value = null }
 
     /** Colección en espera de confirmación (datos móviles + lista grande). */
     data class PendingCol(val title: String, val tracks: List<YtTrack>, val high: Boolean, val truncated: Boolean)
@@ -1460,10 +1472,12 @@ class MainViewModel(
             return
         }
         if (_ytImport.value == "…") return
+        val igen = ++importGen
         viewModelScope.launch {
             _ytImport.value = "…"
             try {
                 val (title, tracks, recortada) = withContext(Dispatchers.IO) { yt.playlistTracks(clean) }
+                if (igen != importGen) return@launch
                 if (tracks.isEmpty()) {
                     _ytImport.value = "La playlist no trae temas visibles"
                     return@launch
@@ -1482,5 +1496,6 @@ class MainViewModel(
         }
     }
 
-    fun clearYtImport() { _ytImport.value = null }
+    private var importGen = 0
+    fun clearYtImport() { importGen++; _ytImport.value = null }
 }

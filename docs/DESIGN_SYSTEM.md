@@ -363,3 +363,25 @@ misma jerarquía que el reproductor.
   con insets, ficha con "Encolar" + salto a artista/álbum.
 
 138 tests verdes.
+
+## Auditoría 7.14 (quinta pasada)
+
+- Cálculos/toggles en frío se encolan (next/prev/seek/shuffle/repeat).
+- Salto a prueba de cancelación + sin dip en bordes; rewind no cuenta stats.
+- Restore en borrado/reorden; pitch/speed persistidos; stream muerto avisa.
+- Headless (Auto/BT) no se corta al abrir.
+- ACTIVE con cupo en mano; resume trunca variante cambiada; LIKE exacto;
+  una sola ficha; LRU real; VEVO también en colecciones.
+- clear/close limpian su generación; guard en guardado de cola; toggleFav
+  serializado con lectura fresca; guardado de cola en lote.
+- Repair con cursor persistido; saveLocal con artista resuelto; gen en
+  previa y ver-más; estimado único; VPN con red subyacente.
+- Letras: warm con la misma clave; Plain con scroll por tema; aviso sin
+  duración; historial re-escuchable con url.
+- Ficha con Encolar + artista/álbum saneados; PillNav/MiniPlayer/HeroCard/
+  NpAction/InfoAction/SectionHeader/EmptyState con rol y etiqueta;
+  % exacto en texto; diálogo de datos solo en raíz; sheet con recorte.
+- Teclado escondido al ocultar la barra; renameId fantasma cerrado;
+  restore $name validado; sweep con guard de SD.
+
+138 tests verdes.

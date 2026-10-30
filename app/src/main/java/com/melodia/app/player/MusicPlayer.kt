@@ -540,6 +540,7 @@ class MusicPlayer(private val context: Context) {
     fun next() {
         ensureBound()
         val p = exo ?: run { addPending { next() }; return }
+        marcarSalto()
         ensureRestore(p)
         // Sin a dónde ir no hay fundido: el dip a silencio sin cambio confunde.
         if (!puedeAvanzar()) return
@@ -548,6 +549,7 @@ class MusicPlayer(private val context: Context) {
     fun prev() {
         ensureBound()
         val p = exo ?: run { addPending { prev() }; return }
+        marcarSalto()
         ensureRestore(p)
         if (!puedeRetroceder()) return
         jumpWithFade { try { exo?.seekToPreviousMediaItem() } catch (_: Exception) {} }

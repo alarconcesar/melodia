@@ -136,7 +136,7 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
     }
 
     private suspend fun runJob(track: YtTrack, high: Boolean, fromScratch: Boolean) {
-        update(track.id) { it.copy(status = DlStatus.ACTIVE) }
+        // Sin cupo sigue QUEUED ("En cola"): ACTIVE = transfiriendo de verdad.
         try {
             val audio = withContext(Dispatchers.IO) {
                 extractSlots.acquire()
@@ -184,6 +184,7 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             var velocidad = 0L
             var descargado = done
             slots.acquire()
+            update(track.id) { it.copy(status = DlStatus.ACTIVE) }
             try {
             descargado = yt.downloadToFile(audio.url, part, done) { d, tot ->
                 val ahora = System.currentTimeMillis()

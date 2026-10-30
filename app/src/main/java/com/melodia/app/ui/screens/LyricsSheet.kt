@@ -125,9 +125,15 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
                 }
             }
             is MainViewModel.LyricsUi.Plain -> {
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                // Clave por tema: si no, hereda el scroll de la letra anterior.
+                androidx.compose.runtime.key(s.id) {
+                Column(
+                    Modifier.fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
                     Text(l.text, style = Ds.Body, color = cs.onBackground, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(60.dp))
+                }
                 }
             }
             is MainViewModel.LyricsUi.None -> {

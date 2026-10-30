@@ -31,6 +31,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
@@ -169,7 +173,12 @@ fun SongArt(
 
 // ── Click con rebote: se hunde al presionar y vuelve con spring ──
 @Composable
-fun pressClick(onClick: () -> Unit, min: Float = 0.96f): Modifier {
+fun pressClick(
+    onClick: () -> Unit,
+    min: Float = 0.96f,
+    role: Role? = null,
+    label: String? = null
+): Modifier {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -180,7 +189,10 @@ fun pressClick(onClick: () -> Unit, min: Float = 0.96f): Modifier {
     )
     return Modifier
         .graphicsLayer { scaleX = scale; scaleY = scale }
-        .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+        .clickable(
+            interactionSource = interaction, indication = null,
+            role = role, onClickLabel = label, onClick = onClick
+        )
 }
 
 // ── Spinner propio: M3 CircularProgressIndicator crashea en este BOM ──
@@ -224,7 +236,7 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
                     text = action, style = Ds.Sub,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable(
-                        role = androidx.compose.ui.semantics.Role.Button, onClick = onAction
+                        role = Role.Button, onClick = onAction
                     ).padding(4.dp)
                 )
             } else {
@@ -478,7 +490,10 @@ fun HeroCard(
         shape = Ds.HeroShape, color = cs.surface,
         modifier = Modifier.fillMaxWidth()
             .graphicsLayer { scaleX = cardScale; scaleY = cardScale }
-            .clickable(interactionSource = cardPress, indication = null, onClick = onOpen)
+            .clickable(
+                interactionSource = cardPress, indication = null,
+                role = Role.Button, onClickLabel = label, onClick = onOpen
+            )
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             MicroLabel(label)
@@ -601,7 +616,14 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
                 Box(
                     modifier = Modifier.weight(1f).clip(CircleShape)
                         .background(pillBg)
-                        .clickable { onTab(idx) }
+                        .clickable(
+                            role = Role.Tab,
+                            onClick = { onTab(idx) }
+                        )
+                        .semantics {
+                            contentDescription = label
+                            selected = sel
+                        }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -648,7 +670,11 @@ fun MiniPlayerDs(
     Surface(
         shape = Ds.CardShape, color = cs.surfaceVariant.copy(alpha = 0.97f),
         tonalElevation = 0.dp, shadowElevation = 6.dp,
-        modifier = modifier.fillMaxWidth().clickable(onClick = onOpen)
+        modifier = modifier.fillMaxWidth()
+            .clickable(
+                role = Role.Button, onClickLabel = "Abrir reproductor",
+                onClick = onOpen
+            )
     ) {
         Column {
             Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
