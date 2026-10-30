@@ -53,9 +53,13 @@ class ArtworkRepository(private val context: Context) {
      * coincide ([titlesMatch]) y, con pista del canal, el artista encaja con
      * ella. Sin match seguro se devuelve null (mejor "YouTube" que inventar).
      */
+    private val artistMem = mutableMapOf<String, String?>()
     suspend fun fetchArtist(title: String, hint: String): String? = withContext(Dispatchers.IO) {
         try {
             val h = hint.trim()
+            val ck = "artist:" + normTitle(h.ifBlank { "*" }) + "|" + normTitle(title)
+            artistMem[ck]?.let { return@withContext it }
+            try { prefs.getString(ck, null)?.let { return@withContext it.ifBlank { null } } } catch (_: Exception) {}
             val q = if (h.isBlank() || h.equals("YouTube", true)) title else "$title $h"
             val url = URL(
                 "https://itunes.apple.com/search?term=${URLEncoder.encode(q, "UTF-8")}" +
@@ -116,14 +120,33 @@ class ArtworkRepository(private val context: Context) {
                     prefs.edit().putString(k, "").apply()
                     return@withContext null
                 }
-                var art = arr.getJSONObject(0).optString("artworkUrl100", "")
+                val primero = arr.getJSONObject(0)
+                // Sin validar, pegaba el arte del primer resultado aunque fuera
+                // otro tema con nombre parecido.
+                if (!titlesMatch(title, primero.optString("trackName", ""))) {
+                    mem[k] = null
+                    try { prefs.edit().putString(k, "").apply() } catch (_: Exception) {}
+                    return@withContext null
+                }
+                var art = primero.optString("artworkUrl100", "")
                 if (art.isBlank()) return@withContext null
                 art = art.replace("100x100bb", "600x600bb")
                 mem[k] = art
                 try {
+                    // Tope con expulsión (no clear nuclear: borraría saveLocal y emb:).
+                    val all = prefs.all
+                    if (all.size >= 400) {
+                        val ed = prefs.edit()
+                        // prefs no guarda fecha: se expulsan claves planas
+                        // artista|título (emb:/artist: no se tocan).
+                        var n = 0
+                        for (key in all.keys) {
+                            if (n >= 50) break
+                            if (!key.startsWith("emb:") && !key.startsWith("artist:")) { ed.remove(key); n++ }
+                        }
+                        ed.apply()
+                    }
                     prefs.edit().putString(k, art).apply()
-                    // tope aprox. de caché: si crece mucho, se limpia y reaprende
-                    if (prefs.all.size > 400) prefs.edit().clear().putString(k, art).apply()
                 } catch (_: Exception) {}
                 art
             } finally {

@@ -429,3 +429,17 @@ misma jerarquía que el reproductor.
   Handler por lifecycleScope; docstring honesto; sleep con etiqueta.
 
 140 tests verdes.
+
+## Auditoría 7.19 (novena pasada)
+
+- Artistas sin duplicados por mayúsculas; álbum usa arte válido.
+- Repair rota por lo hecho; fetch con expulsión; fetchArtist cacheado.
+- Arte validado contra el título; junk cubierto en fase 3.
+- Moov de 64 bits etiquetado bien.
+- Worker nuevo a salvo del viejo; calidad resetea barra; jobs con id;
+  huérfanos barridos; pausa suelta registro en el acto.
+- Eliminar lista con confirm; artista vacío legible; stats en horas.
+- Letra plana perezosa; play-all suena lo visible; conteo sin Guardada;
+  error acotado; reverb fuera; respaldo en API <29; swipe sin parpadeo.
+
+141 tests verdes.

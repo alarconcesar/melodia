@@ -3,7 +3,6 @@ package com.melodia.app.player
 import android.content.Context
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
-import android.media.audiofx.PresetReverb
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,7 +11,6 @@ class EqualizerManager(context: Context) {
     private val prefs = context.getSharedPreferences("melodia_eq", Context.MODE_PRIVATE)
     private var eq: Equalizer? = null
     private var bass: BassBoost? = null
-    private var reverb: PresetReverb? = null
     private var sessionId: Int = 0
 
     private val _enabled = MutableStateFlow(prefs.getBoolean("enabled", false))
@@ -46,7 +44,6 @@ class EqualizerManager(context: Context) {
                 } catch (_: Exception) {}
             }
             bass = BassBoost(0, newSession).also { it.enabled = _enabled.value; try { it.setStrength(_bass.value.coerceIn(0, 1000).toShort()) } catch (_: Exception) {} }
-            reverb = PresetReverb(0, newSession).also { it.enabled = false }
             // Solo se marca tras crear los tres efectos: si el dispositivo no
             // tiene efectos, el próximo cambio de sesión reintenta en vez de
             // dejar el EQ muerto para siempre.
@@ -150,5 +147,5 @@ class EqualizerManager(context: Context) {
         setBass(vals.getOrElse(5) { 0 })
         _preset.value = name; prefs.edit().putString("preset", name).apply()
     }
-    private fun releaseFx() { try { eq?.release() } catch (_: Exception) {}; try { bass?.release() } catch (_: Exception) {}; try { reverb?.release() } catch (_: Exception) {}; eq = null; bass = null; reverb = null }
+    private fun releaseFx() { try { eq?.release() } catch (_: Exception) {}; try { bass?.release() } catch (_: Exception) {}; eq = null; bass = null }
 }

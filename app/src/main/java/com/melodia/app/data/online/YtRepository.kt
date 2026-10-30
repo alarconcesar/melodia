@@ -904,7 +904,9 @@ class YtRepository(private val context: Context) {
                     } catch (_: Exception) {}
                 } catch (_: Exception) {}
             }
-            repairCursor = (repairCursor + vistas) % filas.size
+            // Avanza por lo resuelto en ESTA pasada (antes sumaba vistas==size
+            // y el cursor nunca rotaba: la cola sin red quedaba sin turno).
+            repairCursor = (repairCursor + escritas + redUsada) % filas.size
         } catch (_: Exception) {}
         escritas
     }

@@ -334,6 +334,7 @@ fun MelodiaScreen(vm: MainViewModel) {
     var showInfoId by rememberSaveable { mutableStateOf<Long?>(null) }
     val showInfo = all.find { it.id == showInfoId }
     var renameId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deleteListId by rememberSaveable { mutableStateOf<Long?>(null) }
     // Áreas de las barras flotantes para el blur (Haze)
     // Alto real de la barra inferior: el miniplayer se apoya justo encima (sin taparla)
 
@@ -553,7 +554,7 @@ fun MelodiaScreen(vm: MainViewModel) {
                     2 -> {
                         if (openPid == null) PlaylistsTab(playlists, allLinks, all,
                             onOpen = { vm.openPl(it) }, onCreate = { showCreate = true },
-                            onDelete = { vm.deletePlaylist(it) }, onRename = { renameId = it },
+                            onDelete = { deleteListId = it }, onRename = { renameId = it },
                             onPin = { vm.togglePinPlaylist(it) },
                             onCover = { id, album -> vm.setPlaylistCover(id, album) },
                             onPlay = { pid ->
@@ -681,6 +682,22 @@ fun MelodiaScreen(vm: MainViewModel) {
         }
     }
 
+    deleteListId?.let { pid ->
+        val nombre = playlists.find { it.id == pid }?.name ?: "esta lista"
+        AlertDialog(
+            onDismissRequest = { deleteListId = null },
+            title = { Text("Eliminar lista") },
+            text = { Text("\"$nombre\" se quitará de Melodia (los temas quedan en tu biblioteca). No se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = { deleteListId = null; vm.deletePlaylist(pid) }) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteListId = null }) { Text("Cancelar") }
+            }
+        )
+    }
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -1142,7 +1159,7 @@ fun ExploreTab(
             ArtistDetail(
                 name = aName, songs = mine, currentId = currentId, playing = playing, favs = favs,
                 onBack = { artistDetail = null },
-                onPlay = { vm.playArtist(aName) }, onShuffle = { vm.shuffleArtist(aName) },
+                onPlay = { vm.playListAt(mine, 0) }, onShuffle = { vm.shuffleList(mine) },
                 onTap = { vm.playListAt(mine, mine.indexOfFirst { s -> s.id == it }.takeIf { i -> i >= 0 } ?: 0) },
                 onFav = { vm.toggleFav(it) }, onLongPress = onAdd,
                 onQueue = { vm.queueEnd(it.id) { ok -> if (!ok && vm.currentSong.value?.id == YT_STREAM_ID) toast(ctx, "Estás en online: reproduce un tema local para encolar") else toast(ctx, if (ok) "Añadido al final de la cola" else "No se pudo añadir") } }
@@ -2279,7 +2296,7 @@ fun StatsSheet(vm: MainViewModel, onDismiss: () -> Unit) {
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         StatCard("${sum.plays}", "reproducciones", Modifier.weight(1f))
-                        StatCard("${sum.minutes}", "minutos", Modifier.weight(1f))
+                        StatCard(fmtTotal(sum.minutes * 60_000L), "tiempo", Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(12.dp))
                     if (sum.topSongs.isNotEmpty()) {

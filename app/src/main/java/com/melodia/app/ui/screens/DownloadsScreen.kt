@@ -93,7 +93,9 @@ fun DownloadsScreenContent(
     // DONE queda visible unos segundos como "Guardada": antes la tarjeta
     // desaparecía al instante y salía "Sin descargas en curso" aunque acabara
     // de terminar (hasta que refrescaba el historial).
+    // DONE queda visible 8 s como "Guardada": no cuenta como en curso.
     val activos = jobs
+    val enCurso = activos.filter { it.status != DlStatus.DONE }
     val reanudables = activos.filter { it.status == DlStatus.PAUSED || it.status == DlStatus.ERROR }
     val pausables = activos.filter { it.status == DlStatus.ACTIVE || it.status == DlStatus.QUEUED }
 
@@ -117,26 +119,28 @@ fun DownloadsScreenContent(
             }
 
             if (activos.isNotEmpty()) {
-                item {
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        MicroLabel("En curso · ${activos.size}")
-                        Spacer(Modifier.weight(1f))
-                        if (pausables.isNotEmpty()) {
-                            Text(
-                                "Pausar todo", style = Ds.Sub, color = cs.onSurfaceVariant,
-                                modifier = Modifier.clickable(onClick = onPauseAll).padding(6.dp)
-                            )
-                        }
-                        if (reanudables.isNotEmpty()) {
-                            Text(
-                                "Reanudar todo",
-                                style = Ds.Sub.copy(fontWeight = FontWeight.Medium),
-                                color = cs.primary,
-                                modifier = Modifier.clickable(onClick = onResumeAll).padding(6.dp)
-                            )
+                if (enCurso.isNotEmpty()) {
+                    item {
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MicroLabel("En curso · ${enCurso.size}")
+                            Spacer(Modifier.weight(1f))
+                            if (pausables.isNotEmpty()) {
+                                Text(
+                                    "Pausar todo", style = Ds.Sub, color = cs.onSurfaceVariant,
+                                    modifier = Modifier.clickable(onClick = onPauseAll).padding(6.dp)
+                                )
+                            }
+                            if (reanudables.isNotEmpty()) {
+                                Text(
+                                    "Reanudar todo",
+                                    style = Ds.Sub.copy(fontWeight = FontWeight.Medium),
+                                    color = cs.primary,
+                                    modifier = Modifier.clickable(onClick = onResumeAll).padding(6.dp)
+                                )
+                            }
                         }
                     }
                 }

@@ -777,7 +777,10 @@ fun YtCollectionSheet(vm: MainViewModel) {
                     p.loading -> Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
                         MelodiaSpinner(size = 24.dp, width = 2.dp)
                     }
-                    p.error != null -> Text(p.error, style = Ds.Body, color = cs.error)
+                    p.error != null -> Text(
+                        p.error, style = Ds.Body, color = cs.error,
+                        maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
                     else -> YtPreviewList(
                         tracks = p.tracks,
                         onPlay = { t -> vm.closeYtPreview(); vm.playYt(t) }

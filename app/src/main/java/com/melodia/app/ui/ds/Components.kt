@@ -412,7 +412,7 @@ fun TrackRow(
                 color = tituloColor
             )
             Text(
-                "${s.artist} · ${fmt(s.durationMs)}", maxLines = 1, overflow = TextOverflow.Ellipsis,
+                "${s.artist.ifBlank { "Desconocido" }} · ${fmt(s.durationMs)}", maxLines = 1, overflow = TextOverflow.Ellipsis,
                 style = Ds.Sub, color = cs.onSurfaceVariant
             )
         }

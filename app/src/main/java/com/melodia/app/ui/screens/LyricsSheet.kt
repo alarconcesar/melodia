@@ -126,13 +126,19 @@ fun LyricsSheet(s: Song, vm: MainViewModel, onClose: () -> Unit) {
             }
             is MainViewModel.LyricsUi.Plain -> {
                 // Clave por tema: si no, hereda el scroll de la letra anterior.
+                // LazyColumn: la Column componía cientos de versos de golpe.
                 androidx.compose.runtime.key(s.id) {
-                Column(
-                    Modifier.fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 60.dp)
                 ) {
-                    Text(l.text, style = Ds.Body, color = cs.onBackground, textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(60.dp))
+                    itemsIndexed(l.text.lines()) { i, verso ->
+                        Text(
+                            verso.ifBlank { " " }, style = Ds.Body, color = cs.onBackground,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                        )
+                    }
                 }
                 }
             }

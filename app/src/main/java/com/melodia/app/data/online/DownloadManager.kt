@@ -70,10 +70,22 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
                 }
                 syncProgress()
             }
+            // Barrido de .part huérfanos (sin entrada): el persist() trunca a
+            // 100 y la muerte a mitad dejaba restos que nadie reclamaba.
+            try {
+                val vivos = saved.map { (t, h, _, _) -> partFile(t.id, h).name }.toSet()
+                dir.listFiles()?.forEach { f ->
+                    if (f.name.endsWith(".part") && f.name !in vivos) {
+                        try { f.delete() } catch (_: Exception) {}
+                    }
+                }
+            } catch (_: Exception) {}
         }
     }
 
     fun enqueue(track: YtTrack, high: Boolean) {
+        // Sin id no hay job válido (.part compartido, key "" en la UI).
+        if (track.id.isBlank()) return
         synchronized(running) {
             // Si terminó y sigue visible como "Guardada", se retira para bajar
             // de nuevo (antes se ignoraba en silencio durante 8 s).
@@ -92,7 +104,8 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
                 if (cur.high != high && !running.containsKey(track.id) &&
                     (cur.status == DlStatus.QUEUED || cur.status == DlStatus.PAUSED || cur.status == DlStatus.ERROR)
                 ) {
-                    update(track.id) { it.copy(track = track, high = high, downloaded = 0, total = 0, error = null) }
+                    update(track.id) { it.copy(track = track, high = high, downloaded = 0, total = 0, error = null, progress = 0f, speedBps = 0L) }
+                    syncProgress()
                     // El .part lleva sufijo por calidad: el de la otra queda
                     // huérfano y el dir no tiene trim. Se borra aquí.
                     try { partFile(track.id, !high).delete() } catch (_: Exception) {}
@@ -104,10 +117,14 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
             if (running.containsKey(track.id)) return
             _jobs.value += DlJob(track, high, DlStatus.QUEUED)
             persist()
-            running[track.id] = scope.launch {
+            lateinit var nuevo: Job
+            nuevo = scope.launch {
                 try { runJob(track, high, fromScratch = false) } catch (_: Exception) {}
-                synchronized(running) { running.remove(track.id) }
+                // Solo su propio registro: el worker viejo (ventana DONE)
+                // ya no borra al nuevo al morir.
+                synchronized(running) { if (running[track.id] === nuevo) running.remove(track.id) }
             }
+            running[track.id] = nuevo
         }
     }
 
@@ -122,9 +139,8 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
                 j.copy(status = DlStatus.PAUSED) else j
         }
         persist()
-        scope.launch {
-            try { synchronized(running) { running.remove(id) }?.cancelAndJoin() } catch (_: Exception) {}
-        }
+        val w = synchronized(running) { running.remove(id) }
+        scope.launch { try { w?.cancelAndJoin() } catch (_: Exception) {} }
     }
 
     fun resume(id: String) {
@@ -133,12 +149,14 @@ class DownloadManager(private val context: Context, private val yt: YtRepository
         synchronized(running) {
             if (running.containsKey(id)) return
             update(id) { it.copy(status = DlStatus.QUEUED, error = null) }
-            running[id] = scope.launch {
+            lateinit var nuevo: Job
+            nuevo = scope.launch {
                 try {
                     runJob(j.track, j.high, fromScratch = j.status == DlStatus.ERROR && j.downloaded <= 0)
                 } catch (_: Exception) {}
-                synchronized(running) { running.remove(id) }
+                synchronized(running) { if (running[id] === nuevo) running.remove(id) }
             }
+            running[id] = nuevo
         }
     }
 

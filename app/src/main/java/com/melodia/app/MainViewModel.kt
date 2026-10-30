@@ -665,6 +665,9 @@ class MainViewModel(
         emitPlay(base, (base.indices).random())
     }
     fun playListAt(list: List<Song>, idx: Int) = emitPlay(list, idx)
+    fun shuffleList(list: List<Song>) {
+        if (list.isNotEmpty()) emitPlay(list.shuffled(), 0)
+    }
     fun playFavAt(idx: Int) = emitPlay(favSongs.value, idx)
     // ── Artista / álbum: reproducir y aleatorio propios ──
     private fun artistSongs(name: String) =
@@ -1075,7 +1078,9 @@ class MainViewModel(
                         if (n >= 50) break
                         val cur = actual[s.id] ?: continue
                         if (cur.albumId > 0 || !cur.artUrl.isNullOrBlank()) continue
-                        if (cur.artist.isBlank() || cur.artist == "Desconocido") continue
+                        if (cur.artist.isBlank() || cur.artist.equals("Desconocido", true) ||
+                            cur.artist.equals("YouTube", true) || cur.artist == "<unknown>"
+                        ) continue
                         // La caché local no necesita cortesía de red: se aplica
                         // directo y sin el delay de 250 ms (eran 12.5 s por
                         // reload aunque todo estuviera cacheado).

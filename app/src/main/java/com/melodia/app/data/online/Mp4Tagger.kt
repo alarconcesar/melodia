@@ -55,6 +55,12 @@ object Mp4Tagger {
     private fun be32(v: Int): ByteArray =
         byteArrayOf((v ushr 24).toByte(), (v ushr 16).toByte(), (v ushr 8).toByte(), v.toByte())
 
+    private fun be64(v: Long): ByteArray =
+        byteArrayOf(
+            (v ushr 56).toByte(), (v ushr 48).toByte(), (v ushr 40).toByte(), (v ushr 32).toByte(),
+            (v ushr 24).toByte(), (v ushr 16).toByte(), (v ushr 8).toByte(), v.toByte()
+        )
+
     private fun box(type: String, vararg payloads: ByteArray): ByteArray {
         val total = 8 + payloads.sumOf { it.size }
         val bb = ByteBuffer.allocate(total).order(ByteOrder.BIG_ENDIAN)
@@ -146,10 +152,13 @@ object Mp4Tagger {
         } else {
             data.copyOfRange(moovBox.contentStart, moovBox.contentEnd) + udtaBox
         }
-        val newMoovLen = moovBox.headerSize + moovContent.size
-        val newMoov = be32(newMoovLen) + "moov".toByteArray(Charsets.US_ASCII) +
-            (if (moovBox.headerSize == 16) data.copyOfRange(moovBox.start + 8, moovBox.contentStart) else byteArrayOf()) +
-            moovContent
+        val newMoovLen = (moovBox.headerSize + moovContent.size).toLong()
+        val newMoov = if (moovBox.headerSize == 16) {
+            // Cabecera extendida: size==1 + largesize de 64 bits reales.
+            be32(1) + "moov".toByteArray(Charsets.US_ASCII) + be64(newMoovLen) + moovContent
+        } else {
+            be32(newMoovLen.toInt()) + "moov".toByteArray(Charsets.US_ASCII) + moovContent
+        }
         val delta = newMoov.size - moovBox.size
 
         var out = data.copyOfRange(0, moovBox.start) + newMoov +

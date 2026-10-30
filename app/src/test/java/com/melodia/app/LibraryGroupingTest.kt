@@ -32,6 +32,18 @@ class LibraryGroupingTest {
     )
 
     @Test
+    fun artistasNoDuplicanPorMayusculas() {
+        val lista = listOf(
+            song(1, artist = "Muse"),
+            song(2, artist = "muse"),
+            song(3, artist = "Muse ")
+        )
+        val artistas = groupArtists(lista)
+        assertEquals(1, artistas.size)
+        assertEquals(3, artistas.first().count)
+    }
+
+    @Test
     fun artistasVaciosCaenEnDesconocido() {
         val lista = listOf(
             song(1, artist = ""),

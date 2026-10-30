@@ -30,12 +30,13 @@ fun groupAlbums(songs: List<Song>): List<Album> =
     }.map { (_, l) ->
             val first = l.firstOrNull()
             val artist = first?.albumArtist?.takeIf { it.isNotBlank() } ?: first?.artist ?: ""
-            Album(first?.album?.ifBlank { "Sin álbum" } ?: "Sin álbum", artist, l.size, first?.albumId ?: 0L)
+            val artId = l.firstOrNull { it.albumId > 0 }?.albumId ?: 0L
+            Album(first?.album?.ifBlank { "Sin álbum" } ?: "Sin álbum", artist, l.size, artId)
         }
         .sortedBy { it.name.lowercase() }
 fun groupArtists(songs: List<Song>): List<Artist> =
-    songs.groupBy { it.artist.ifBlank { "Desconocido" } }
-        .map { (n, l) -> Artist(n, l.size) }
+    songs.groupBy { it.artist.trim().ifBlank { "Desconocido" }.lowercase() }
+        .map { (_, l) -> Artist(l.first().artist.trim().ifBlank { "Desconocido" }, l.size) }
         .sortedBy { it.name.lowercase() }
 
 /**
