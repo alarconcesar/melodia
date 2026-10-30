@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -439,6 +440,14 @@ fun TrackRow(
                         .graphicsLayer { scaleX = heart.value; scaleY = heart.value }
                 )
             }
+        }
+        // La ficha con su botón propio: info, encolar, editar, compartir y
+        // excluir sin depender de gestos escondidos.
+        IconButton(onClick = onLongPress, modifier = Modifier.size(36.dp)) {
+            Icon(
+                Icons.Default.MoreVert, "Más opciones",
+                tint = cs.onSurfaceVariant, modifier = Modifier.size(18.dp)
+            )
         }
         }
     }
