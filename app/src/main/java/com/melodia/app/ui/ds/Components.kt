@@ -78,7 +78,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -278,7 +282,8 @@ fun TrackRow(
     val scope = rememberCoroutineScope()
     val rowCtx = LocalContext.current.applicationContext
     val safeGestures = remember { SafeMode.isOn(rowCtx, SafeMode.NO_EXTRAS) }
-    val offset = remember { Animatable(0f) }
+    var dragX by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var releaseJob by remember { androidx.compose.runtime.mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val maxSwipe = with(LocalDensity.current) { 140.dp.toPx() }
     val threshold = maxSwipe * 0.5f
     // Feedback de pulsación: la fila se hunde 1.5 % mientras el dedo está encima.
@@ -298,9 +303,9 @@ fun TrackRow(
     Box(Modifier.fillMaxWidth()) {
         // Franja de acción: solo existe mientras hay deslizamiento. Sin esto cada
         // fila visible arrastraba dos capas (Canvas + caja con alpha) al hacer scroll.
-        val swiping = !safeGestures && offset.value != 0f
+        val swiping = !safeGestures && dragX != 0f
         if (swiping) Canvas(Modifier.matchParentSize()) {
-            val v = offset.value
+            val v = dragX
             val a = (kotlin.math.abs(v) / maxSwipe).coerceIn(0f, 1f) * 0.18f
             if (v > 0f) {
                 drawRect(
@@ -316,8 +321,8 @@ fun TrackRow(
             }
         }
         if (swiping) Box(Modifier.matchParentSize()) {
-            val leftA = (offset.value / maxSwipe).coerceIn(0f, 1f)
-            val rightA = (-offset.value / maxSwipe).coerceIn(0f, 1f)
+            val leftA = (dragX / maxSwipe).coerceIn(0f, 1f)
+            val rightA = (-dragX / maxSwipe).coerceIn(0f, 1f)
             if (onQueue != null) Icon(
                 Icons.Default.PlaylistAdd, null,
                 tint = cs.primary, modifier = Modifier.align(Alignment.CenterStart)
@@ -334,7 +339,7 @@ fun TrackRow(
         Row(
             modifier = Modifier.fillMaxWidth()
                 .graphicsLayer { scaleX = rowScale; scaleY = rowScale }
-                .offset { IntOffset(offset.value.roundToInt(), 0) }
+                .offset { IntOffset(dragX.roundToInt(), 0) }
                 .then(
                     if (safeGestures || selecting) Modifier else Modifier.pointerInput(Unit) {
                         // Dirección bloqueada al primer movimiento: si el gesto es
@@ -361,18 +366,25 @@ fun TrackRow(
                                 }
                                 if (locked == 1) {
                                     ch.consume()
-                                    val v = dx.coerceIn(-maxSwipe, maxSwipe)
-                                    // awaitEachGesture es scope restringido (no deja
-                                    // llamar a snapTo directo): un launch por evento
-                                    // es barato frente al costo del propio frame.
-                                    scope.launch { offset.snapTo(v) }
+                                    // Directo al estado, sin corrutina por evento:
+                                    // N snapTo en vuelo se pisaban y parpadeaba.
+                                    try { releaseJob?.cancel() } catch (_: Exception) {}
+                                    releaseJob = null
+                                    dragX = dx.coerceIn(-maxSwipe, maxSwipe)
                                 }
                             }
                             if (locked == 1) {
-                                val v = offset.value
+                                val v = dragX
                                 if (v >= threshold && onQueue != null) onQueue()
                                 else if (v <= -threshold) onFav()
-                                scope.launch { offset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
+                                // Un solo regreso: si un evento viejo llega tarde,
+                                // ya no hay snapTo que lo traiga de vuelta.
+                                releaseJob = scope.launch {
+                                    val a = Animatable(v)
+                                    try {
+                                        a.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) { dragX = value }
+                                    } catch (_: Exception) {}
+                                }
                             }
                         }
                     }

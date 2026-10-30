@@ -873,6 +873,23 @@ class MainViewModel(
         viewModelScope.launch {
             try {
                 val json = withContext(Dispatchers.IO) { lists.exportJson(songs.value) }
+                // API <29: sin MediaStore.Downloads, archivo directo en Descargas.
+                if (android.os.Build.VERSION.SDK_INT < 29) {
+                    val ok = withContext(Dispatchers.IO) {
+                        try {
+                            val dir = java.io.File(
+                                android.os.Environment.getExternalStoragePublicDirectory(
+                                    android.os.Environment.DIRECTORY_DOWNLOADS
+                                ), "Melodia"
+                            )
+                            dir.mkdirs()
+                            java.io.File(dir, "melodia-respaldo.json").writeText(json)
+                            true
+                        } catch (_: Exception) { false }
+                    }
+                    fin(if (ok) "Respaldo guardado en Descargas/Melodia" else "No se pudo crear el respaldo")
+                    return@launch
+                }
                 val values = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.Downloads.DISPLAY_NAME, "melodia-respaldo.json")
                     put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
