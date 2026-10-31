@@ -435,7 +435,11 @@ private fun SettingsRow(
     val cs = MaterialTheme.colorScheme
     Row(
         Modifier.fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null) Modifier.then(
+                    com.melodia.app.ui.ds.pressClick(onClick, min = 0.985f)
+                ) else Modifier
+            )
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

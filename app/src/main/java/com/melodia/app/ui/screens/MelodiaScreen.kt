@@ -183,6 +183,7 @@ import com.melodia.app.data.model.Song
 import com.melodia.app.ui.ds.DsBackground
 import com.melodia.app.ui.ds.EmptyState
 import com.melodia.app.ui.ds.EqBars
+import com.melodia.app.ui.ds.enterFromRight
 import com.melodia.app.ui.ds.HeroCard
 import com.melodia.app.ui.ds.HomeSkeleton
 import com.melodia.app.ui.ds.MelodiaPillNav
@@ -1408,7 +1409,10 @@ private fun ArtistDetail(
 ) {
     val cs = MaterialTheme.colorScheme
     val artId = remember(songs) { songs.firstOrNull { it.albumId > 0 }?.albumId ?: 0L }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 200.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize().enterFromRight(),
+        contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 200.dp)
+    ) {
         item {
             CollectionHeader(
                 title = name,
@@ -1442,7 +1446,10 @@ private fun AlbumDetail(
     val cs = MaterialTheme.colorScheme
     val artId = album?.artId ?: songs.firstOrNull { it.albumId > 0 }?.albumId ?: 0L
     val artist = album?.artist?.ifBlank { songs.firstOrNull()?.artist ?: "" } ?: ""
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 200.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize().enterFromRight(),
+        contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 200.dp)
+    ) {
         item {
             CollectionHeader(
                 title = name,
@@ -1815,6 +1822,7 @@ private fun SeekBar(progress: Float, onSeek: (Float) -> Unit, modifier: Modifier
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PlaylistDetail(
     name: String,
@@ -1823,7 +1831,10 @@ fun PlaylistDetail(
     onMove: (Long, Boolean) -> Unit, onRemove: (Long) -> Unit
 ) {
     val cs = MaterialTheme.colorScheme
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp, 6.dp, 20.dp, 200.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize().enterFromRight(),
+        contentPadding = PaddingValues(20.dp, 6.dp, 20.dp, 200.dp)
+    ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = cs.onBackground) }
@@ -1850,7 +1861,13 @@ fun PlaylistDetail(
         }
         itemsIndexed(songs, key = { _, e -> "pl-${e.playlistId}-${e.songId}" }) { idx, e ->
             var menu by remember { mutableStateOf(false) }
-            Row(Modifier.fillMaxWidth().clickable { onPlay(e.songId) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .animateItemPlacement()
+                    .then(pressClick({ onPlay(e.songId) }, min = 0.985f))
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text("${idx + 1}", style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.width(28.dp))
                 Column(Modifier.weight(1f)) {
                     Text(e.title.ifBlank { "Tema" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = Ds.Body, color = cs.onBackground)
@@ -2372,7 +2389,7 @@ fun StatsSheet(vm: MainViewModel, onDismiss: () -> Unit) {
                     )
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        StatCard("${sum.plays}", "reproducciones", Modifier.weight(1f))
+                        StatCard("${sum.plays}", "reproducciones", Modifier.weight(1f), animar = true)
                         StatCard(fmtTotal(sum.minutes * 60_000L), "tiempo", Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(12.dp))
@@ -2459,14 +2476,49 @@ private fun SearchMatchRow(
 }
 
 @Composable
-private fun StatCard(value: String, label: String, modifier: Modifier = Modifier) {
+private fun StatCard(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    animar: Boolean = false
+) {
     val cs = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(14.dp), color = cs.surface, modifier = modifier) {
+    // Entrada con fade + subida corta (cada tarjeta se siente viva).
+    val a = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) {
+        a.animateTo(1f, tween(300, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+    }
+    Surface(
+        shape = RoundedCornerShape(14.dp), color = cs.surface,
+        modifier = modifier.graphicsLayer {
+            alpha = a.value
+            translationY = (1f - a.value) * 12.dp.toPx()
+        }
+    ) {
         Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, style = Ds.Display, color = cs.primary)
+            Text(
+                if (animar) contadorAnimado(value) else value,
+                style = Ds.Display, color = cs.primary, maxLines = 1
+            )
             Text(label, style = Ds.Sub, color = cs.onSurfaceVariant)
         }
     }
+}
+
+/**
+ * Cuenta ascendente del número visible: 0 → valor en ~600 ms.
+ * Si el texto no es numérico (p. ej. "25 h 10 min"), se devuelve tal cual.
+ */
+@Composable
+private fun contadorAnimado(texto: String): String {
+    val destino = texto.filter { it.isDigit() }.toIntOrNull() ?: return texto
+    val p = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(destino) {
+        p.animateTo(1f, tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+    }
+    if (destino <= 0) return texto
+    val n = (destino * p.value).toInt()
+    return if (texto.all { it.isDigit() }) "$n" else texto.replace(destino.toString(), "$n")
 }
 
 // ── Fundido entre canciones ────────────────────────────────────────
@@ -2614,6 +2666,7 @@ fun QueueSheet(vm: MainViewModel, onDismiss: () -> Unit) {
  * Contenido de la cola, sin ViewModel ni ventana: se puede componer en la JVM
  * con datos falsos y verificar botones y textos sin tocar Room ni el servicio.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun QueueSheetContent(
     queue: List<Song>,
@@ -2751,6 +2804,7 @@ fun QueueSheetContent(
                 ) {
                     itemsIndexed(siguientes, key = { i, e -> "${desde + i}-${e.id}" }) { i, e ->
                         val idx = desde + i
+                        Box(Modifier.animateItemPlacement()) {
                         QueueRow(
                             index = idx, song = e,
                             isCurrent = false,
@@ -2762,6 +2816,7 @@ fun QueueSheetContent(
                             onDown = { onMove(idx, idx + 1) },
                             onRemove = { onRemove(idx) }
                         )
+                        }
                     }
                     if (siguientes.isEmpty()) item {
                         Text(
@@ -3013,10 +3068,17 @@ fun TrackInfoSheet(
             usePlatformDefaultWidth = false, decorFitsSystemWindows = false
         )
     ) {
+        // Entrada animada: la hoja sube y el scrim aparece (no de golpe).
+        val entra = remember { androidx.compose.animation.core.Animatable(0f) }
+        LaunchedEffect(Unit) {
+            entra.animateTo(1f, androidx.compose.animation.core.spring(
+                dampingRatio = 0.85f, stiffness = 380f
+            ))
+        }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
             // Scrim: toque fuera = cerrar.
             Box(
-                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f))
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f * entra.value))
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -3025,7 +3087,9 @@ fun TrackInfoSheet(
             Surface(
                 shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
                 color = cs.surface,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().graphicsLayer {
+                    translationY = (1f - entra.value) * 120.dp.toPx()
+                }
             ) {
                 Column(
                     Modifier.fillMaxWidth()

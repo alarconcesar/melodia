@@ -478,3 +478,17 @@ misma jerarquía que el reproductor.
 - Fila marcada: fondo acento al 10 % (tween 180), check con spring desde
   0.6 + halo, crossfade 160 en la ranura derecha (check ⇄ corazón).
 - Haptics al marcar (LongPress como "tic").
+
+## Movimiento global 7.25
+
+- Esqueleto de carga: barrido de brillo diagonal leído en drawBehind
+  (0 recomposiciones por frame).
+- `Modifier.enterFromRight()`: detalles (artista, álbum, playlist) entran
+  con fade + 48 dp desde la derecha en 260 ms.
+- Cola, playlist y tarjetas de descarga usan `animateItemPlacement()`
+  (se deslizan al reordenar / aparecer / desaparecer).
+- Estadísticas: tarjetas con fade+12 dp y contador ascendente (650 ms).
+- EmptyState: fade+10 dp al aparecer y el icono "respira" (2.8 s).
+- Hoja de info: entra con spring 0.85/380 y el scrim aparece con ella.
+- Feedback de pulsación (0.985) en filas de Ajustes, resultados online y
+  playlist.

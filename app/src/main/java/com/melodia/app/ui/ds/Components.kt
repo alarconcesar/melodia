@@ -87,6 +87,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -507,13 +508,47 @@ private fun MiniProgress(progress: Float) {
 @Composable
 fun SkeletonBlock(modifier: Modifier = Modifier, shape: Shape = RoundedCornerShape(8.dp)) {
     val cs = MaterialTheme.colorScheme
+    val base = cs.onSurfaceVariant.copy(alpha = 0.10f)
+    val brillo = cs.onSurfaceVariant.copy(alpha = 0.26f)
     val t = rememberInfiniteTransition(label = "sk")
-    val a by t.animateFloat(
-        initialValue = 0.10f, targetValue = 0.22f,
-        animationSpec = infiniteRepeatable(tween(950, easing = LinearEasing), RepeatMode.Reverse),
+    // Barrido de brillo diagonal. Se lee en la fase de dibujo: cero
+    // recomposiciones por frame (solo redibuja lo que ya está en pantalla).
+    val avance by t.animateFloat(
+        initialValue = -0.4f, targetValue = 1.4f,
+        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing)),
         label = "ska"
     )
-    Box(modifier.clip(shape).background(cs.onSurfaceVariant.copy(alpha = a)))
+    Box(
+        modifier.clip(shape).background(base).drawBehind {
+            val w = size.width.coerceAtLeast(1f)
+            val h = size.height.coerceAtLeast(1f)
+            val ancho = h * 1.1f + w * 0.18f
+            val x = avance * (w + ancho) - ancho
+            drawRect(
+                brush = Brush.linearGradient(
+                    colors = listOf(Color.Transparent, brillo, Color.Transparent),
+                    start = androidx.compose.ui.geometry.Offset(x, 0f),
+                    end = androidx.compose.ui.geometry.Offset(x + ancho, h)
+                )
+            )
+        }
+    )
+}
+
+/**
+ * Entrada de pantallas de detalle: fade + deslizamiento corto desde la
+ * derecha. Se aplica al contenedor ya compuesto (una sola animación).
+ */
+@Composable
+fun Modifier.enterFromRight(distance: androidx.compose.ui.unit.Dp = 48.dp): Modifier {
+    val a = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        a.animateTo(1f, tween(260, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+    }
+    return this.graphicsLayer {
+        alpha = a.value
+        translationX = (1f - a.value) * distance.toPx()
+    }
 }
 
 /** Silueta de Inicio: evita el parpadeo de "biblioteca vacía" al abrir la app. */
@@ -612,12 +647,28 @@ fun EmptyState(
     modifier: Modifier = Modifier
 ) {
     val cs = MaterialTheme.colorScheme
+    // Entrada: fade + subida corta; el icono respira muy lento (2.8 s).
+    val entrada = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entrada.animateTo(1f, tween(320, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+    }
+    val resp = rememberInfiniteTransition(label = "empty")
+    val respiro by resp.animateFloat(
+        initialValue = 0.94f, targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(tween(2800, easing = androidx.compose.animation.core.FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "resp"
+    )
     Column(
-        modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
+        modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp)
+            .graphicsLayer {
+                alpha = entrada.value
+                translationY = (1f - entrada.value) * 10.dp.toPx()
+            },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            Modifier.size(56.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.10f)),
+            Modifier.size(56.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.10f))
+                .graphicsLayer { scaleX = respiro; scaleY = respiro },
             contentAlignment = Alignment.Center
         ) { Icon(icon, null, Modifier.size(26.dp), tint = cs.primary) }
         Spacer(Modifier.height(14.dp))

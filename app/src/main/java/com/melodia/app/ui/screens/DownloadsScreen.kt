@@ -76,6 +76,7 @@ fun DownloadsScreen(vm: MainViewModel, onClose: () -> Unit, onPlayRecord: (YtRep
 }
 
 /** Contenido puro (testeable sin ViewModel). */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DownloadsScreenContent(
     jobs: List<DlJob>,
@@ -145,12 +146,15 @@ fun DownloadsScreenContent(
                     }
                 }
                 items(activos, key = { it.track.id }) { j ->
-                    DlJobCard(
-                        job = j,
-                        onPause = { onPause(j.track.id) },
-                        onResume = { onResume(j.track.id) },
-                        onCancel = { onCancel(j.track.id) }
-                    )
+                    // Las tarjetas se deslizan al entrar/salir en vez de saltar.
+                    Box(Modifier.animateItemPlacement()) {
+                        DlJobCard(
+                            job = j,
+                            onPause = { onPause(j.track.id) },
+                            onResume = { onResume(j.track.id) },
+                            onCancel = { onCancel(j.track.id) }
+                        )
+                    }
                 }
             } else {
                 item {

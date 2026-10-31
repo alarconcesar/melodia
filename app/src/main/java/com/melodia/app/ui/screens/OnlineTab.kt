@@ -476,7 +476,11 @@ fun YtRowFlat(
     modifier: Modifier = Modifier
 ) {
     val cs = MaterialTheme.colorScheme
-    Column(modifier.fillMaxWidth().clickable(onClick = onPlay).padding(vertical = 5.dp)) {
+    Column(
+        modifier.fillMaxWidth()
+            .then(com.melodia.app.ui.ds.pressClick(onPlay, min = 0.985f))
+            .padding(vertical = 5.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             OnlineThumb(track, 48.dp)
             Spacer(Modifier.width(12.dp))
