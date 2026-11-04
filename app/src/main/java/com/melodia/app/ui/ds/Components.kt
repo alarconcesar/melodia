@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -123,10 +124,18 @@ data class SelectionState(
     val selecting: Boolean = false,
     val selected: Set<Long> = emptySet(),
     val toggle: (Long) -> Unit = {},
-    val start: (Long?) -> Unit = {}
+    val start: (Long?) -> Unit = {},
+    val reportScope: (List<Long>) -> Unit = {}
 )
 
 val LocalSelection = androidx.compose.runtime.staticCompositionLocalOf { SelectionState() }
+
+/** Registra los IDs de la colección visible; no borra búsqueda ni cambia el contenido. */
+@Composable
+fun SelectionScope(ids: List<Long>) {
+    val selection = LocalSelection.current
+    LaunchedEffect(ids) { selection.reportScope(ids) }
+}
 
 // ── Carátula real del álbum (MediaStore) con fallback a icono ─────
 // El icono va DETRÁS: si la imagen carga lo tapa; si no hay arte, se ve el icono.
@@ -187,9 +196,10 @@ fun pressClick(
     label: String? = null
 ): Modifier {
     // Modo seguro (NO_EFFECTS): sin animación de escala, solo el click.
-    val safe = com.melodia.app.SafeMode.isOn(
-        androidx.compose.ui.platform.LocalContext.current, com.melodia.app.SafeMode.NO_EFFECTS
-    )
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val safe = remember(context) {
+        com.melodia.app.SafeMode.isOn(context, com.melodia.app.SafeMode.NO_EFFECTS)
+    }
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     if (safe) {
@@ -249,13 +259,14 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
         Text(text = title, style = Ds.Title, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.weight(1f))
         if (action != null) {
             if (onAction != null) {
-                Text(
-                    text = action, style = Ds.Sub,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable(
-                        role = Role.Button, onClick = onAction
-                    ).padding(4.dp)
-                )
+                Box(
+                    Modifier.heightIn(min = 48.dp).clickable(
+                        role = Role.Button, onClickLabel = action, onClick = onAction
+                    ).padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = action, style = Ds.Sub, color = MaterialTheme.colorScheme.primary)
+                }
             } else {
                 Text(text = action, style = Ds.Sub, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -411,9 +422,15 @@ fun TrackRow(
                         }
                     }
                 )
+                .semantics { this.selected = selected }
                 .combinedClickable(
                     interactionSource = pressSource,
                     indication = null,
+                    role = Role.Button,
+                    onClickLabel = if (selecting) {
+                        if (selected) "Deseleccionar ${s.title}" else "Seleccionar ${s.title}"
+                    } else "Reproducir ${s.title}",
+                    onLongClickLabel = if (selecting) "Abrir opciones de ${s.title}" else "Seleccionar varios",
                     onClick = { if (selecting) onSelectToggle() else onTap() },
                     onLongClick = { if (selecting) onLongPress() else selection.start(s.id) }
                 )
@@ -468,7 +485,8 @@ fun TrackRow(
                         )
                     }
                     1 -> Box(
-                        Modifier.fillMaxSize().clip(CircleShape).clickable(onClick = onFav),
+                        Modifier.fillMaxSize().clip(CircleShape)
+                            .clickable(role = Role.Button, onClickLabel = "Quitar de favoritos", onClick = onFav),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -647,17 +665,9 @@ fun EmptyState(
     modifier: Modifier = Modifier
 ) {
     val cs = MaterialTheme.colorScheme
-    // Entrada: fade + subida corta; el icono respira muy lento (2.8 s).
+    // El vacío tiene una entrada breve, no una animación infinita ornamental.
     val entrada = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        entrada.animateTo(1f, tween(320, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
-    }
-    val resp = rememberInfiniteTransition(label = "empty")
-    val respiro by resp.animateFloat(
-        initialValue = 0.94f, targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(tween(2800, easing = androidx.compose.animation.core.FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "resp"
-    )
+    LaunchedEffect(Unit) { entrada.animateTo(1f, tween(180)) }
     Column(
         modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp)
             .graphicsLayer {
@@ -667,8 +677,7 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            Modifier.size(56.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.10f))
-                .graphicsLayer { scaleX = respiro; scaleY = respiro },
+            Modifier.size(56.dp).clip(CircleShape).background(cs.primary.copy(alpha = 0.10f)),
             contentAlignment = Alignment.Center
         ) { Icon(icon, null, Modifier.size(26.dp), tint = cs.primary) }
         Spacer(Modifier.height(14.dp))
@@ -692,17 +701,17 @@ fun EmptyState(
 // ── Barras de ecualizador animadas ───────────────────────────────
 @Composable
 fun EqBars(color: Color, modifier: Modifier = Modifier) {
-    val t = rememberInfiniteTransition(label = "eq")
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
-        repeat(3) { i ->
-            val f by t.animateFloat(
-                initialValue = 0.25f, targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(380 + i * 140), RepeatMode.Reverse),
-                label = "bar$i"
-            )
-            Box(
-                Modifier.width(3.dp).height((7 + 13 * f).dp).clip(CircleShape).background(color)
-            )
+    val transition = rememberInfiniteTransition(label = "eq")
+    val levels = List(3) { i ->
+        transition.animateFloat(0.25f, 1f,
+            infiniteRepeatable(tween(380 + i * 140), RepeatMode.Reverse), label = "eq-$i")
+    }
+    Canvas(modifier.size(18.dp, 22.dp)) {
+        val bar = 3.dp.toPx()
+        levels.forEachIndexed { i, level ->
+            val height = size.height * level.value
+            drawRoundRect(color, topLeft = androidx.compose.ui.geometry.Offset(i * 6.dp.toPx(), (size.height-height)/2),
+                size = androidx.compose.ui.geometry.Size(bar, height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(bar/2))
         }
     }
 }
@@ -715,12 +724,12 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
         Triple("Inicio", Icons.Default.Home, 0),
         Triple("Explorar", Icons.Default.Search, 1),
         Triple("Listas", Icons.Default.PlaylistPlay, 2),
-        Triple("Favs", Icons.Default.Favorite, 3),
+        Triple("Favoritos", Icons.Default.Favorite, 3),
         Triple("Online", Icons.Default.Download, 4)
     )
     Surface(
         shape = CircleShape, color = cs.surface.copy(alpha = 0.95f),
-        tonalElevation = 0.dp, shadowElevation = 6.dp,
+        tonalElevation = 0.dp, shadowElevation = 0.dp,
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
@@ -763,7 +772,8 @@ fun MelodiaPillNav(tab: Int, onTab: (Int) -> Unit, modifier: Modifier = Modifier
                         Spacer(Modifier.height(3.dp))
                         Text(
                             label,
-                            style = if (sel) Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium) else Ds.Sub,
+                            style = Ds.Sub.copy(fontSize = 11.sp, fontWeight = if (sel) androidx.compose.ui.text.font.FontWeight.Medium else androidx.compose.ui.text.font.FontWeight.Normal),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                             color = if (sel) cs.primary else cs.onSurfaceVariant
                         )
                     }
@@ -791,7 +801,7 @@ fun MiniPlayerDs(
     val cs = MaterialTheme.colorScheme
     Surface(
         shape = Ds.CardShape, color = cs.surfaceVariant.copy(alpha = 0.97f),
-        tonalElevation = 0.dp, shadowElevation = 6.dp,
+        tonalElevation = 0.dp, shadowElevation = 0.dp,
         modifier = modifier.fillMaxWidth()
             .clickable(
                 role = Role.Button, onClickLabel = "Abrir reproductor",

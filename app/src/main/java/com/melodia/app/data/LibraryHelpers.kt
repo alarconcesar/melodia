@@ -26,7 +26,7 @@ fun groupAlbums(songs: List<Song>): List<Album> =
     songs.groupBy {
         val n = it.album.ifBlank { "Sin álbum" }
         val a = it.albumArtist.takeIf { a -> a.isNotBlank() } ?: it.artist.ifBlank { "Desconocido" }
-        n.lowercase() + "|" + a.lowercase()
+        n.trim().lowercase() to a.trim().lowercase()
     }.map { (_, l) ->
             val first = l.firstOrNull()
             val artist = first?.albumArtist?.takeIf { it.isNotBlank() } ?: first?.artist ?: ""
@@ -34,6 +34,19 @@ fun groupAlbums(songs: List<Song>): List<Album> =
             Album(first?.album?.ifBlank { "Sin álbum" } ?: "Sin álbum", artist, l.size, artId)
         }
         .sortedBy { it.name.lowercase() }
+/** Una tarjeta de álbum mantiene nombre y artista al abrirse y reproducirse. */
+data class AlbumIdentity(val name: String, val artist: String? = null)
+
+fun songsForAlbum(songs: List<Song>, identity: AlbumIdentity): List<Song> = songs.filter { song ->
+    song.album.trim().ifBlank { "Sin álbum" }.equals(identity.name.trim(), ignoreCase = true) &&
+        (identity.artist == null || (song.albumArtist.takeIf { it.isNotBlank() }
+            ?: song.artist.ifBlank { "Desconocido" }).trim().equals(identity.artist.trim(), ignoreCase = true))
+}.sortedWith(AlbumTrackOrder)
+
+fun songsForArtist(songs: List<Song>, name: String): List<Song> = songs.filter {
+    it.artist.trim().ifBlank { "Desconocido" }.equals(name.trim(), ignoreCase = true)
+}
+
 fun groupArtists(songs: List<Song>): List<Artist> =
     songs.groupBy { it.artist.trim().ifBlank { "Desconocido" }.lowercase() }
         .map { (_, l) -> Artist(l.first().artist.trim().ifBlank { "Desconocido" }, l.size) }

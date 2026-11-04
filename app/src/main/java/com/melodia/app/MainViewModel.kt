@@ -56,18 +56,19 @@ class MainViewModel(
     // selection filters
     private val _folder = MutableStateFlow<String?>(null)
     val folder: StateFlow<String?> = _folder
-    private val _album = MutableStateFlow<String?>(null)
-    val album: StateFlow<String?> = _album
+    private val _album = MutableStateFlow<AlbumIdentity?>(null)
+    val album: StateFlow<String?> = _album.map { it?.name }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val _artist = MutableStateFlow<String?>(null)
     val artistF: StateFlow<String?> = _artist
 
     val filtered: StateFlow<List<Song>> = combine(_songs, _query, _sort, _folder, _album, _artist) { args ->
         @Suppress("UNCHECKED_CAST") val list = args[0] as List<Song>; val q = args[1] as String
-        val s = args[2] as SortMode; val f = args[3] as String?; val al = args[4] as String?; val ar = args[5] as String?
+        val s = args[2] as SortMode; val f = args[3] as String?; val al = args[4] as AlbumIdentity?; val ar = args[5] as String?
         var out = list
         if (f != null) out = out.filter { try { java.io.File(it.dataPath).parent == f } catch (_: Exception) { false } }
-        if (al != null) out = out.filter { (it.album.ifBlank { "Sin álbum" }) == al }
-        if (ar != null) out = out.filter { (it.artist.ifBlank { "Desconocido" }) == ar }
+        if (al != null) out = songsForAlbum(out, al)
+        if (ar != null) out = songsForArtist(out, ar)
         if (q.isNotBlank()) out = out.filter { it.title.contains(q, true) || it.artist.contains(q, true) || it.album.contains(q, true) }
         when {
             // Viendo un álbum: manda el orden del disco, no el alfabético
@@ -561,7 +562,7 @@ class MainViewModel(
     }
     fun setSort(s: SortMode) { _sort.value = s }
     fun setFolder(p: String?) { _folder.value = p; _album.value = null; _artistF2(null) }
-    fun setAlbum(a: String?) { _album.value = a; _folder.value = null; _artistF2(null) }
+    fun setAlbum(a: String?, artist: String? = null) { _album.value = a?.let { AlbumIdentity(it, artist) }; _folder.value = null; _artistF2(null) }
     fun setArtist(a: String?) { _artistF2(a); _folder.value = null; _album.value = null }
     private fun _artistF2(a: String?) { _artist.value = a }
     fun clearFilters() { _folder.value = null; _album.value = null; _artist.value = null }
@@ -765,10 +766,16 @@ class MainViewModel(
     private val _selected = MutableStateFlow<Set<Long>>(emptySet())
     val selected: StateFlow<Set<Long>> = _selected
 
+    private var visibleSelectionIds: List<Long> = emptyList()
+    private val _selectionScope = MutableStateFlow<List<Long>>(emptyList())
+    val selectionScope: StateFlow<List<Long>> = _selectionScope
+
+    fun setVisibleSelectionScope(ids: List<Long>) { visibleSelectionIds = ids }
+
     fun startSelection(id: Long? = null) {
-        // El buscador se oculta en selección pero el filtro seguía vivo: "Todo"
-        // marcaba solo lo filtrado sin avisar. Se limpia al entrar.
-        if (_query.value.isNotBlank()) _query.value = ""
+        // Se conserva la consulta y se congela la colección REAL que inició la
+        // selección. Limpiarla aquí ampliaba «Todo» a canciones no mostradas.
+        if (!_selecting.value) _selectionScope.value = visibleSelectionIds.toList()
         _selecting.value = true
         if (id != null && id != YT_STREAM_ID) _selected.value = _selected.value + id
     }
@@ -786,6 +793,7 @@ class MainViewModel(
     fun clearSelection() {
         _selecting.value = false
         _selected.value = emptySet()
+        _selectionScope.value = emptyList()
     }
 
     /** Quita las marcas pero sigue en modo selección (botón "Nada"). */
@@ -1510,7 +1518,7 @@ class MainViewModel(
                 }
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
-                _ytMsg.value = errMsg(t, "No se pudo leer la playlist")
+                _ytMsg.value = errMsg(t, "No se pudo leer la lista")
             } finally {
                 _loadingCol.value = null
             }
@@ -1549,7 +1557,7 @@ class MainViewModel(
     fun importYtPlaylist(url: String) {
         val clean = url.trim()
         if (!clean.contains("list=", true)) {
-            _ytImport.value = "Pega un link de playlist (lleva “list=” en la URL)"
+            _ytImport.value = "Pega el enlace de una lista (debe incluir “list=” en la URL)"
             return
         }
         if (_ytImport.value == "…") return
@@ -1560,7 +1568,7 @@ class MainViewModel(
                 val (title, tracks, recortada) = withContext(Dispatchers.IO) { yt.playlistTracks(clean) }
                 if (igen != importGen) return@launch
                 if (tracks.isEmpty()) {
-                    _ytImport.value = "La playlist no trae temas visibles"
+                    _ytImport.value = "La lista no trae temas visibles"
                     return@launch
                 }
                 if (pideConfirmacion(tracks.size)) {
@@ -1572,7 +1580,7 @@ class MainViewModel(
                 _ytImport.value = "OK|${tracks.size}|$title" + if (recortada) "|CORTADA" else ""
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
-                _ytImport.value = errMsg(t, "No se pudo leer la playlist")
+                _ytImport.value = errMsg(t, "No se pudo leer la lista")
             }
         }
     }

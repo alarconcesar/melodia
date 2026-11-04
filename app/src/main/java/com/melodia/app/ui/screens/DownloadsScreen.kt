@@ -1,16 +1,18 @@
 package com.melodia.app.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,7 +43,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.melodia.app.MainViewModel
@@ -76,7 +82,7 @@ fun DownloadsScreen(vm: MainViewModel, onClose: () -> Unit, onPlayRecord: (YtRep
 }
 
 /** Contenido puro (testeable sin ViewModel). */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun DownloadsScreenContent(
     jobs: List<DlJob>,
@@ -91,9 +97,6 @@ fun DownloadsScreenContent(
     onPlayRecord: (YtRepository.DlRecord) -> Unit = {}
 ) {
     val cs = MaterialTheme.colorScheme
-    // DONE queda visible unos segundos como "Guardada": antes la tarjeta
-    // desaparecía al instante y salía "Sin descargas en curso" aunque acabara
-    // de terminar (hasta que refrescaba el historial).
     // DONE queda visible 8 s como "Guardada": no cuenta como en curso.
     val activos = jobs
     val enCurso = activos.filter { it.status != DlStatus.DONE }
@@ -111,36 +114,35 @@ fun DownloadsScreenContent(
                     Modifier.fillMaxWidth().padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
+                    IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.ArrowBack, "Atrás", tint = cs.onBackground)
                     }
                     Spacer(Modifier.width(6.dp))
-                    Text("Descargas", style = Ds.Display, color = cs.onBackground, modifier = Modifier.weight(1f))
+                    Text("Descargas", style = Ds.Title, color = cs.onBackground,
+                        modifier = Modifier.weight(1f).semantics { heading() })
                 }
             }
 
             if (activos.isNotEmpty()) {
                 if (enCurso.isNotEmpty()) {
                     item {
-                        Row(
-                            Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             MicroLabel("En curso · ${enCurso.size}")
-                            Spacer(Modifier.weight(1f))
-                            if (pausables.isNotEmpty()) {
-                                Text(
-                                    "Pausar todo", style = Ds.Sub, color = cs.onSurfaceVariant,
-                                    modifier = Modifier.clickable(onClick = onPauseAll).padding(6.dp)
-                                )
-                            }
-                            if (reanudables.isNotEmpty()) {
-                                Text(
-                                    "Reanudar todo",
-                                    style = Ds.Sub.copy(fontWeight = FontWeight.Medium),
-                                    color = cs.primary,
-                                    modifier = Modifier.clickable(onClick = onResumeAll).padding(6.dp)
-                                )
+                            // Las acciones se envuelven sin reducir el contador ni el texto.
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (pausables.isNotEmpty()) {
+                                    TextButton(onClick = onPauseAll, modifier = Modifier.heightIn(min = 48.dp)) {
+                                        Text("Pausar todo", style = Ds.Sub, color = cs.onSurface)
+                                    }
+                                }
+                                if (reanudables.isNotEmpty()) {
+                                    TextButton(onClick = onResumeAll, modifier = Modifier.heightIn(min = 48.dp)) {
+                                        Text("Reanudar todo", style = Ds.Sub, color = cs.primary)
+                                    }
+                                }
                             }
                         }
                     }
@@ -173,21 +175,21 @@ fun DownloadsScreenContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Historial", style = Ds.Title, color = cs.onBackground, modifier = Modifier.weight(1f))
-                        IconButton(onClick = onClearHistory, modifier = Modifier.size(32.dp)) {
+                        IconButton(onClick = onClearHistory, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Default.Delete, "Borrar historial", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
                         }
                     }
                 }
                 itemsIndexed(history, key = { i, r -> "hist-$i-${r.at}-${r.title}" }) { _, r ->
                     Column(
-                        Modifier.fillMaxWidth().padding(vertical = 6.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { onPlayRecord(r) })
-                            .padding(horizontal = 4.dp)
+                        Modifier.fillMaxWidth().clip(Ds.RowShape)
+                            .clickable(role = Role.Button, onClickLabel = "Reproducir ${r.title}",
+                                onClick = { onPlayRecord(r) })
+                            .heightIn(min = 56.dp).padding(vertical = 10.dp)
                     ) {
                         Text(
                             r.title, style = Ds.Body, color = cs.onBackground,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                            maxLines = 2, overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             "${r.artist.ifBlank { "YouTube" }} · ${if (r.high) "Alta" else "Estándar"} · " +
@@ -213,39 +215,42 @@ private fun DlJobCard(
     val st = job.status
     Surface(
         shape = Ds.CardShape, color = cs.surface,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            // El título conserva todo el ancho: los controles no lo comprimen en 320 dp.
+            Text(
+                job.track.title, style = Ds.Body, color = cs.onSurface,
+                maxLines = 2, overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                "${job.track.artist.ifBlank { "YouTube" }} · ${if (job.high) "Alta" else "Estándar"}",
+                style = Ds.Sub, color = cs.onSurfaceVariant,
+                maxLines = 2, overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        job.track.title, style = Ds.Body, color = cs.onBackground,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        "${job.track.artist.ifBlank { "YouTube" }} · ${if (job.high) "Alta" else "Estándar"}" +
-                            estado(job) +
-                            if (job.speedBps > 0 && job.status == DlStatus.ACTIVE) " · ${vel(job.speedBps)}" else "",
-                        style = Ds.Sub,
-                        color = if (st == DlStatus.ERROR) cs.error else cs.onSurfaceVariant,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis
-                    )
+                if (st == DlStatus.DONE) {
+                    Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = cs.primary)
+                    Spacer(Modifier.width(6.dp))
                 }
-                when (st) {
-                    DlStatus.ACTIVE, DlStatus.QUEUED -> IconButton(onClick = onPause, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Pause, "Pausar", Modifier.size(18.dp), tint = cs.onBackground)
+                Text(
+                    estado(job).removePrefix(" · ") +
+                        if (job.speedBps > 0 && st == DlStatus.ACTIVE) " · ${vel(job.speedBps)}" else "",
+                    style = Ds.Sub,
+                    color = when (st) {
+                        DlStatus.ERROR -> cs.error
+                        DlStatus.DONE -> cs.primary
+                        else -> cs.onSurfaceVariant
                     }
-                    DlStatus.PAUSED, DlStatus.ERROR -> IconButton(onClick = onResume, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.PlayArrow, "Reanudar", Modifier.size(18.dp), tint = cs.primary)
-                    }
-                    DlStatus.DONE -> Icon(
-                        Icons.Default.Check, "Guardada",
-                        Modifier.size(20.dp), tint = cs.primary
-                    )
-                }
-                IconButton(onClick = onCancel, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Close, "Quitar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
-                }
+                )
+            }
+            if (st == DlStatus.ERROR) {
+                Text(
+                    "Pulsa Reanudar para volver a intentarlo.",
+                    style = Ds.Sub, color = cs.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
             if (st == DlStatus.ACTIVE || st == DlStatus.QUEUED || st == DlStatus.PAUSED) {
                 Spacer(Modifier.height(10.dp))
@@ -265,7 +270,36 @@ private fun DlJobCard(
                     )
                     Spacer(Modifier.width(10.dp))
                     // El número es exacto; la barra va suavizada (avance).
-                    Text("${(job.progress * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
+                    Text("${(job.progress.coerceIn(0f, 1f) * 100).toInt()}%", style = Ds.Sub, color = cs.primary)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End)) {
+                when (st) {
+                    DlStatus.ACTIVE, DlStatus.QUEUED -> TextButton(
+                        onClick = onPause,
+                        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = "Pausar" }
+                    ) {
+                        Icon(Icons.Default.Pause, null, Modifier.size(18.dp), tint = cs.onSurface)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Pausar", style = Ds.Sub, color = cs.onSurface)
+                    }
+                    DlStatus.PAUSED, DlStatus.ERROR -> TextButton(
+                        onClick = onResume,
+                        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = "Reanudar" }
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp), tint = cs.primary)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Reanudar", style = Ds.Sub, color = cs.primary)
+                    }
+                    DlStatus.DONE -> Unit
+                }
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = "Quitar" }
+                ) {
+                    Icon(Icons.Default.Close, null, Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Quitar", style = Ds.Sub, color = cs.onSurfaceVariant)
                 }
             }
         }
@@ -277,7 +311,7 @@ private fun estado(job: DlJob): String = when (job.status) {
     DlStatus.PAUSED -> if (job.total > 0) " · Pausada · ${mb(job.downloaded)}/${mb(job.total)}" else " · Pausada"
     DlStatus.ERROR -> " · ${job.error ?: "Falló"}"
     DlStatus.DONE -> " · Guardada"
-    else -> if (job.total > 0) " · ${mb(job.downloaded)}/${mb(job.total)}" else ""
+    DlStatus.ACTIVE -> " · Descargando" + if (job.total > 0) " · ${mb(job.downloaded)}/${mb(job.total)}" else ""
 }
 
 private fun mb(b: Long): String = "%.1f MB".format(b / 1048576f)

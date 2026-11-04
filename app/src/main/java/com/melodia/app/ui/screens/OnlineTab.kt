@@ -20,20 +20,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.QueueMusic
@@ -67,6 +65,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -223,83 +229,91 @@ fun OnlineTabContent(
     val cs = MaterialTheme.colorScheme
     var menu by remember { mutableStateOf(false) }
     val kb = LocalSoftwareKeyboardController.current
+    val focus = LocalFocusManager.current
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         // Buscador + menú ⋮ en la misma línea: el título "Online" repetía lo que
         // ya dice la pestaña seleccionada en la nav.
         Row(
-            Modifier.fillMaxWidth().padding(top = 12.dp),
+            Modifier.fillMaxWidth().padding(top = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
                 value = query,
                 onValueChange = onQueryChange,
-                placeholder = { Text("Buscar en YouTube", style = Ds.Body) },
+                placeholder = { Text("Buscar en YouTube", style = Ds.Body, color = cs.onSurfaceVariant) },
+                textStyle = Ds.Body.copy(color = cs.onSurface),
                 singleLine = true,
                 shape = RoundedCornerShape(Ds.RRow),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = cs.surface,
                     unfocusedContainerColor = cs.surface,
                     disabledContainerColor = cs.surface,
+                    focusedTextColor = cs.onSurface,
+                    unfocusedTextColor = cs.onSurface,
+                    cursorColor = cs.primary,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent
                 ),
                 leadingIcon = {
-                    IconButton(onClick = { kb?.hide(); onSearch() }, modifier = Modifier.size(40.dp)) {
+                    IconButton(onClick = { focus.clearFocus(); kb?.hide(); onSearch() }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Search, "Buscar", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
                     }
                 },
-                trailingIcon = {
-                    when {
-                        loading -> Box(Modifier.padding(end = 10.dp)) { MelodiaSpinner(size = 16.dp, width = 2.dp) }
-                        query.isNotEmpty() -> IconButton(onClick = onClearQuery, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Close, "Limpiar", Modifier.size(16.dp), tint = cs.onSurfaceVariant)
+                // Sin ranura vacía: el placeholder conserva ancho a 320 dp.
+                trailingIcon = if (loading || query.isNotEmpty()) {
+                    {
+                        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                            if (loading) {
+                                MelodiaSpinner(size = 18.dp, width = 2.dp)
+                            } else {
+                                IconButton(onClick = onClearQuery, modifier = Modifier.size(48.dp)) {
+                                    Icon(Icons.Default.Close, "Limpiar", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+                                }
+                            }
                         }
                     }
-                },
+                } else null,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { kb?.hide(); onSearch() }),
+                keyboardActions = KeyboardActions(onSearch = { focus.clearFocus(); kb?.hide(); onSearch() }),
                 modifier = Modifier.weight(1f)
             )
             Spacer(Modifier.width(4.dp))
             Box {
-                IconButton(onClick = { menu = true }, modifier = Modifier.size(40.dp)) {
+                IconButton(onClick = { focus.clearFocus(); kb?.hide(); menu = true }, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Default.MoreVert, "Opciones", Modifier.size(20.dp), tint = cs.onSurfaceVariant)
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
-                        text = { Text("Descargas") },
-                        leadingIcon = { Icon(Icons.Default.Download, null) },
+                        text = { Text("Descargas", style = Ds.Body, color = cs.onSurface) },
+                        leadingIcon = { Icon(Icons.Default.Download, null, tint = cs.onSurfaceVariant) },
                         onClick = { menu = false; onOpenDownloads() }
                     )
                     DropdownMenuItem(
-                        text = { Text("Importar playlist") },
-                        leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) },
+                        text = { Text("Importar lista", style = Ds.Body, color = cs.onSurface) },
+                        leadingIcon = { Icon(Icons.Default.PlaylistAdd, null, tint = cs.onSurfaceVariant) },
                         onClick = { menu = false; onOpenImport() }
                     )
                     Divider()
                     DropdownMenuItem(
-                        text = { Text("Ahorro de datos") },
-                        trailingIcon = { if (saver) Icon(Icons.Default.Check, null) },
+                        text = { Text("Ahorro de datos", style = Ds.Body, color = cs.onSurface) },
+                        modifier = Modifier.semantics { stateDescription = if (saver) "Activado" else "Desactivado" },
+                        trailingIcon = { if (saver) Icon(Icons.Default.Check, null, tint = cs.primary) },
                         onClick = { onToggleSaver() }
                     )
                     DropdownMenuItem(
-                        text = { Text("Calidad alta") },
-                        trailingIcon = { if (highQ) Icon(Icons.Default.Check, null) },
+                        text = { Text("Calidad alta", style = Ds.Body, color = cs.onSurface) },
+                        modifier = Modifier.semantics { stateDescription = if (highQ) "Activada" else "Desactivada" },
+                        trailingIcon = { if (highQ) Icon(Icons.Default.Check, null, tint = cs.primary) },
                         onClick = { onToggleQuality() }
                     )
                 }
             }
         }
 
-        if (notice != null) {
-            Text(
-                notice, style = Ds.Sub, color = cs.primary,
-                maxLines = 2, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
-            )
-            LaunchedEffect(notice) {
+        LaunchedEffect(notice) {
+            if (notice != null) {
                 kotlinx.coroutines.delay(4500)
                 onClearNotice()
             }
@@ -307,38 +321,38 @@ fun OnlineTabContent(
 
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 200.dp)
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 10.dp, bottom = 200.dp)
         ) {
-            if (loading && items.isNotEmpty()) item {
-                androidx.compose.material3.LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
+            if (notice != null) item {
+                Text(
+                    notice, style = Ds.Sub, color = cs.primary,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite }
                 )
+            }
+            if (loading && items.isNotEmpty()) item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                    MelodiaSpinner(size = 18.dp, width = 2.dp)
+                }
+            }
+            // Un fallo de reproducción o de paginación también debe verse con resultados.
+            if (error != null && items.isNotEmpty() && !loading) item {
+                OnlineSearchError(error, errorRetry, onSearch)
             }
             when {
                 loading && items.isEmpty() -> item {
-                    Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
-                        MelodiaSpinner()
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MelodiaSpinner(size = 24.dp, width = 2.dp)
+                        Text("Buscando en YouTube…", style = Ds.Sub, color = cs.onSurfaceVariant)
                     }
                 }
 
                 error != null && items.isEmpty() -> item {
-                    Column(Modifier.padding(top = 24.dp)) {
-                        Text(
-                            error, style = Ds.Body,
-                            color = if (errorRetry) cs.error else cs.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        if (errorRetry) {
-                            Text(
-                                "Reintentar",
-                                style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
-                                color = cs.primary,
-                                modifier = Modifier.clickable { onSearch() }.padding(vertical = 4.dp)
-                            )
-                        } else {
-                            Text("Cambia las palabras y busca de nuevo.", style = Ds.Sub, color = cs.onSurfaceVariant)
-                        }
-                    }
+                    OnlineSearchError(error, errorRetry, onSearch)
                 }
 
                 items.isEmpty() -> {
@@ -355,7 +369,7 @@ fun OnlineTabContent(
                         item {
                             Text(
                                 "Recientes", style = Ds.Sub, color = cs.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 18.dp, bottom = 8.dp)
+                                modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
                             )
                         }
                         item {
@@ -367,12 +381,14 @@ fun OnlineTabContent(
                                     Surface(
                                         shape = RoundedCornerShape(10.dp),
                                         color = cs.surfaceVariant,
-                                        modifier = Modifier.clickable { onQueryChange(term); onSearch() }
+                                        modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Buscar $term") {
+                                            focus.clearFocus(); kb?.hide(); onQueryChange(term); onSearch()
+                                        }.heightIn(min = 48.dp)
                                     ) {
                                         Text(
                                             term, style = Ds.Sub, color = cs.onBackground,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
                                         )
                                     }
                                 }
@@ -383,13 +399,14 @@ fun OnlineTabContent(
                         item {
                             Text(
                                 "Escuchado online", style = Ds.Sub, color = cs.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 20.dp, bottom = 10.dp)
+                                modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
                             )
                         }
                         item {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 itemsIndexed(history, key = { i, t -> "h-$i-${t.id}" }) { _, track ->
-                                    Column(Modifier.width(124.dp).clickable { onPlay(track) }) {
+                                    Column(Modifier.width(124.dp).clickable(role = Role.Button,
+                                        onClickLabel = "Reproducir ${track.title}") { onPlay(track) }) {
                                         OnlineThumb(track, 124.dp)
                                         Spacer(Modifier.height(6.dp))
                                         Text(
@@ -410,20 +427,19 @@ fun OnlineTabContent(
 
                 else -> {
                     item {
-                        Row(
-                            Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        FlowRow(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                "${items.size} ${if (items.size == 1) "resultado" else "resultados"}",
-                                style = Ds.Sub, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                "Descargar todo",
-                                style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
-                                color = cs.primary,
-                                modifier = Modifier.clickable { onDownloadAll() }.padding(4.dp)
-                            )
+                            Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                                Text(
+                                    "${items.size} ${if (items.size == 1) "resultado" else "resultados"}",
+                                    style = Ds.Sub, color = cs.onSurfaceVariant
+                                )
+                            }
+                            TextButton(onClick = onDownloadAll, modifier = Modifier.heightIn(min = 48.dp)) {
+                                Text("Descargar todo", style = Ds.Sub, color = cs.primary)
+                            }
                         }
                     }
                     itemsIndexed(items, key = { i, item -> "${item.key}-$i" }) { _, item ->
@@ -449,18 +465,34 @@ fun OnlineTabContent(
                                 if (moreLoading) {
                                     MelodiaSpinner(size = 24.dp, width = 2.dp)
                                 } else {
-                                    Text(
-                                        "Ver más",
-                                        style = Ds.Sub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
-                                        color = cs.primary,
-                                        modifier = Modifier.clickable { onLoadMore() }.padding(8.dp)
-                                    )
+                                    TextButton(onClick = onLoadMore, modifier = Modifier.heightIn(min = 48.dp)) {
+                                        Text("Ver más", style = Ds.Sub, color = cs.primary)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OnlineSearchError(error: String, retry: Boolean, onRetry: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 10.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(error, style = Ds.Body, color = if (retry) cs.error else cs.onSurfaceVariant)
+        if (retry) {
+            TextButton(onClick = onRetry, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("Reintentar", style = Ds.Sub, color = cs.primary)
+            }
+        } else {
+            Text("Cambia las palabras y busca de nuevo.", style = Ds.Sub, color = cs.onSurfaceVariant)
         }
     }
 }
@@ -478,7 +510,17 @@ fun YtRowFlat(
     val cs = MaterialTheme.colorScheme
     Column(
         modifier.fillMaxWidth()
-            .then(com.melodia.app.ui.ds.pressClick(onPlay, min = 0.985f))
+            .then(com.melodia.app.ui.ds.pressClick(onPlay, min = 0.985f,
+                role = Role.Button, label = "Reproducir ${track.title}"))
+            .semantics {
+                stateDescription = when {
+                    busy -> "Preparando audio"
+                    progress == null -> "Disponible online"
+                    progress <= 0f -> "En cola"
+                    progress >= 1f -> "Finalizando descarga"
+                    else -> "Descargando"
+                }
+            }
             .padding(vertical = 5.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -487,35 +529,41 @@ fun YtRowFlat(
             Column(Modifier.weight(1f)) {
                 Text(
                     track.title, style = Ds.Body, color = cs.onBackground,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     track.artist.ifBlank { "YouTube" } +
                         if (track.durationSec > 0) " · ${fmtDur(track.durationSec)}" else "",
                     style = Ds.Sub, color = cs.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
             }
-            when {
-                busy -> Box(Modifier.padding(horizontal = 8.dp)) { MelodiaSpinner(size = 20.dp, width = 2.dp) }
-                // En cola/resolviendo (progreso 0): spinner, sin botón muerto.
-                progress != null && progress <= 0f -> Box(Modifier.padding(horizontal = 8.dp)) { MelodiaSpinner(size = 20.dp, width = 2.dp) }
-                progress == null -> IconButton(onClick = onDownload, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Download, "Descargar", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+            // Slot fijo: el título no cambia de ancho al empezar una descarga.
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                when {
+                    busy || (progress != null && progress <= 0f) -> MelodiaSpinner(size = 20.dp, width = 2.dp)
+                    progress == null -> IconButton(onClick = onDownload, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Download, "Descargar", Modifier.size(20.dp), tint = cs.onSurfaceVariant)
+                    }
                 }
             }
+        }
+        when {
+            busy -> Text("Preparando audio…", style = Ds.Sub, color = cs.primary)
+            progress != null && progress <= 0f -> Text("En cola", style = Ds.Sub, color = cs.onSurfaceVariant)
+            progress != null && progress >= 1f -> Text("Finalizando descarga…", style = Ds.Sub, color = cs.primary)
         }
         if (progress != null) {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LinearProgressIndicator(
                     progress = progress.coerceIn(0f, 1f),
-                    color = cs.primary,
-                    modifier = Modifier.weight(1f).height(2.dp).clip(RoundedCornerShape(2.dp))
+                    color = cs.primary, trackColor = cs.surfaceVariant,
+                    modifier = Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp))
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "${(progress * 100).toInt()}%", style = Ds.Sub, color = cs.primary,
+                    "${(progress.coerceIn(0f, 1f) * 100).toInt()}%", style = Ds.Sub, color = cs.primary,
                     maxLines = 1
                 )
             }
@@ -534,7 +582,8 @@ fun YtCollectionRow(
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
-        modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 6.dp),
+        modifier.fillMaxWidth().clickable(role = Role.Button,
+            onClickLabel = "Abrir ${item.title}", onClick = onOpen).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(48.dp).clip(RoundedCornerShape(Ds.RCard))) {
@@ -560,23 +609,25 @@ fun YtCollectionRow(
         Column(Modifier.weight(1f)) {
             Text(
                 item.title, style = Ds.Body, color = cs.onBackground,
-                maxLines = 1, overflow = TextOverflow.Ellipsis
+                maxLines = 2, overflow = TextOverflow.Ellipsis
             )
             Text(
                 listOfNotNull(
                     item.uploader.ifBlank { null },
                     if (item.count > 0) "${item.count} temas" else null,
-                    "Playlist o álbum"
+                    "Lista o álbum"
                 ).joinToString(" · "),
                 style = Ds.Sub, color = cs.onSurfaceVariant,
-                maxLines = 1, overflow = TextOverflow.Ellipsis
+                maxLines = 2, overflow = TextOverflow.Ellipsis
             )
         }
-        if (busy) {
-            Box(Modifier.padding(horizontal = 8.dp)) { MelodiaSpinner(size = 20.dp, width = 2.dp) }
-        } else {
-            IconButton(onClick = onDownload, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Download, "Descargar entera", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            if (busy) {
+                MelodiaSpinner(size = 20.dp, width = 2.dp)
+            } else {
+                IconButton(onClick = onDownload, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.Download, "Descargar entera", Modifier.size(20.dp), tint = cs.onSurfaceVariant)
+                }
             }
         }
     }
@@ -611,65 +662,133 @@ private fun OnlineThumb(track: YtTrack, size: androidx.compose.ui.unit.Dp) {
 
 @Composable
 private fun ImportPlaylistDialog(vm: MainViewModel, onClose: () -> Unit, onQueued: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
     val importState by vm.ytImport.collectAsState()
     var url by rememberSaveable { mutableStateOf("") }
-    val busy = importState == "…"
     val ok = importState?.startsWith("OK|") == true
     var abierto by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { abierto = false } }
     LaunchedEffect(ok) { if (ok && abierto) onQueued() }
+    ImportPlaylistDialogContent(
+        url = url,
+        importState = importState,
+        onUrlChange = { url = it; vm.clearYtImport() },
+        onImport = { vm.importYtPlaylist(url) },
+        onClose = onClose
+    )
+}
+
+/** Diálogo puro: comparte los estados reales sin arrancar Room ni el reproductor. */
+@Composable
+internal fun ImportPlaylistDialogContent(
+    url: String,
+    importState: String?,
+    onUrlChange: (String) -> Unit,
+    onImport: () -> Unit,
+    onClose: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val focus = LocalFocusManager.current
+    val busy = importState == "…"
+    val ok = importState?.startsWith("OK|") == true
+    val canImport = url.isNotBlank() && !busy
+    fun submit() {
+        if (canImport) { focus.clearFocus(); onImport() }
+    }
     AlertDialog(
         onDismissRequest = { if (!busy) onClose() },
-        title = { Text("Importar playlist", color = cs.onBackground) },
+        containerColor = cs.surface,
+        tonalElevation = 0.dp,
+        title = { Text("Importar lista", style = Ds.Title, color = cs.onSurface) },
         text = {
-            Column(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Text(
-                    "Pega el link de una playlist de YouTube y se encola entera.",
+                    "Pega el enlace de una lista de YouTube para añadirla a Descargas.",
                     style = Ds.Sub, color = cs.onSurfaceVariant
                 )
                 Spacer(Modifier.height(10.dp))
                 TextField(
                     value = url,
-                    onValueChange = { url = it; vm.clearYtImport() },
-                    placeholder = { Text("https://youtube.com/playlist?list=…", style = Ds.Sub) },
+                    onValueChange = onUrlChange,
+                    enabled = !busy,
+                    label = { Text("Enlace de la lista", style = Ds.Sub, color = cs.onSurfaceVariant) },
+                    placeholder = {
+                        Text("https://youtube.com/playlist?list=…", style = Ds.Sub, color = cs.onSurfaceVariant)
+                    },
+                    textStyle = Ds.Body.copy(color = cs.onSurface),
                     singleLine = true,
-                    shape = RoundedCornerShape(Ds.RRow),
+                    isError = importState != null && !busy && !ok,
+                    shape = Ds.RowShape,
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = cs.surfaceVariant,
                         unfocusedContainerColor = cs.surfaceVariant,
+                        disabledContainerColor = cs.surfaceVariant,
+                        errorContainerColor = cs.surfaceVariant,
+                        focusedTextColor = cs.onSurface,
+                        unfocusedTextColor = cs.onSurface,
+                        disabledTextColor = cs.onSurfaceVariant,
+                        errorTextColor = cs.onSurface,
+                        cursorColor = cs.primary,
                         focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                        errorIndicatorColor = Color.Transparent
                     ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
                     modifier = Modifier.fillMaxWidth()
                 )
+                Text(
+                    "Se importan hasta 100 temas. Puedes pausar la cola desde Descargas.",
+                    style = Ds.Sub, color = cs.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+                if (busy) {
+                    // LinearProgressIndicator indeterminado de M3 1.1.2 usa
+                    // KeyframesSpecConfig.at(), ausente en animation-core 1.6.
+                    Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
+                        MelodiaSpinner(size = 20.dp, width = 2.dp)
+                    }
+                }
                 val imp = importState
                 if (imp != null && imp != "…") {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
                     Text(
                         if (ok) {
                             val parts = imp.split("|")
-                            "«${parts.getOrNull(2) ?: "Playlist"}»: ${parts.getOrNull(1) ?: "?"} temas en cola" +
+                            "«${parts.getOrNull(2) ?: "Lista"}»: ${parts.getOrNull(1) ?: "?"} temas en cola" +
                                 (if (parts.size > 3) " (lista recortada)" else "")
                         } else imp,
                         style = Ds.Sub,
-                        color = if (ok) cs.primary else cs.error
+                        color = if (ok) cs.primary else cs.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                     )
+                    if (!ok) {
+                        Text(
+                            "Revisa el enlace y vuelve a pulsar Importar.",
+                            style = Ds.Sub, color = cs.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { vm.importYtPlaylist(url) },
-                enabled = url.isNotBlank() && !busy
-            ) { Text(if (busy) "Importando…" else "Importar") }
+            TextButton(onClick = { submit() }, enabled = canImport, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(if (busy) "Importando…" else "Importar", style = Ds.Sub,
+                    color = if (canImport) cs.primary else cs.onSurface.copy(alpha = 0.38f))
+            }
         },
-        dismissButton = { TextButton(onClick = onClose, enabled = !busy) { Text("Cancelar") } }
+        dismissButton = {
+            TextButton(onClick = onClose, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("Cancelar", style = Ds.Sub,
+                    color = if (busy) cs.onSurface.copy(alpha = 0.38f) else cs.primary)
+            }
+        }
     )
 }
 
 @Composable
-private fun QualityDialog(
+internal fun QualityDialog(
     track: YtTrack,
     highQ: Boolean,
     onPick: (Boolean) -> Unit,
@@ -678,13 +797,19 @@ private fun QualityDialog(
     val cs = MaterialTheme.colorScheme
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Calidad de descarga", color = cs.onBackground) },
+        containerColor = cs.surface,
+        tonalElevation = 0.dp,
+        title = { Text("Calidad de descarga", style = Ds.Title, color = cs.onSurface) },
         text = {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(
                     track.title, style = Ds.Body, color = cs.onBackground,
                     maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
+                Text("Elige una calidad para iniciar la descarga.", style = Ds.Sub, color = cs.onSurfaceVariant)
                 QualityOption(
                     title = "Alta", subtitle = "Mejor sonido, archivo más grande",
                     selected = highQ, onClick = { onPick(true) }
@@ -695,7 +820,11 @@ private fun QualityDialog(
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+        confirmButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("Cancelar", style = Ds.Sub, color = cs.primary)
+            }
+        }
     )
 }
 
@@ -704,18 +833,20 @@ private fun QualityOption(title: String, subtitle: String, selected: Boolean, on
     val cs = MaterialTheme.colorScheme
     Surface(
         shape = RoundedCornerShape(Ds.RRow),
-        color = if (selected) cs.primary.copy(alpha = 0.12f) else cs.surfaceVariant,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+        color = if (selected) cs.secondaryContainer else cs.surfaceVariant,
+        modifier = Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
     ) {
         Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            Modifier.heightIn(min = 64.dp).padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
                 Text(title, style = Ds.Body, color = if (selected) cs.primary else cs.onBackground)
                 Text(subtitle, style = Ds.Sub, color = cs.onSurfaceVariant)
             }
-            if (selected) Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = cs.primary)
+            Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                if (selected) Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = cs.primary)
+            }
         }
     }
 }
@@ -735,7 +866,9 @@ fun YtPreviewList(
     LazyColumn(modifier.fillMaxWidth()) {
         itemsIndexed(tracks, key = { i, t -> "pv-$i-${t.id}" }) { _, t ->
             Row(
-                Modifier.fillMaxWidth().clickable { onPlay(t) }.padding(vertical = 6.dp),
+                Modifier.fillMaxWidth().clickable(role = Role.Button,
+                    onClickLabel = "Reproducir ${t.title}") { onPlay(t) }
+                    .heightIn(min = 56.dp).padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OnlineThumb(t, 40.dp)
@@ -743,13 +876,13 @@ fun YtPreviewList(
                 Column(Modifier.weight(1f)) {
                     Text(
                         t.title, style = Ds.Body, color = cs.onBackground,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                        maxLines = 2, overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         t.artist.ifBlank { "YouTube" } +
                             if (t.durationSec > 0) " · ${fmtDur(t.durationSec)}" else "",
                         style = Ds.Sub, color = cs.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                        maxLines = 2, overflow = TextOverflow.Ellipsis
                     )
                 }
                 Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp), tint = cs.primary)
@@ -765,22 +898,42 @@ fun YtPreviewList(
  */
 @Composable
 fun YtCollectionSheet(vm: MainViewModel) {
-    val cs = MaterialTheme.colorScheme
     val preview by vm.ytPreview.collectAsState()
     val p = preview ?: return
+    YtCollectionPreviewDialog(
+        preview = p,
+        onClose = { vm.closeYtPreview() },
+        onDownload = { vm.downloadYtPreview() },
+        onPlay = { t -> vm.closeYtPreview(); vm.playYt(t) }
+    )
+}
+
+@Composable
+internal fun YtCollectionPreviewDialog(
+    preview: MainViewModel.YtPreview,
+    onClose: () -> Unit,
+    onDownload: () -> Unit,
+    onPlay: (YtTrack) -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    val p = preview
+    val canDownload = p.tracks.isNotEmpty() && !p.loading
     AlertDialog(
-        onDismissRequest = { vm.closeYtPreview() },
+        onDismissRequest = onClose,
+        containerColor = cs.surface,
+        tonalElevation = 0.dp,
         title = {
             Column(Modifier.fillMaxWidth()) {
                 Text(
-                    p.title, style = Ds.Title, color = cs.onBackground,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                    p.title, style = Ds.Title, color = cs.onSurface,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() }
                 )
                 Text(
                     when {
                         p.loading -> "Cargando temas…"
                         p.tracks.isNotEmpty() -> "${p.tracks.size} temas" + if (p.truncated) " (lista recortada)" else ""
-                        else -> "Playlist o álbum"
+                        else -> "Lista o álbum"
                     },
                     style = Ds.Sub, color = cs.onSurfaceVariant
                 )
@@ -792,24 +945,38 @@ fun YtCollectionSheet(vm: MainViewModel) {
                     p.loading -> Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
                         MelodiaSpinner(size = 24.dp, width = 2.dp)
                     }
-                    p.error != null -> Text(
-                        p.error, style = Ds.Body, color = cs.error,
-                        maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    p.error != null -> Column(
+                        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(p.error, style = Ds.Body, color = cs.error)
+                        Text("Cierra y vuelve a abrir la lista para reintentar.",
+                            style = Ds.Sub, color = cs.onSurfaceVariant)
+                    }
+                    p.tracks.isEmpty() -> EmptyState(
+                        icon = Icons.Default.QueueMusic,
+                        title = "Sin temas visibles",
+                        subtitle = "Prueba con otra lista o álbum."
                     )
-                    else -> YtPreviewList(
-                        tracks = p.tracks,
-                        onPlay = { t -> vm.closeYtPreview(); vm.playYt(t) }
-                    )
+                    else -> YtPreviewList(tracks = p.tracks, onPlay = onPlay)
                 }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { vm.downloadYtPreview() },
-                enabled = p.tracks.isNotEmpty()
-            ) { Text("Descargar todo") }
+                onClick = onDownload,
+                enabled = canDownload,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
+                Text("Descargar todo", style = Ds.Sub,
+                    color = if (canDownload) cs.primary else cs.onSurface.copy(alpha = 0.38f))
+            }
         },
-        dismissButton = { TextButton(onClick = { vm.closeYtPreview() }) { Text("Cerrar") } }
+        dismissButton = {
+            TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("Cerrar", style = Ds.Sub, color = cs.primary)
+            }
+        }
     )
 }
 
@@ -832,7 +999,7 @@ fun DownloadsButton(jobs: List<com.melodia.app.data.online.DlJob>, onClick: () -
         totalBytes > 0L -> (doneBytes.toFloat() / totalBytes).coerceIn(0f, 1f)
         else -> activos.map { it.progress }.average().toFloat().coerceIn(0f, 1f)
     }
-    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
         if (activos.isNotEmpty()) {
             CircularProgressIndicator(
                 progress = progreso,
@@ -843,7 +1010,8 @@ fun DownloadsButton(jobs: List<com.melodia.app.data.online.DlJob>, onClick: () -
             )
         }
         Box(
-            Modifier.size(34.dp).clip(CircleShape).clickable(onClick = onClick),
+            Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button,
+                onClickLabel = "Abrir descargas", onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
             Icon(

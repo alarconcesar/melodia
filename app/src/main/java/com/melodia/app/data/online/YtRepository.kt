@@ -190,7 +190,7 @@ class YtRepository(private val context: Context) {
                         val thumbs = try { pl.thumbnails } catch (_: Exception) { emptyList() }
                         YtSearchItem.Collection(
                             id = id,
-                            title = (try { pl.name } catch (_: Exception) { "Playlist" }) ?: "Playlist",
+                            title = (try { pl.name } catch (_: Exception) { "Lista" }) ?: "Lista",
                             uploader = ((try { pl.uploaderName } catch (_: Exception) { "" }) ?: "")
                                 .replace(" - Topic", "").trim(),
                             count = try { pl.streamCount } catch (_: Exception) { 0L }.toInt(),
@@ -916,7 +916,7 @@ class YtRepository(private val context: Context) {
         ensure()
         val ex = yt().getPlaylistExtractor(url)
         ex.fetchPage()
-        val title = (try { ex.name } catch (_: Exception) { "Playlist" }) ?: "Playlist"
+        val title = (try { ex.name } catch (_: Exception) { "Lista" }) ?: "Lista"
         val out = mutableListOf<YtTrack>()
         var page = ex.initialPage
         var rounds = 0

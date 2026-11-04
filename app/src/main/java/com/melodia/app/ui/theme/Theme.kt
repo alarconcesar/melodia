@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.sp
 
 object Ds {
     val Green = Color(0xFF2EE56B)
-    val GreenDeep = Color(0xFF0E9F52)
+    val GreenDeep = Color(0xFF087A3E)
     val Heart = Color(0xFF2EE56B)
 
     // Radios: dos familias y listo (card / fila). Menos variantes = más calma.
@@ -41,9 +41,9 @@ object Ds {
     // Tipo (todos los Text del sistema usan estos estilos + color explícito)
     // Titulares tight (-0.5/-0.25): se sienten más premium que el tracking neutro
     val Display = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.SemiBold, lineHeight = 30.sp, letterSpacing = (-0.5).sp)
-    val Title = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp)
-    val Body = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)
-    val Sub = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Normal)
+    val Title = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp, letterSpacing = (-0.2).sp)
+    val Body = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal, lineHeight = 22.sp)
+    val Sub = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, lineHeight = 18.sp)
     val Micro = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
     val HeroShape = RoundedCornerShape(RHero)
     val CardShape = RoundedCornerShape(RCard)
@@ -109,8 +109,8 @@ private fun lightScheme(accent: Color) = lightColorScheme(
 data class Accent(val name: String, val dark: Color, val light: Color)
 
 val Accents = listOf(
-    Accent("Verde", Color(0xFF2EE56B), Color(0xFF0E9F52)),
-    Accent("Azul", Color(0xFF53B7FF), Color(0xFF0277BD)),
+    Accent("Verde", Color(0xFF2EE56B), Color(0xFF087A3E)),
+    Accent("Azul", Color(0xFF53B7FF), Color(0xFF02649D)),
     Accent("Morado", Color(0xFFC58AFF), Color(0xFF6A1B9A)),
     Accent("Naranja", Color(0xFFFFAB4A), Color(0xFFBF360C)),
     Accent("Rosa", Color(0xFFFF7EB0), Color(0xFFAD1457))
@@ -148,7 +148,22 @@ fun MelodiaTheme(content: @Composable () -> Unit) {
     val accent = currentAccent()
     MaterialTheme(
         colorScheme = if (dark) darkScheme(accent.dark) else lightScheme(accent.light),
-        typography = Typography(),
-        content = content
+        typography = Typography(
+            displaySmall = Ds.Display,
+            headlineSmall = Ds.Display.copy(fontSize = 22.sp, lineHeight = 28.sp),
+            titleLarge = Ds.Title.copy(fontSize = 20.sp, lineHeight = 26.sp),
+            titleMedium = Ds.Title,
+            bodyLarge = Ds.Body.copy(lineHeight = 22.sp),
+            bodyMedium = Ds.Body.copy(fontSize = 14.sp, lineHeight = 20.sp),
+            bodySmall = Ds.Sub.copy(lineHeight = 18.sp),
+            labelLarge = Ds.Body.copy(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+            labelMedium = Ds.Sub.copy(fontWeight = FontWeight.Medium),
+            labelSmall = Ds.Micro
+        ),
+        content = {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onBackground
+            ) { content() }
+        }
     )
 }

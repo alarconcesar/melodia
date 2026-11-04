@@ -51,7 +51,7 @@ class PlaylistsTabTest {
     @Test
     fun sinListasMuestraElVacioYLaTarjetaDeCrear() {
         componer()
-        rule.onNodeWithText("Nueva playlist").assertExists()
+        rule.onNodeWithText("Nueva lista").assertExists()
         rule.onNodeWithText("Sin listas todavía").assertExists()
     }
 
@@ -59,7 +59,7 @@ class PlaylistsTabTest {
     fun laTarjetaDeCrearDisparaElCallback() {
         var creada = false
         componer(onCreate = { creada = true })
-        rule.onNodeWithText("Nueva playlist").performClick()
+        rule.onNodeWithText("Nueva lista").performClick()
         rule.waitForIdle()
         assert(creada) { "no se pidió crear la playlist" }
     }

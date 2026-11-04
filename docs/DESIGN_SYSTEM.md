@@ -16,7 +16,7 @@ verde neón, pill-nav flotante, titulares grandes + secundarios atenuados).
 | `onBackground` / `onSurface` | `#F2F4F2` | `#10140F` |
 | `onSurfaceVariant` (secundario) | `#A0A5A0` | `#5F6B62` |
 | `outline` (bordes cristal) | `#262826` | `#D8DED8` |
-| `primary` (acento) | `#2EE56B` | `#0E9F52` |
+| `primary` (acento) | `#2EE56B` | `#087A3E` (5.0:1 sobre fondo claro) |
 | `onPrimary` | `#06110A` | `#FFFFFF` |
 | Favorito | verde acento (un solo ♥ por fila) | igual |
 
@@ -27,10 +27,10 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
 
 | Estilo | Spec |
 |---|---|
-| `Display` | 28sp SemiBold, títulos hero / Now Playing |
-| `Title` | 17sp SemiBold, secciones y cards |
-| `Body` | 15sp Normal, títulos de tema |
-| `Sub` | 12sp Normal, artista · duración |
+| `Display` | 26sp SemiBold / 30sp, títulos hero y Now Playing |
+| `Title` | 16sp SemiBold / 22sp, secciones y cards |
+| `Body` | 15sp Normal / 22sp, títulos de tema |
+| `Sub` | 13sp Normal / 18sp, artista · duración |
 | `Micro` | 11sp Medium **UPPERCASE** + tracking, etiquetas ("AHORA SUENA") |
 
 ## ⭕ Radios
@@ -46,8 +46,8 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
   Barras de EQ animadas si suena.
 - **HeroCard** — "Seguir escuchando", FAB verde 72dp, borde hairline.
 - **QuickCard** — grid 2 col (Favoritos / Aleatorio / Recientes / Artistas).
-- **MelodiaPillNav** — barra flotante translúcida (78%) + borde + sombra,
-  5 tabs fijos (layout estable, sin saltos). **Sin punto indicador**: el
+- **MelodiaPillNav** — barra flotante plana (`surface` 95 %, sin borde ni
+  sombra), 5 pestañas fijas (layout estable, sin saltos). **Sin punto indicador**: el
   estado seleccionado ya lo dicen el fondo pill + acento + escala del icono.
 - **MiniPlayerDs** — flotante, **apilado con la nav en una misma columna**
   (`Column` anclada abajo): miniplayer, 10dp de aire y la pill-nav. Antes su
@@ -83,11 +83,14 @@ superior (11%) + glow inferior (5%). Sutil, `rgba ~6-11%`, sin gradientes full-c
   (`vm.loaded`), para no mostrar "biblioteca vacía" durante el arranque.
 - **Carrusel "Tus álbumes"** en Inicio — tarjetas de 138dp ordenadas por
   cantidad de temas; tocar aplica el filtro de álbum en Explorar.
-- **QueueSheet** — diálogo ancho (94% de la pantalla) con conteo y duración
-  total, chips de aleatorio/repetir, filas con ↑ ↓ ✕ (cajas de 30dp, no
-  `IconButton`, cuyo mínimo de 48dp ahoga el título), "Vaciar" (deja sonando el
-  tema actual) y "Guardar lista" (playlist nueva en el mismo orden).
-- **TrackInfoSheet / EqSheet** — diálogos con scroll, colores explícitos.
+- **QueueSheet** — pantalla completa: barra con cierre, tema actual en una
+  tarjeta única, chips de aleatorio/repetir, "A continuación" desde la
+  ocurrencia real del tema y pie fijo "Vaciar · Guardar lista". Si hay IDs
+  repetidos usa el índice de la ocurrencia, nunca `indexOf(id)`.
+- **TrackInfoSheet** — hoja inferior con scrim, `SongInfoContent` puro, datos
+  en píldoras, artista/álbum navegables y acciones en dos filas de tres.
+- **EqSheet y diálogos de datos** — cuerpo desplazable, colores explícitos y
+  controles con nombre accesible.
 
 ## 📏 Reglas duras (aprende de nuestros bugs)
 
@@ -488,7 +491,41 @@ misma jerarquía que el reproductor.
 - Cola, playlist y tarjetas de descarga usan `animateItemPlacement()`
   (se deslizan al reordenar / aparecer / desaparecer).
 - Estadísticas: tarjetas con fade+12 dp y contador ascendente (650 ms).
-- EmptyState: fade+10 dp al aparecer y el icono "respira" (2.8 s).
+- EmptyState: fade+10 dp finito al aparecer; sin respiración infinita decorativa.
 - Hoja de info: entra con spring 0.85/380 y el scrim aparece con ella.
 - Feedback de pulsación (0.985) en filas de Ajustes, resultados online y
   playlist.
+
+
+## Coherencia global 7.26 (pase de UI)
+
+Objetivo: una sola gramática visual en todas las pantallas y estados, sin
+sacrificar rendimiento.
+
+- **Escala y contraste:** `Display 26`, `Title 16`, `Body 15`, `Sub 13`, `Micro 11`.
+  Acentos claros verificados ≥ 4,5:1 sobre fondo y con blanco encima (azul de
+  texto `#02649D`). Todo texto secundario lleva color explícito.
+- **Selección con alcance real:** `SelectionScope` registra los IDs que la
+  pantalla muestra (Inicio, Explorar filtrado, artista, álbum, playlist,
+  favoritos). «Todo» marca ese conjunto, no la biblioteca global; cambiar de
+  pestaña o volver de un detalle cierra la selección. La consulta ya no se borra
+  al entrar: la selección coincide con lo visible.
+- **Una acción, un gesto:** las tarjetas recientes y las filas de playlist
+  respetan la selección activa (tocar marca en vez de reproducir). Mantener
+  pulsado inicia selección; ⋮ abre la ficha.
+- **Álbumes homónimos:** se transporta `AlbumIdentity(nombre, artista)` al
+  detalle, filtros, búsqueda y reproducción. Nunca se vuelve a filtrar solo por
+  nombre.
+- **Cola por ocurrencia:** `QueueSheetContent(currentIndex)` resuelve el tema
+  actual por índice real del timeline; con `[A,B,A,C]` la lista de siguientes
+  arranca en C. El ecualizador solo se anima si `isPlaying`.
+- **Búsqueda en Explorar:** con consulta activa se muestran las canciones
+  coincidentes (y vacío explicativo), no las categorías sin filtrar.
+- **Detalle de lista:** cabecera de colección con portada y acciones separadas;
+  filas con carátula real y menú visible.
+- **Accesibilidad:** `SeekBar` expone `setProgress`; filas anuncian selección y
+  acción; botones sin texto llevan descripción. Cuerpos de diálogo con scroll
+  para 320 dp / fuente 1,3–2×.
+- **Inicio:** sin hero duplicado cuando el miniplayer ya muestra el tema actual.
+- **Movimiento:** entrada finita de 170–220 ms, press 0,985, selección 180 ms;
+  nada de animaciones infinitas decorativas ni blur sobre scroll.

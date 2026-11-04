@@ -111,7 +111,7 @@ class OnlineTabTest {
         rule.onNodeWithContentDescription("Opciones").performClick()
         rule.waitForIdle()
         rule.onNodeWithText("Descargas").assertExists()
-        rule.onNodeWithText("Importar playlist").assertExists()
+        rule.onNodeWithText("Importar lista").assertExists()
         rule.onNodeWithText("Calidad alta").assertExists()
     }
 
@@ -134,7 +134,7 @@ class OnlineTabTest {
         )
         rule.onNodeWithText("3 resultados").assertExists()
         rule.onNodeWithText("Queen Greatest Hits").assertExists()
-        rule.onNodeWithText("Queen Official · 17 temas · Playlist o álbum").assertExists()
+        rule.onNodeWithText("Queen Official · 17 temas · Lista o álbum").assertExists()
         rule.onNodeWithText("Queen Greatest Hits").performClick()
         rule.waitForIdle()
         assert(abierta?.id == "PL123") { "no se abrió la colección: ${abierta?.id}" }
