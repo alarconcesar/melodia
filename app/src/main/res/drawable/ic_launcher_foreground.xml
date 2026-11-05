@@ -1,12 +1,9 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Corchea de Melodia: cabeza inclinada, mastil y bandera curva.
-         Contenido dentro de la zona segura de 66 dp del icono adaptativo. -->
-    <path android:fillColor="#2EE56B"
-        android:pathData="M40.5,74.5m-11.5,0a11.5,8.8 -20 1,0 23,0a11.5,8.8 -20 1,0 -23,0z" />
-    <path android:fillColor="#2EE56B"
-        android:pathData="M51,24.5h7.5v50h-7.5z" />
-    <path android:fillColor="#2EE56B"
-        android:pathData="M58.5,24.5C66.5,24.5 75.5,30 78.5,42.5C74.5,35.5 67.5,31.5 58.5,31.5Z" />
+    <!-- Corchea de Melodia: glifo audiotrack centrado por masa y dentro de la zona segura. -->
+    <group android:translateX="17.003" android:translateY="15.128"
+        android:scaleX="3.0556" android:scaleY="3.0556">
+        <path android:fillColor="#2EE56B" android:pathData="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z" />
+    </group>
 </vector>
