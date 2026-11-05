@@ -45,9 +45,7 @@ import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
@@ -124,7 +122,6 @@ fun SettingsScreen(
     var showSleep by rememberSaveable { mutableStateOf(false) }
     var safeMode by remember { mutableStateOf(com.melodia.app.SafeMode.estaActivo(ctx)) }
     var showAbout by rememberSaveable { mutableStateOf(false) }
-    var showPrivacy by rememberSaveable { mutableStateOf(false) }
     var showExcluded by rememberSaveable { mutableStateOf(false) }
     val excluded by vm.excludedFolders.collectAsState()
     val version = remember {
@@ -246,10 +243,6 @@ fun SettingsScreen(
                     }
                 }
 
-                // ── Rendimiento: el refresco queda aislado de las demás preferencias ──
-                item(key = "rendimiento-titulo") { SectionLabel("Rendimiento") }
-                item(key = "rendimiento") { LivePerformanceSettings() }
-
                 // ── Info ──
                 item(key = "informacion-titulo") { SectionLabel("Información") }
                 item(key = "informacion") {
@@ -259,13 +252,6 @@ fun SettingsScreen(
                             title = "Melodia $version",
                             value = "Reproductor local · sin anuncios",
                             onClick = { showAbout = true }
-                        )
-                        SettingsDivider()
-                        SettingsRow(
-                            icon = Icons.Default.PrivacyTip,
-                            title = "Privacidad",
-                            value = "Política completa y servicios externos",
-                            onClick = { showPrivacy = true }
                         )
                         SettingsDivider()
                         SettingsSwitch(
@@ -323,7 +309,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showPrivacy) PrivacyPolicySheet(onClose = { showPrivacy = false })
     if (showExcluded) {
         ExcludedFoldersDialog(vm, excluded, onClose = { showExcluded = false })
     }
@@ -560,67 +545,6 @@ internal fun SettingsAboutContent(version: String) {
     }
 }
 
-@Composable
-private fun LivePerformanceSettings() {
-    var tick by remember { mutableStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(1000)
-            tick++
-        }
-    }
-    val overall = remember(tick) { com.melodia.app.perf.FrameMonitor.overall() }
-    val perScreen = remember(tick) { com.melodia.app.perf.FrameMonitor.byScreen() }
-    SettingsPerformanceContent(overall, perScreen) {
-        com.melodia.app.perf.FrameMonitor.reset()
-        tick++
-    }
-}
-
-@Composable
-internal fun SettingsPerformanceContent(
-    overall: com.melodia.app.perf.FrameMonitor.ScreenStats,
-    perScreen: List<com.melodia.app.perf.FrameMonitor.ScreenStats>,
-    onReset: () -> Unit
-) {
-    val cs = MaterialTheme.colorScheme
-    SettingsCard {
-        SettingsRow(
-            icon = Icons.Default.Speed,
-            title = if (overall.frames < 30) "Midiendo fluidez…" else "${overall.fps} fotogramas por segundo",
-            value = if (overall.frames < 30) "Navega un momento y vuelve para ver los resultados."
-                else "${overall.slowPct}% de fotogramas lentos · peor: ${overall.worstMs} ms"
-        )
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // Etiqueta y valor en dos líneas: nunca compiten por el ancho.
-            perScreen.take(4).forEach { stats ->
-                Column(Modifier.semantics(mergeDescendants = true) {}) {
-                    Text(stats.screen, style = SettingsTitleStyle, color = cs.onSurface)
-                    Text(
-                        "${stats.fps} fotogramas/s · ${stats.slowPct}% lentos · peor: ${stats.worstMs} ms",
-                        style = SettingsDetailStyle,
-                        color = if (stats.slowPct >= 5) cs.error else cs.onSurfaceVariant
-                    )
-                }
-            }
-            Text(
-                "Reinicia la medición, usa una pantalla durante 10 s y vuelve a consultar los resultados.",
-                style = SettingsDetailStyle, color = cs.onSurfaceVariant
-            )
-            TextButton(onClick = onReset, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("Reiniciar medición", style = SettingsDetailStyle, color = cs.primary)
-            }
-        }
-    }
-}
-
-/**
- * Carpetas que no deben entrar a la biblioteca (audios de WhatsApp, grabaciones
- * de voz, etc.). Se listan también las excluidas para poder reactivarlas.
- */
 @Composable
 private fun ExcludedFoldersDialog(
     vm: MainViewModel,

@@ -30,7 +30,6 @@ class MainActivity : ComponentActivity() {
         try { if (res[audioPerm] == true && ::vm.isInitialized) vm.reload() } catch (_: Exception) {}
     }
     override fun onDestroy() {
-        try { com.melodia.app.perf.FrameMonitor.stop() } catch (_: Exception) {}
         super.onDestroy()
     }
 
@@ -38,7 +37,6 @@ class MainActivity : ComponentActivity() {
     @Suppress("UNCHECKED_CAST")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        com.melodia.app.perf.FrameMonitor.start()
         // Pantalla completa real: el fondo y el blur llegan hasta los bordes
         try { enableEdgeToEdge() } catch (_: Exception) {}
         val app = application as MelodiaApp

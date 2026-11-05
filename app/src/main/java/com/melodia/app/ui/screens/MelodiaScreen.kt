@@ -338,21 +338,6 @@ fun MelodiaScreen(vm: MainViewModel) {
     var showXfade by rememberSaveable { mutableStateOf(false) }
     var showStats by rememberSaveable { mutableStateOf(false) }
     var showLib by rememberSaveable { mutableStateOf(false) }
-    // Etiqueta para el reporte de fluidez (Ajustes → Rendimiento).
-    LaunchedEffect(tab, showPlayer, showSettings, showLyrics) {
-        com.melodia.app.perf.FrameMonitor.screen(
-            when {
-                showSettings -> "Ajustes"
-                showLyrics -> "Letra"
-                showPlayer -> "Reproductor"
-                tab == 0 -> "Inicio"
-                tab == 1 -> "Explorar"
-                tab == 2 -> "Listas"
-                tab == 3 -> "Favs"
-                else -> "Online"
-            }
-        )
-    }
     var showBackup by rememberSaveable { mutableStateOf(false) }
     var showEq by rememberSaveable { mutableStateOf(false) }
     var showInfoId by rememberSaveable { mutableStateOf<Long?>(null) }

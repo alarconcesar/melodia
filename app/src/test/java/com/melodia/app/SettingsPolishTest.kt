@@ -46,11 +46,9 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.melodia.app.perf.FrameMonitor
 import com.melodia.app.ui.screens.ExcludedFoldersContent
 import com.melodia.app.ui.screens.SettingsAboutContent
 import com.melodia.app.ui.screens.SettingsAppearance
-import com.melodia.app.ui.screens.SettingsPerformanceContent
 import com.melodia.app.ui.screens.SettingsRow
 import com.melodia.app.ui.screens.SettingsSwitch
 import com.melodia.app.ui.screens.SleepTimerOptions
@@ -218,20 +216,10 @@ class SettingsPolishTest {
     }
 
     @Test
-    fun informacionDePrivacidadIncluyeServiciosYBusquedaAutomatica() {
+    fun acercaDeIncluyeServiciosYConsultasAutomaticas() {
         compose(fontScale = 2f, scrolling = false) { SettingsAboutContent("prueba") }
         rule.onNodeWithText("automáticamente.", substring = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("iTunes (Apple): carátulas y metadatos").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Versión prueba").performScrollTo().assertIsDisplayed()
-    }
-
-    @Test
-    fun rendimientoMuestraResultadosEnEspanolYPermiteReiniciar() {
-        var resets = 0
-        val stats = FrameMonitor.ScreenStats("Biblioteca", 59, 2, 36L, 100)
-        compose(fontScale = 2f) { SettingsPerformanceContent(stats, listOf(stats)) { resets++ } }
-        rule.onNodeWithText("59 fotogramas por segundo").assertExists()
-        rule.onNodeWithText("Reiniciar medición").performScrollTo().assertIsDisplayed().performClick()
-        rule.runOnIdle { assertEquals(1, resets) }
     }
 }

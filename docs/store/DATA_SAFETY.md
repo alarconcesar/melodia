@@ -77,11 +77,11 @@ La app no permite crear cuentas de Melodia en el código revisado. La obligació
 | ¿Son opcionales? | No demostrado para las consultas automáticas | Revisar controles reales para todos los usuarios; decidir si se requiere un control o aviso adicional |
 | Cifrado en tránsito | HTTPS explícito en iTunes y LRCLIB; resto sin validación exhaustiva | Capturar/inspeccionar destinos, redirecciones y enlaces dinámicos de audio e imágenes del artefacto final; no marcar «todo cifrado» solo por ejemplos |
 | Solicitudes de eliminación | Borrado local descrito; borrado externo sin comprobar | Resolver contacto/mecanismo real, instrucciones para respaldos y datos de terceros; no inventar un servicio de eliminación |
-| Aviso destacado y consentimiento | La sección Privacidad informa de servicios y consultas automáticas, pero es un resumen | Evaluar si hace falta aviso/consentimiento antes de la transmisión según expectativas y datos; documentar decisión y secuencia. Tener permiso de audio no equivale por sí solo a consentimiento para cualquier envío externo.[2] |
-| Política completa dentro de la app | Pendiente | `SettingsAboutContent` solo muestra resumen y fuentes; no contiene este texto completo ni enlace público. No dar por cumplido el acceso completo |
+| Aviso destacado y consentimiento | «Acerca de» (Ajustes) informa de servicios y consultas automáticas, pero es un resumen y no hay pantalla dedicada | Evaluar si hace falta aviso/consentimiento antes de la transmisión según expectativas y datos; documentar decisión y secuencia. Tener permiso de audio no equivale por sí solo a consentimiento para cualquier envío externo.[2] |
+| Política dentro de la app | **No incluida por decisión del titular** | La app no muestra ni enlaza la política: se retiraron la hoja y el recurso embebido. La URL pública se declara solo en la ficha de Play Console; no hay acceso desde la app |
 | Contacto público y de privacidad | **Pendiente por instrucción expresa del titular: no añadir ningún correo** | Proporcionar y aprobar un punto de contacto real o mecanismo de consultas antes del envío; la política exige ese elemento. No se inventó correo, URL ni marcador en `PRIVACY.md`.[2] |
 | Responsable y mercados | Sin validar | Confirmar identidad del titular, mercados, roles y bases de tratamiento aplicables; revisar derechos y transferencias internacionales sin inventar garantías |
-| URL de privacidad | No publicada en este trabajo | Cuando se autorice, disponer de URL pública activa, sin inicio de sesión ni bloqueo geográfico; el archivo del repositorio no equivale a esa URL.[2] |
+| URL de privacidad | Publicada y verificada (5/11/2026): `https://vnic-cesar.tailb6ee43.ts.net/melodia/privacidad/` | Mantener activa y sin bloqueo; declararla en la ficha de Play Console. No está enlazada desde la app por decisión del titular.[2] |
 | Anuncios | No se identificó integración de anuncios en el código/dependencias directas revisados | Revalidar el artefacto final y sus dependencias antes de contestar la declaración |
 | Acceso a la aplicación | Sin cuenta de Melodia observada | Documentar permisos y acceso a funciones para revisión; no crear credenciales ficticias |
 | Servicio en primer plano multimedia | Declarado en manifiesto | Preparar justificación y evidencia real de reproducción iniciada por el usuario y controles; completar lo que pida la consola, no marcar como enviado |
@@ -97,7 +97,7 @@ La app no permite crear cuentas de Melodia en el código revisado. La obligació
 - [ ] Revisar políticas de destinatarios y documentar lo que siga siendo desconocido; no deducir retención de la caché local.
 - [ ] Resolver categorías y decisiones de recogida/compartición, opcionalidad y tratamiento temporal con evidencia.
 - [ ] Probar borrado, confirmaciones, cachés, exportación, respaldo Android y restauración mediante `QA_DEVICE_CHECKLIST.md`.
-- [ ] Resolver contacto real, revisión del responsable, acceso completo a privacidad y URL pública cuando se autoricen.
+- [ ] Resolver contacto real, revisión del responsable y declaración de la URL pública en Play Console.
 - [ ] Resolver avisos/consentimientos aplicables, licencias/derechos y decisiones de audiencia sin cerrar por esta edición el punto 1.
 - [ ] Con aprobación del titular y solo con autorización de envío, trasladar las respuestas a Play Console y conservar la versión aprobada y sus pruebas.
 

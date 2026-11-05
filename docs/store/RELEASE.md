@@ -1,7 +1,8 @@
 # Melodia — Estado de preparación de la publicación
 
-Revisión: 5 de noviembre de 2026. Rama `publicacion-20261105`, versión **7.28 (versionCode 95)**.
-Base de partida: `1f91a7e` (7.27 / 94).
+Revisión: 5 de noviembre de 2026. Rama `publicacion-20261105`, versión **7.29 (versionCode 96)**.
+Base de partida: `1f91a7e` (7.27 / 94); la preparación de publicación entró en 7.28 (95) y 7.29 retira
+la medición de rendimiento y toda mención a la política dentro de la app.
 
 **Preparado, no enviado.** Este documento registra qué está verificado y qué falta. No autoriza subir
 la app a Google Play ni sustituye las pruebas en un teléfono real.
@@ -30,7 +31,7 @@ ANDROID_HOME=/home/ubuntu/Android ./gradlew \
   testDebugUnitTest lintRelease assemblePerf assembleRelease bundleRelease --console=plain
 ```
 
-Resultado del build final: **BUILD SUCCESSFUL**, **207 pruebas, 0 fallos, 0 errores, 0 omitidas**.
+Resultado del build final: **BUILD SUCCESSFUL**, **203 pruebas, 0 fallos, 0 errores, 0 omitidas**.
 
 ## 2. Firma y artefactos
 
@@ -44,7 +45,7 @@ Resultado del build final: **BUILD SUCCESSFUL**, **207 pruebas, 0 fallos, 0 erro
   `com.melodia.app`. `keystore.properties` y `*.jks` están ignorados por git y no entran en el repo.
 - `apksigner verify` pasa en perf y release; el AAB valida con `bundletool 1.18.3 validate` (JAR
   descargado del release oficial con SHA-256 comprobado) y su firma JAR verifica con `jarsigner`.
-- Manifest del AAB comprobado: `com.melodia.app`, `versionCode 95`, `versionName 7.28`, `minSdk 24`,
+- Manifest del AAB comprobado: `com.melodia.app`, `versionCode 96`, `versionName 7.29`, `minSdk 24`,
   `targetSdk 36`, `debuggable=false`.
 - **APK/AAB no contienen código nativo** (`.so` = 0), por lo que no aplica el problema de empaquetado
   de 16 KB; igual conviene probar en un entorno de 16 KB antes de dar por cerrado ese punto.
@@ -63,8 +64,9 @@ Resultado del build final: **BUILD SUCCESSFUL**, **207 pruebas, 0 fallos, 0 erro
 - La política describe datos locales, consultas externas (YouTube/NewPipe, LRCLIB, iTunes), dirección
   IP, consultas automáticas, retención desconocida de terceros, borrado, derechos y respaldos de
   Android. **No promete que «ningún dato sale»** ni que borrar la app elimina copias externas.
-- Dentro de la app: Ajustes → «Política completa y servicios externos» abre la hoja
-  `PrivacyPolicySheet`, que carga el texto canónico completo y ofrece el enlace público.
+- Dentro de la app **no hay ninguna mención a la política de privacidad**: ni enlace, ni hoja, ni
+  texto embebido. Decisión del titular (5 de noviembre de 2026). El texto vive en el sitio público y
+  la URL se declara únicamente en la ficha de Play Console, que es donde la tienda la exige.
 - URL pública: <https://vnic-cesar.tailb6ee43.ts.net/melodia/privacidad/>
   - Verificada por HTTPS real contra las dos IP de ingreso: 200, TLS válido, contenido idéntico al
     build local (SHA-256).
@@ -92,7 +94,10 @@ Resultado del build final: **BUILD SUCCESSFUL**, **207 pruebas, 0 fallos, 0 erro
 - Cobertura automatizada nueva de esta pasada:
   - `DeleteConsentTest` (4): consentimiento por URI en Android 10 y por lote en 11+.
   - `PublicationPolicyTest` (9): límite de 2000 URI por solicitud y rutas del widget.
-  - `PrivacyPolicyTest` (3): recurso canónico y hoja completa a 320 dp.
+  - `PrivacyPolicyTest` se retiró junto con la hoja y el recurso: la app ya no contiene la palabra
+  «privacidad» ni el texto de la política.
+- `SettingsPolishTest` conserva el caso de «Acerca de», que sí informa de servicios externos y
+  consultas automáticas (no es la política).
 - Correcciones de comportamiento incluidas:
   - Borrado en Android 10 usa `RecoverableSecurityException`; `createDeleteRequest` solo desde API 30
     (antes se llamaba desde 29 y podía devolver un éxito falso).

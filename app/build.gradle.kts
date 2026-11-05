@@ -13,8 +13,8 @@ android {
         applicationId = "com.melodia.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 95
-        versionName = "7.28"
+        versionCode = 96
+        versionName = "7.29"
         resConfigs("es")
     }
     signingConfigs {
@@ -70,7 +70,6 @@ android {
             all { it.forkEvery = 1 }
         }
     }
-    sourceSets.getByName("main").res.srcDir(layout.buildDirectory.dir("generated/privacyResources"))
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.8" }
     kotlinOptions { jvmTarget = "17" }
@@ -79,14 +78,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
-
-// Un único texto canónico para web y app; se genera el recurso, no se duplica a mano.
-val generatePrivacyPolicy by tasks.registering(Copy::class) {
-    from(rootProject.file("docs/store/PRIVACY.md"))
-    into(layout.buildDirectory.dir("generated/privacyResources/raw"))
-    rename("PRIVACY.md", "privacy_policy.txt")
-}
-tasks.named("preBuild").configure { dependsOn(generatePrivacyPolicy) }
 
 dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
