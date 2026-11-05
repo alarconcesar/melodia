@@ -18,3 +18,12 @@ keystore.properties
 
 # Planes locales de sesión (no forman parte del producto)
 /.hermes/
+
+# Sitio de marketing: fuentes versionadas, builds y binarios fuera de git
+/web/node_modules/
+/web/dist/
+/web/public/descargas/*.apk
+/web/qa/*.png
+/web/qa/*.jpg
+/web/qa/*.webm
+/web/**/__pycache__/

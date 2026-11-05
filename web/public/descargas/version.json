@@ -1,0 +1,13 @@
+{
+  "app": "Melodia",
+  "version": "7.33",
+  "versionCode": 100,
+  "minSdk": 24,
+  "targetSdk": 36,
+  "variant": "release",
+  "channel": "prueba",
+  "bytes": 2913451,
+  "sha256": "f10d025565e8ae45aff7f2852047d17d111a78cd2d4ea564abd16e245f4a5b46",
+  "file": "melodia-7.33.apk",
+  "installationNote": "La firma release es distinta de las compilaciones internas perf. Respalda listas y favoritos antes de cualquier desinstalación."
+}

@@ -1,0 +1,58 @@
+[
+  {
+    "name": "caratula",
+    "aspect": "1:1",
+    "prompt": "Original fine art album cover photography, no text, no lettering, no logos, no interface. A solitary sharp volcanic sea stack emerging from dark calm Pacific ocean, the entire rock and its reflection in frame, rich cold forest green monochrome atmosphere with a small warm ivory full moon, subtle grain like a 35mm analog photograph, editorial music art direction, very dark nearly black corners, cinematic high contrast, minimal poetic composition with lots of negative space, premium indie album artwork, square composition.",
+    "exit_code": 0,
+    "result": {
+      "success": true,
+      "image": "/home/ubuntu/.hermes/profiles/emma/cache/generated/images/openai_codex_gpt-image-2-medium_20261105_232130_b1398675.png",
+      "model": "gpt-image-2-medium",
+      "prompt": "Original fine art album cover photography, no text, no lettering, no logos, no interface. A solitary sharp volcanic sea stack emerging from dark calm Pacific ocean, the entire rock and its reflection in frame, rich cold forest green monochrome atmosphere with a small warm ivory full moon, subtle grain like a 35mm analog photograph, editorial music art direction, very dark nearly black corners, cinematic high contrast, minimal poetic composition with lots of negative space, premium indie album artwork, square composition.",
+      "aspect_ratio": "square",
+      "modality": "text",
+      "provider": "openai-codex",
+      "size": "1024x1024",
+      "quality": "medium",
+      "input_image_count": 0,
+      "requested_size": "1024x1024",
+      "pixel_size": "1254x1254",
+      "reported_quality": "low",
+      "reported_size": "1254x1254",
+      "imagegen_request_id": "3926fcf3-1ad1-4ade-990a-8d2ad02170af"
+    },
+    "output": "/home/ubuntu/projects/melodia/web/public/images/caratula.webp",
+    "size": [
+      960,
+      960
+    ]
+  },
+  {
+    "name": "escucha",
+    "aspect": "16:9",
+    "prompt": "Premium editorial music lifestyle photograph for an independent music player brand, landscape horizontal composition. Candid side profile and upper torso of a young adult Latina woman wearing elegant black over ear headphones and a dark charcoal jacket, eyes closed, feeling music, standing at a concrete rooftop overlooking a quiet Lima urban skyline and the Pacific coast at blue hour. Subject on the right third, huge soft negative space on left with pale green-grey overcast sky. Direct flash mixed with natural twilight, 35mm film grain, rich graphite blacks, cool desaturated green grey palette with natural skin color, sophisticated fashion magazine campaign, authentic not stock photo, no text, no logos, no phone screen, no UI.",
+    "exit_code": 0,
+    "result": {
+      "success": true,
+      "image": "/home/ubuntu/.hermes/profiles/emma/cache/generated/images/openai_codex_gpt-image-2-medium_20261105_232142_a9053a12.png",
+      "model": "gpt-image-2-medium",
+      "prompt": "Premium editorial music lifestyle photograph for an independent music player brand, landscape horizontal composition. Candid side profile and upper torso of a young adult Latina woman wearing elegant black over ear headphones and a dark charcoal jacket, eyes closed, feeling music, standing at a concrete rooftop overlooking a quiet Lima urban skyline and the Pacific coast at blue hour. Subject on the right third, huge soft negative space on left with pale green-grey overcast sky. Direct flash mixed with natural twilight, 35mm film grain, rich graphite blacks, cool desaturated green grey palette with natural skin color, sophisticated fashion magazine campaign, authentic not stock photo, no text, no logos, no phone screen, no UI.",
+      "aspect_ratio": "landscape",
+      "modality": "text",
+      "provider": "openai-codex",
+      "size": "1536x1024",
+      "quality": "medium",
+      "input_image_count": 0,
+      "requested_size": "1536x1024",
+      "pixel_size": "1672x941",
+      "reported_quality": "medium",
+      "reported_size": "1672x941",
+      "imagegen_request_id": "7d93553a-bfa6-49c4-b7c6-c24836a3b4ac"
+    },
+    "output": "/home/ubuntu/projects/melodia/web/public/images/escucha.webp",
+    "size": [
+      1600,
+      900
+    ]
+  }
+]

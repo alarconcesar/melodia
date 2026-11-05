@@ -1,0 +1,226 @@
+[
+  {
+    "path": "404.html",
+    "status": 200,
+    "mime": "text/html; charset=utf-8",
+    "equal": true,
+    "bytes": 718
+  },
+  {
+    "path": "assets/index-CT7JyqmX.js",
+    "status": 200,
+    "mime": "application/javascript; charset=utf-8",
+    "equal": true,
+    "bytes": 7457
+  },
+  {
+    "path": "assets/index-NZDE72rH.css",
+    "status": 200,
+    "mime": "text/css",
+    "equal": true,
+    "bytes": 37432
+  },
+  {
+    "path": "assets/manrope-cyrillic-wght-normal-Dvxsihut.woff2",
+    "status": 200,
+    "mime": "application/octet-stream",
+    "equal": true,
+    "bytes": 14500
+  },
+  {
+    "path": "assets/manrope-greek-wght-normal-DL7QRZyv.woff2",
+    "status": 200,
+    "mime": "application/octet-stream",
+    "equal": true,
+    "bytes": 9444
+  },
+  {
+    "path": "assets/manrope-latin-ext-wght-normal-Ch3YOpNY.woff2",
+    "status": 200,
+    "mime": "application/octet-stream",
+    "equal": true,
+    "bytes": 15120
+  },
+  {
+    "path": "assets/manrope-latin-wght-normal-DHIcAJRg.woff2",
+    "status": 200,
+    "mime": "application/octet-stream",
+    "equal": true,
+    "bytes": 24836
+  },
+  {
+    "path": "assets/manrope-vietnamese-wght-normal-usUDDRr7.woff2",
+    "status": 200,
+    "mime": "application/octet-stream",
+    "equal": true,
+    "bytes": 8520
+  },
+  {
+    "path": "audio/costa-adentro.ogg",
+    "status": 200,
+    "mime": "audio/ogg",
+    "equal": true,
+    "bytes": 152516
+  },
+  {
+    "path": "audio/credits.json",
+    "status": 200,
+    "mime": "application/json",
+    "equal": true,
+    "bytes": 520
+  },
+  {
+    "path": "audio/fuera-de-hora.ogg",
+    "status": 200,
+    "mime": "audio/ogg",
+    "equal": true,
+    "bytes": 143829
+  },
+  {
+    "path": "audio/lado-b.ogg",
+    "status": 200,
+    "mime": "audio/ogg",
+    "equal": true,
+    "bytes": 160290
+  },
+  {
+    "path": "condiciones/index.html",
+    "status": 200,
+    "mime": "text/html; charset=utf-8",
+    "equal": true,
+    "bytes": 2941
+  },
+  {
+    "path": "descargas/melodia-7.33.apk",
+    "status": 200,
+    "mime": "application/octet-stream",
+    "equal": true,
+    "bytes": 2913451
+  },
+  {
+    "path": "descargas/version.json",
+    "status": 200,
+    "mime": "application/json",
+    "equal": true,
+    "bytes": 431
+  },
+  {
+    "path": "fonts/manrope-latin-variable.woff2",
+    "status": 200,
+    "mime": "application/octet-stream",
+    "equal": true,
+    "bytes": 24836
+  },
+  {
+    "path": "icons.svg",
+    "status": 200,
+    "mime": "image/svg+xml",
+    "equal": true,
+    "bytes": 9081
+  },
+  {
+    "path": "images/apple-touch-icon.png",
+    "status": 200,
+    "mime": "image/png",
+    "equal": true,
+    "bytes": 2094
+  },
+  {
+    "path": "images/caratula-480.webp",
+    "status": 200,
+    "mime": "image/webp",
+    "equal": true,
+    "bytes": 6626
+  },
+  {
+    "path": "images/caratula.webp",
+    "status": 200,
+    "mime": "image/webp",
+    "equal": true,
+    "bytes": 28232
+  },
+  {
+    "path": "images/escucha-800.webp",
+    "status": 200,
+    "mime": "image/webp",
+    "equal": true,
+    "bytes": 22390
+  },
+  {
+    "path": "images/escucha.webp",
+    "status": 200,
+    "mime": "image/webp",
+    "equal": true,
+    "bytes": 79452
+  },
+  {
+    "path": "images/favicon.png",
+    "status": 200,
+    "mime": "image/png",
+    "equal": true,
+    "bytes": 700
+  },
+  {
+    "path": "images/icon.png",
+    "status": 200,
+    "mime": "image/png",
+    "equal": true,
+    "bytes": 5906
+  },
+  {
+    "path": "images/mark.svg",
+    "status": 200,
+    "mime": "image/svg+xml",
+    "equal": true,
+    "bytes": 270
+  },
+  {
+    "path": "images/og-melodia.jpg",
+    "status": 200,
+    "mime": "image/jpeg",
+    "equal": true,
+    "bytes": 56364
+  },
+  {
+    "path": "index.html",
+    "status": 200,
+    "mime": "text/html; charset=utf-8",
+    "equal": true,
+    "bytes": 21636
+  },
+  {
+    "path": "legal.css",
+    "status": 200,
+    "mime": "text/css",
+    "equal": true,
+    "bytes": 1777
+  },
+  {
+    "path": "licencias/core-LICENSE.txt",
+    "status": 200,
+    "mime": "text/plain; charset=utf-8",
+    "equal": true,
+    "bytes": 1092
+  },
+  {
+    "path": "licencias/manrope-LICENSE.txt",
+    "status": 200,
+    "mime": "text/plain; charset=utf-8",
+    "equal": true,
+    "bytes": 4383
+  },
+  {
+    "path": "robots.txt",
+    "status": 200,
+    "mime": "text/plain; charset=utf-8",
+    "equal": true,
+    "bytes": 172
+  },
+  {
+    "path": "sitemap.xml",
+    "status": 200,
+    "mime": "text/xml; charset=utf-8",
+    "equal": true,
+    "bytes": 176
+  }
+]

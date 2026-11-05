@@ -1,0 +1,23 @@
+[
+  {
+    "file": "costa-adentro.ogg",
+    "duration": 32,
+    "bytes": 152516,
+    "bpm": 88,
+    "composition": "Original, síntesis numérica, sin muestras de terceros"
+  },
+  {
+    "file": "fuera-de-hora.ogg",
+    "duration": 32,
+    "bytes": 143829,
+    "bpm": 80,
+    "composition": "Original, síntesis numérica, sin muestras de terceros"
+  },
+  {
+    "file": "lado-b.ogg",
+    "duration": 32,
+    "bytes": 160290,
+    "bpm": 96,
+    "composition": "Original, síntesis numérica, sin muestras de terceros"
+  }
+]

@@ -1,0 +1,948 @@
+{
+  "url": "https://vnic-cesar.tailb6ee43.ts.net/melodia/",
+  "viewports": [
+    {
+      "width": 320,
+      "height": 844,
+      "overflow": 0,
+      "fontReady": true,
+      "fonts": [
+        "Manrope Variable"
+      ],
+      "heroTitle": {
+        "size": "48px",
+        "height": 96
+      },
+      "ctaBottom": 432,
+      "visualTop": 456,
+      "pageHeight": 7391,
+      "errors": [],
+      "badAssets": []
+    },
+    {
+      "width": 360,
+      "height": 844,
+      "overflow": 0,
+      "fontReady": true,
+      "fonts": [
+        "Manrope Variable"
+      ],
+      "heroTitle": {
+        "size": "48px",
+        "height": 96
+      },
+      "ctaBottom": 432,
+      "visualTop": 456,
+      "pageHeight": 7323,
+      "errors": [],
+      "badAssets": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": 0,
+      "fontReady": true,
+      "fonts": [
+        "Manrope Variable"
+      ],
+      "heroTitle": {
+        "size": "48px",
+        "height": 96
+      },
+      "ctaBottom": 432,
+      "visualTop": 456,
+      "pageHeight": 7201,
+      "errors": [],
+      "badAssets": []
+    },
+    {
+      "width": 430,
+      "height": 844,
+      "overflow": 0,
+      "fontReady": true,
+      "fonts": [
+        "Manrope Variable"
+      ],
+      "heroTitle": {
+        "size": "48px",
+        "height": 96
+      },
+      "ctaBottom": 408,
+      "visualTop": 432,
+      "pageHeight": 7113,
+      "errors": [],
+      "badAssets": []
+    },
+    {
+      "width": 768,
+      "height": 900,
+      "overflow": 0,
+      "fontReady": true,
+      "fonts": [
+        "Manrope Variable"
+      ],
+      "heroTitle": {
+        "size": "48px",
+        "height": 96
+      },
+      "ctaBottom": 546,
+      "visualTop": 96,
+      "pageHeight": 5787,
+      "errors": [],
+      "badAssets": []
+    },
+    {
+      "width": 1024,
+      "height": 900,
+      "overflow": 0,
+      "fontReady": true,
+      "fonts": [
+        "Manrope Variable"
+      ],
+      "heroTitle": {
+        "size": "60px",
+        "height": 120
+      },
+      "ctaBottom": 578,
+      "visualTop": 96,
+      "pageHeight": 5875,
+      "errors": [],
+      "badAssets": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "overflow": 0,
+      "fontReady": true,
+      "fonts": [
+        "Manrope Variable"
+      ],
+      "heroTitle": {
+        "size": "72px",
+        "height": 144
+      },
+      "ctaBottom": 591.75,
+      "visualTop": 97.75,
+      "pageHeight": 6010,
+      "errors": [],
+      "badAssets": []
+    },
+    {
+      "width": 1920,
+      "height": 900,
+      "overflow": 0,
+      "fontReady": true,
+      "fonts": [
+        "Manrope Variable"
+      ],
+      "heroTitle": {
+        "size": "96px",
+        "height": 192
+      },
+      "ctaBottom": 641.75,
+      "visualTop": 123.75,
+      "pageHeight": 6090,
+      "errors": [],
+      "badAssets": []
+    }
+  ],
+  "checks": [
+    {
+      "name": "320:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320:viewport-real",
+      "passed": true,
+      "detail": 320
+    },
+    {
+      "name": "320:overflow",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "320:font-loaded",
+      "passed": true,
+      "detail": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "name": "320:hero-cta-in-fold",
+      "passed": true,
+      "detail": 432
+    },
+    {
+      "name": "320:images",
+      "passed": true,
+      "detail": [
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula-480.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/escucha.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/icon.png",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "320:reveals",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "320:page-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "320:http-assets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "360:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360:viewport-real",
+      "passed": true,
+      "detail": 360
+    },
+    {
+      "name": "360:overflow",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "360:font-loaded",
+      "passed": true,
+      "detail": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "name": "360:hero-cta-in-fold",
+      "passed": true,
+      "detail": 432
+    },
+    {
+      "name": "360:images",
+      "passed": true,
+      "detail": [
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula-480.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/escucha.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/icon.png",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "360:reveals",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "360:page-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "360:http-assets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "390:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390:viewport-real",
+      "passed": true,
+      "detail": 390
+    },
+    {
+      "name": "390:overflow",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "390:font-loaded",
+      "passed": true,
+      "detail": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "name": "390:hero-cta-in-fold",
+      "passed": true,
+      "detail": 432
+    },
+    {
+      "name": "390:images",
+      "passed": true,
+      "detail": [
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula-480.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/escucha.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/icon.png",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "390:reveals",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "390:page-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "390:http-assets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "mobile:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "mobile:menu-expanded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "mobile:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "mobile:menu-focus-restored",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "mobile:menu-anchor-close",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430:viewport-real",
+      "passed": true,
+      "detail": 430
+    },
+    {
+      "name": "430:overflow",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "430:font-loaded",
+      "passed": true,
+      "detail": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "name": "430:hero-cta-in-fold",
+      "passed": true,
+      "detail": 408
+    },
+    {
+      "name": "430:images",
+      "passed": true,
+      "detail": [
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula-480.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/escucha.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/icon.png",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "430:reveals",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "430:page-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "430:http-assets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "768:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768:viewport-real",
+      "passed": true,
+      "detail": 768
+    },
+    {
+      "name": "768:overflow",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "768:font-loaded",
+      "passed": true,
+      "detail": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "name": "768:hero-cta-in-fold",
+      "passed": true,
+      "detail": 546
+    },
+    {
+      "name": "768:images",
+      "passed": true,
+      "detail": [
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula-480.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/escucha.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/icon.png",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "768:reveals",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "768:page-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "768:http-assets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1024:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024:viewport-real",
+      "passed": true,
+      "detail": 1024
+    },
+    {
+      "name": "1024:overflow",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "1024:font-loaded",
+      "passed": true,
+      "detail": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "name": "1024:hero-cta-in-fold",
+      "passed": true,
+      "detail": 578
+    },
+    {
+      "name": "1024:images",
+      "passed": true,
+      "detail": [
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula-480.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/escucha.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/icon.png",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "1024:reveals",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "1024:page-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1024:http-assets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1440:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440:viewport-real",
+      "passed": true,
+      "detail": 1440
+    },
+    {
+      "name": "1440:overflow",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "1440:font-loaded",
+      "passed": true,
+      "detail": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "name": "1440:hero-cta-in-fold",
+      "passed": true,
+      "detail": 591.75
+    },
+    {
+      "name": "1440:images",
+      "passed": true,
+      "detail": [
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula-480.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/escucha.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/icon.png",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "1440:reveals",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "1440:page-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1440:http-assets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "demo:real-playback",
+      "passed": true,
+      "detail": {
+        "paused": false,
+        "time": 0.270862,
+        "duration": 32,
+        "error": null
+      }
+    },
+    {
+      "name": "demo:pause",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "demo:favorite",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "demo:next-title",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "demo:second-audio",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "demo:eq-graves",
+      "passed": true,
+      "detail": [
+        8,
+        5,
+        0,
+        -1,
+        0
+      ]
+    },
+    {
+      "name": "demo:eq-manual-clears-presets",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "demo:eq-flat",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "faq:opens",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "faq:closes",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "download:sha256",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "download:size",
+      "passed": true,
+      "detail": 2913451
+    },
+    {
+      "name": "download:name",
+      "passed": true,
+      "detail": "Melodia-7.33.apk"
+    },
+    {
+      "name": "1920:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920:viewport-real",
+      "passed": true,
+      "detail": 1920
+    },
+    {
+      "name": "1920:overflow",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "1920:font-loaded",
+      "passed": true,
+      "detail": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "name": "1920:hero-cta-in-fold",
+      "passed": true,
+      "detail": 641.75
+    },
+    {
+      "name": "1920:images",
+      "passed": true,
+      "detail": [
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula-480.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/caratula.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/escucha.webp",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/icon.png",
+          "ok": true
+        },
+        {
+          "src": "/melodia/images/mark.svg",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "1920:reveals",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "1920:page-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1920:http-assets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "reduced:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "reduced:headline-visible",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "reduced:download-link",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "reduced:frame-transform",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "no-js:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "no-js:headline-visible",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "no-js:download-link",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "no-js:demo-honest",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "large-text:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "large-text:headline-visible",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "large-text:download-link",
+      "passed": true,
+      "detail": null
+    }
+  ],
+  "failures": []
+}

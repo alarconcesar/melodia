@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /melodia/
+
+# Vista previa: no indexar el hostname de infraestructura.
+# Cambiar esta política y el canonical al aprobar el dominio de lanzamiento.
