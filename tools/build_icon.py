@@ -91,27 +91,34 @@ def main() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="melodia-icon-out-"))
 
     tx, ty, s = base_transform()
-    # Pasada 1: centrar por caja. Pasada 2: corregir con el centroide real.
+    # Centrado por caja (contorno), no por masa: el ojo juzga la simetria del
+    # contorno. Centrar por centroide dejaba la caja 1-2 dp alta y a la derecha,
+    # que es exactamente lo que se percibe como "no esta centrado".
     for _ in range(2):
         fg = render(build_svg(tx, ty, s, False), tmp / "fg.png")
-        cx, cy = centroid(fg)
-        tx += (54 - cx * 108 / 1024)
-        ty += (54 - cy * 108 / 1024)
+        bbox = fg.getchannel("A").getbbox()
+        assert bbox, "El foreground quedo vacio"
+        tx += (54 - (bbox[0] + bbox[2]) / 2 * 108 / 1024)
+        ty += (54 - (bbox[1] + bbox[3]) / 2 * 108 / 1024)
 
     fg = render(build_svg(tx, ty, s, False), tmp / "fg.png")
-    cx, cy = centroid(fg)
-    centro = (cx * 108 / 1024, cy * 108 / 1024)
     bbox = fg.getchannel("A").getbbox()
-    assert bbox, "El foreground quedó vacío"
+    assert bbox, "El foreground quedo vacio"
     to_dp = 108 / 1024
     lo, hi = bbox[0] * to_dp, bbox[2] * to_dp
     top, bottom = bbox[1] * to_dp, bbox[3] * to_dp
+    centro_caja = ((lo + hi) / 2, (top + bottom) / 2)
+    cx, cy = centroid(fg)
     print("GLIFO bbox", round(lo, 2), round(top, 2), round(hi, 2), round(bottom, 2))
-    print("CENTROIDE", round(centro[0], 2), round(centro[1], 2))
+    print("MARGENES", round(lo, 2), round(108 - hi, 2), round(top, 2), round(108 - bottom, 2))
+    print("CENTRO_CAJA", round(centro_caja[0], 2), round(centro_caja[1], 2))
+    print("CENTROIDE", round(cx * to_dp, 2), round(cy * to_dp, 2))
     print("TRANSFORM", round(tx, 3), round(ty, 3), round(s, 4))
 
     assert lo >= 21 and hi <= 87 and top >= 21 and bottom <= 87, "El glifo sale de la zona segura"
-    assert abs(centro[0] - 54) <= 1 and abs(centro[1] - 54) <= 1, f"Centroide fuera: {centro}"
+    assert abs(centro_caja[0] - 54) <= 0.5 and abs(centro_caja[1] - 54) <= 0.5, f"Caja descentrada: {centro_caja}"
+    # Margen lateral y vertical deben ser iguales: es lo que se ve como centrado.
+    assert abs(lo - (108 - hi)) <= 0.6 and abs(top - (108 - bottom)) <= 0.6, "Margenes asimetricos"
 
     fg48 = fg.resize((48, 48), Image.LANCZOS)
     a48 = fg48.getchannel("A").load()
