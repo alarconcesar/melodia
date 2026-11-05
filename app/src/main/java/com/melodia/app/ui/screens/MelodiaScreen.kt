@@ -424,15 +424,19 @@ fun MelodiaScreen(vm: MainViewModel) {
     Box(Modifier.fillMaxSize().background(cs.background)) {
         DsBackground()
         Column(Modifier.fillMaxSize()) {
-            // ── Top bar DS compacta: sin logo, solo saludo + nombre ──
+            // ── Top bar: el saludo es el título. El nombre de la app ya está en
+            // el icono y repetirlo aquí se leía como «Buenas tardes, Melodia».
             Row(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 10.dp, top = 12.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(greeting(), style = Ds.Micro, color = cs.onSurfaceVariant)
-                    Text("Melodia", style = Ds.Title, color = cs.onBackground)
-                }
+                Text(
+                    greeting(),
+                    style = Ds.Display.copy(fontSize = 22.sp, lineHeight = 28.sp),
+                    color = cs.onBackground,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
                 if (sleepLeft != null) AssistChip(
                     onClick = { vm.sleep.cancel() },
                     label = { Text("${sleepLeft}m") },
