@@ -1,6 +1,6 @@
 # Melodia — Estado de preparación de la publicación
 
-Revisión: 5 de noviembre de 2026. Rama `publicacion-20261105`, versión **7.31 (versionCode 98)**.
+Revisión: 5 de noviembre de 2026. Rama `publicacion-20261105`, versión **7.32 (versionCode 99)**.
 Base de partida: `1f91a7e` (7.27 / 94); la preparación de publicación entró en 7.28 (95) 7.29 retira
 la medición de rendimiento y toda mención a la política, y 7.30–7.31 rehacen el icono con el glifo Material centrado por masa.
 
@@ -45,7 +45,7 @@ Resultado del build final: **BUILD SUCCESSFUL**, **203 pruebas, 0 fallos, 0 erro
   `com.melodia.app`. `keystore.properties` y `*.jks` están ignorados por git y no entran en el repo.
 - `apksigner verify` pasa en perf y release; el AAB valida con `bundletool 1.18.3 validate` (JAR
   descargado del release oficial con SHA-256 comprobado) y su firma JAR verifica con `jarsigner`.
-- Manifest del AAB comprobado: `com.melodia.app`, `versionCode 98`, `versionName 7.31`, `minSdk 24`,
+- Manifest del AAB comprobado: `com.melodia.app`, `versionCode 99`, `versionName 7.32`, `minSdk 24`,
   `targetSdk 36`, `debuggable=false`.
 - **APK/AAB no contienen código nativo** (`.so` = 0), por lo que no aplica el problema de empaquetado
   de 16 KB; igual conviene probar en un entorno de 16 KB antes de dar por cerrado ese punto.
