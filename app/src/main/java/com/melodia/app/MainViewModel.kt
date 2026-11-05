@@ -804,12 +804,13 @@ class MainViewModel(
         val ids = _selected.value.toList()
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            val sender = withContext(Dispatchers.IO) { repo.deleteSongs(ids) }
-            if (sender != null) {
-                onNeedsConfirm(sender)
-            } else {
-                clearSelection()
-                reload()
+            try {
+                val sender = withContext(Dispatchers.IO) { repo.deleteSongs(ids) }
+                if (sender != null) onNeedsConfirm(sender)
+                else { clearSelection(); reload() }
+            } catch (_: Exception) {
+                _notice.value = "No se pudieron borrar todos los archivos. Revisa los permisos e inténtalo de nuevo."
+                reload() // Mantiene la selección: un fallo no es un borrado confirmado.
             }
         }
     }

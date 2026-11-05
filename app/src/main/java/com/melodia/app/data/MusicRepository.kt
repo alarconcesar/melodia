@@ -96,23 +96,30 @@ class MusicRepository(context: Context, private val dlMeta: DownloadMetaStore = 
     suspend fun deleteSongs(ids: List<Long>): IntentSender? = withContext(Dispatchers.IO) {
         if (ids.isEmpty()) return@withContext null
         val uris = ids.map { ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }
-        // Se borra uno por uno: si un URI lanza, se pide confirmación SOLO por
-        // los que faltan (antes se pedía por TODOS, incluidos los ya borrados).
+        // Android 11+: consentimiento por lote. Android 10: se autoriza cada
+        // archivo con RecoverableSecurityException y DESPUÉS se reintenta.
+        // createDeleteRequest no existe hasta API 30 (no 29).
         val pendientes = mutableListOf<android.net.Uri>()
+        var consentimientoQ: IntentSender? = null
         uris.forEach { u ->
             try {
                 resolver.delete(u, null, null)
             } catch (e: Exception) {
-                val recoverable = generateSequence(e as? Throwable) { it.cause }
-                    .any { it is android.app.RecoverableSecurityException }
-                if (recoverable) pendientes += u
+                if (Build.VERSION.SDK_INT >= 30 &&
+                    generateSequence(e as Throwable) { it.cause }.any { it is SecurityException }) {
+                    pendientes += u
+                } else if (Build.VERSION.SDK_INT >= 29) {
+                    val recoverable = generateSequence(e as Throwable) { it.cause }
+                        .filterIsInstance<android.app.RecoverableSecurityException>().firstOrNull()
+                    if (recoverable != null) {
+                        if (consentimientoQ == null) consentimientoQ = recoverable.userAction.actionIntent.intentSender
+                    } else throw e
+                } else throw e // No convertir errores de permiso/IO en éxito.
             }
         }
-        if (pendientes.isEmpty()) return@withContext null
-        // createDeleteRequest existe desde API 29 (el gate era >= 30 y en
-        // Android 10 devolvía null = "éxito" falso).
-        if (Build.VERSION.SDK_INT < 29) return@withContext null
-        try { MediaStore.createDeleteRequest(resolver, pendientes).intentSender } catch (_: Exception) { null }
+        if (Build.VERSION.SDK_INT >= 30 && pendientes.isNotEmpty()) {
+            MediaStore.createDeleteRequest(resolver, MediaDeleteBatch.next(pendientes)).intentSender
+        } else consentimientoQ
     }
 
     /**

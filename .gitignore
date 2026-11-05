@@ -15,3 +15,6 @@ keystore.properties
 *.hprof
 *.keystore
 !debug.keystore
+
+# Planes locales de sesión (no forman parte del producto)
+/.hermes/

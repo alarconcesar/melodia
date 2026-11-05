@@ -109,9 +109,12 @@ fun SettingsScreen(
     val cs = MaterialTheme.colorScheme
     val ctx = LocalContext.current
     // Ajustes solo necesita el fundido, no el reloj ni el progreso de reproducción.
+    val initialPlaybackSettings = remember(vm) {
+        vm.playerState.value.let { it.crossfade to it.crossfadeSecs }
+    }
     val playbackSettings by remember(vm) {
         vm.playerState.map { it.crossfade to it.crossfadeSecs }.distinctUntilChanged()
-    }.collectAsState(initial = vm.playerState.value.let { it.crossfade to it.crossfadeSecs })
+    }.collectAsState(initial = initialPlaybackSettings)
     val (crossfadeEnabled, crossfadeSeconds) = playbackSettings
     val folder by vm.scanFolder.collectAsState()
     val minSecs by vm.minSecs.collectAsState()
@@ -121,6 +124,7 @@ fun SettingsScreen(
     var showSleep by rememberSaveable { mutableStateOf(false) }
     var safeMode by remember { mutableStateOf(com.melodia.app.SafeMode.estaActivo(ctx)) }
     var showAbout by rememberSaveable { mutableStateOf(false) }
+    var showPrivacy by rememberSaveable { mutableStateOf(false) }
     var showExcluded by rememberSaveable { mutableStateOf(false) }
     val excluded by vm.excludedFolders.collectAsState()
     val version = remember {
@@ -260,8 +264,8 @@ fun SettingsScreen(
                         SettingsRow(
                             icon = Icons.Default.PrivacyTip,
                             title = "Privacidad",
-                            value = "Archivos locales y servicios en línea",
-                            onClick = { showAbout = true }
+                            value = "Política completa y servicios externos",
+                            onClick = { showPrivacy = true }
                         )
                         SettingsDivider()
                         SettingsSwitch(
@@ -319,6 +323,7 @@ fun SettingsScreen(
         )
     }
 
+    if (showPrivacy) PrivacyPolicySheet(onClose = { showPrivacy = false })
     if (showExcluded) {
         ExcludedFoldersDialog(vm, excluded, onClose = { showExcluded = false })
     }

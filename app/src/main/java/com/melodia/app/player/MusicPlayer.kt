@@ -37,6 +37,7 @@ const val YT_STREAM_ID = -100L
 /** Saltos seguidos por error antes de rendirse (evita bucles con archivos muertos). */
 const val MAX_ERROR_SKIPS = 5
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MusicPlayer(private val context: Context) {
     var eq: EqualizerManager? = null
     private var exo: ExoPlayer? = null

@@ -306,11 +306,22 @@ fun MelodiaScreen(vm: MainViewModel) {
             vm.clearNotice()
         }
     }
+    var pendingDeleteConsent by rememberSaveable { mutableStateOf<android.content.IntentSender?>(null) }
     val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
     ) { res ->
-        if (res.resultCode == android.app.Activity.RESULT_OK) vm.clearSelection()
+        if (res.resultCode == android.app.Activity.RESULT_OK) {
+            // Android 10 concede permiso: se reintenta. Android 11+ borra el
+            // lote autorizado: el reintento avanza los pendientes (>2000 en 16).
+            // Los IDs ya borrados devuelven 0 y no vuelven a pedir consentimiento.
+            vm.deleteSelected { pendingDeleteConsent = it }
+        }
         vm.reload()
+    }
+    LaunchedEffect(pendingDeleteConsent) {
+        val sender = pendingDeleteConsent ?: return@LaunchedEffect
+        pendingDeleteConsent = null
+        deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
     }
     // Editar metadatos de archivos ajenos (API 29+) también pide consentimiento.
     val metaLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -732,11 +743,7 @@ fun MelodiaScreen(vm: MainViewModel) {
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteConfirm = false
-                    vm.deleteSelected { sender ->
-                        deleteLauncher.launch(
-                            androidx.activity.result.IntentSenderRequest.Builder(sender).build()
-                        )
-                    }
+                    vm.deleteSelected { sender -> pendingDeleteConsent = sender }
                 }) { Text("Borrar", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
@@ -1962,21 +1969,21 @@ fun NowPlaying(s: Song, vm: MainViewModel, isFav: Boolean, onClose: () -> Unit, 
                 // Sin mínimo que desborde: en horizontal el panel puede ser menor de 170 dp.
                 val artSize = minOf(maxWidth, maxHeight, 430.dp).coerceAtLeast(1.dp)
                 AnimatedContent(
-                    targetState = s.id, label = "nowplaying",
+                    targetState = s, label = "nowplaying",
                     transitionSpec = {
                         (fadeIn(tween(220)) + scaleIn(initialScale = 0.97f)) togetherWith
                             (fadeOut(tween(160)) + scaleOut(targetScale = 0.97f))
                     },
                     modifier = Modifier.align(Alignment.Center)
-                ) {
+                ) { artSong ->
                     Box(Modifier.size(artSize), contentAlignment = Alignment.Center) {
                         SongArt(
-                            albumId = s.albumId, size = artSize, shape = Ds.HeroShape,
-                            iconSize = artSize * 0.36f, artUrl = s.artUrl
+                            albumId = artSong.albumId, size = artSize, shape = Ds.HeroShape,
+                            iconSize = artSize * 0.36f, artUrl = artSong.artUrl
                         )
                         // Doble toque: izquierda −10 s, derecha +10 s
                         Box(
-                            Modifier.matchParentSize().pointerInput(s.id) {
+                            Modifier.matchParentSize().pointerInput(artSong.id) {
                                 detectTapGestures(onDoubleTap = { off ->
                                     if (off.x < size.width / 2) { vm.player.seekBy(-10_000); tapMsg = "−10 segundos" }
                                     else { vm.player.seekBy(10_000); tapMsg = "+10 segundos" }

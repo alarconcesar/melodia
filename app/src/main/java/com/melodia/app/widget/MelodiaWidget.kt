@@ -30,20 +30,35 @@ class MelodiaWidget : AppWidgetProvider() {
         val act = intent.action ?: return
         if (act !in ROUTED) return
         try {
-            androidx.core.content.ContextCompat.startForegroundService(
-                ctx, Intent(ctx, MelodiaPlaybackService::class.java).setAction(act)
-            )
-        } catch (_: Exception) {
-            try {
-                ctx.startActivity(
-                    Intent(ctx, MainActivity::class.java).apply {
-                        action = Intent.ACTION_MAIN
-                        addCategory(Intent.CATEGORY_LAUNCHER)
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
+            val app = ctx.applicationContext as com.melodia.app.MelodiaApp
+            val container = app.appContainer
+            val state = container.musicPlayer.state.value
+            when (WidgetActionPolicy.route(
+                isSleep = act == MelodiaPlaybackService.ACTION_SLEEP,
+                isPlaying = state.isPlaying,
+                hasActiveTrack = state.currentId > 0 || state.currentId == com.melodia.app.player.YT_STREAM_ID,
+                hasTimer = container.sleepTimer.minsLeft.value != null
+            )) {
+                WidgetActionPolicy.Route.START_SLEEP -> container.sleepTimer.start(30)
+                WidgetActionPolicy.Route.CANCEL_SLEEP -> container.sleepTimer.cancel()
+                WidgetActionPolicy.Route.OPEN_APP -> openApp(ctx)
+                WidgetActionPolicy.Route.START_SERVICE -> androidx.core.content.ContextCompat.startForegroundService(
+                    ctx, Intent(ctx, MelodiaPlaybackService::class.java).setAction(act)
                 )
-            } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {
+            openApp(ctx)
         }
+    }
+
+    private fun openApp(ctx: Context) {
+        try {
+            ctx.startActivity(Intent(ctx, MainActivity::class.java).apply {
+                action = Intent.ACTION_MAIN
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            })
+        } catch (_: Exception) {}
     }
 
     companion object {

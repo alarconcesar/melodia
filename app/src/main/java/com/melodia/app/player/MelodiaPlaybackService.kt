@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
  *   la reanudación del sistema la trae de vuelta al reproducir).
  * - Sin cola: se retira la notificación y el servicio se detiene.
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MelodiaPlaybackService : MediaSessionService() {
 
     private var session: MediaSession? = null

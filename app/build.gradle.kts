@@ -8,13 +8,13 @@ import java.util.Properties
 
 android {
     namespace = "com.melodia.app"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.melodia.app"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 94
-        versionName = "7.27"
+        targetSdk = 36
+        versionCode = 95
+        versionName = "7.28"
         resConfigs("es")
     }
     signingConfigs {
@@ -56,10 +56,10 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
     }
-    // Sin red en el VPS: lintVital intenta bajar sus jars y rompe el build offline.
+    // La publicación exige lint real: ningún error queda oculto por el build.
     lint {
-        checkReleaseBuilds = false
-        abortOnError = false
+        checkReleaseBuilds = true
+        abortOnError = true
     }
     testOptions {
         unitTests {
@@ -70,6 +70,7 @@ android {
             all { it.forkEvery = 1 }
         }
     }
+    sourceSets.getByName("main").res.srcDir(layout.buildDirectory.dir("generated/privacyResources"))
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.8" }
     kotlinOptions { jvmTarget = "17" }
@@ -78,6 +79,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+
+// Un único texto canónico para web y app; se genera el recurso, no se duplica a mano.
+val generatePrivacyPolicy by tasks.registering(Copy::class) {
+    from(rootProject.file("docs/store/PRIVACY.md"))
+    into(layout.buildDirectory.dir("generated/privacyResources/raw"))
+    rename("PRIVACY.md", "privacy_policy.txt")
+}
+tasks.named("preBuild").configure { dependsOn(generatePrivacyPolicy) }
 
 dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
