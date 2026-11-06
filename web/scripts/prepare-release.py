@@ -53,7 +53,9 @@ def main():
     assert version_match and code_match, 'Falta la versión de Android'
     version = version_match[1]
     code = int(code_match[1])
-    assert version == '7.33' and code == 100, 'Actualiza el copy y la descarga de la web antes de cambiar de versión'
+    manifest = json.loads((ROOT / 'public/descargas/version.json').read_text())
+    assert version == manifest['version'] and code == manifest['versionCode'], \
+        'La ficha de descarga no coincide con la versión compilada'
     apk = APP / 'app/build/outputs/apk/release/app-release.apk'
     subprocess.run(['/home/ubuntu/Android/build-tools/35.0.0/apksigner','verify',str(apk)],check=True)
     # aapt2 en ARM64 necesita box64; si no está disponible, la firma y la versión

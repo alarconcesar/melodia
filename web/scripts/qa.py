@@ -13,6 +13,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 URL=os.environ.get('MELODIA_QA_URL','http://127.0.0.1:8942/melodia/')
 CHROME=sorted(Path.home().glob('.cache/ms-playwright/chromium_headless_shell-*/chrome-linux/headless_shell'))[-1]
 RESULT={'url':URL,'viewports':[],'checks':[],'failures':[]}
+version=json.loads((ROOT/'public/descargas/version.json').read_text())
 
 def record(name,value,detail=None):
     RESULT['checks'].append({'name':name,'passed':bool(value),'detail':detail})
@@ -117,7 +118,7 @@ with sync_playwright() as pw:
         record(f'{mode}:overflow',page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
         record(f'{mode}:headline-visible',page.locator('h1').evaluate('(e)=>Number(getComputedStyle(e).opacity)>0.99'))
         href=page.locator('.download-link').get_attribute('href') or ''
-        record(f'{mode}:download-link',href.endswith('melodia-7.33.apk'),href)
+        record(f'{mode}:download-link',href.endswith(version['file']),href)
         if mode=='reduced': record('reduced:frame-transform',page.locator('.demo-frame').evaluate('(e)=>getComputedStyle(e).transform')=='none')
         if mode=='no-js':record('no-js:demo-honest',page.locator('.no-js-demo').is_visible())
         context.close()

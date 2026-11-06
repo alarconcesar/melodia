@@ -737,7 +737,7 @@
       "passed": true,
       "detail": {
         "paused": false,
-        "time": 0.800719,
+        "time": 0.814692,
         "duration": 17.846333,
         "error": null
       }
@@ -801,12 +801,12 @@
     {
       "name": "download:size",
       "passed": true,
-      "detail": 2913451
+      "detail": 2913607
     },
     {
       "name": "download:name",
       "passed": true,
-      "detail": "melodia-7.33.apk"
+      "detail": "melodia-7.35.apk"
     },
     {
       "name": "1920:http",
@@ -901,7 +901,7 @@
     {
       "name": "reduced:download-link",
       "passed": true,
-      "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.33/melodia-7.33.apk"
+      "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.35/melodia-7.35.apk"
     },
     {
       "name": "reduced:frame-transform",
@@ -921,7 +921,7 @@
     {
       "name": "no-js:download-link",
       "passed": true,
-      "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.33/melodia-7.33.apk"
+      "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.35/melodia-7.35.apk"
     },
     {
       "name": "no-js:demo-honest",
@@ -941,7 +941,7 @@
     {
       "name": "root-font-20:download-link",
       "passed": true,
-      "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.33/melodia-7.33.apk"
+      "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.35/melodia-7.35.apk"
     }
   ],
   "failures": []
