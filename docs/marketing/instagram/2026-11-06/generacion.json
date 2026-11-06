@@ -1,0 +1,58 @@
+{
+  "proyecto": "Melodia",
+  "fecha": "2026-11-06",
+  "pieza": "Presentación de la app para el feed de Instagram",
+  "estado": "generada y verificada; no publicada en Instagram",
+  "commit_contexto_marca": "5c911ebe44b3d2b64e173ddfbc15cad556262e72",
+  "referencias": [
+    "/home/ubuntu/projects/melodia/docs/store/icon-512.png",
+    "/home/ubuntu/projects/melodia/web/qa/runtime/mobile-audit-hero-1440.png"
+  ],
+  "generaciones": [
+    {
+      "etapa": "base",
+      "archivo_nativo": "fuentes/base-codex.png",
+      "proveedor_confirmado": "openai-codex",
+      "modelo_devuelto": "gpt-image-2-medium",
+      "calidad_devuelta": "medium",
+      "tamano_solicitado": "1024x1536",
+      "tamano_real": "1122x1402",
+      "request_id": "b1adc41c-b30b-417c-bbdc-0c82cad31878",
+      "sha256": "7062491adb37e1f8143856108532187c34fe7b196aa91dd6afc2e3f39dac8311",
+      "prompt": "Create ONE polished, art-directed Instagram FEED launch poster for the Android music app MELODIA. Final composition must be VERTICAL 4:5, intended for 1080 x 1350 px export. NOT a story, NOT a landscape screenshot, NOT a collage. Keep all important text and the complete logo comfortably within an 80 px-equivalent safe margin.\n\nBRAND REFERENCES: reference 1 is the actual official Melodia app icon: preserve that precise single musical-note silhouette and vivid green, do NOT redesign it, substitute a double note, or make a Spotify-like mark. Reference 2 is the approved landing page, supplied ONLY for brand typography, black/green palette and editorial mood; do NOT copy the website layout, browser header, player, or screenshot. The brand headline has just been explicitly approved by the owner: 'Tu música. A tu manera.' This MUST remain the main headline. Do not replace it with 'Descarga música gratis'.\n\nART DIRECTION: a striking, premium minimalist music-launch poster. Deep true-black background, restrained emerald accents exactly #2EE56B, warm-white type. Sophisticated Manrope-like geometric typography, excellent kerning, confident asymmetric editorial composition, generous negative space. The central/bottom visual is a beautiful sculptural pair of unbranded graphite over-ear headphones in controlled studio lighting, with a single elegant translucent emerald ribbon of sound passing through the earcups. Tactile matte graphite, restrained polished details, subtle green edge light. This is a CONCEPTUAL MUSIC VISUAL, not a product hardware claim. Make it feel designed by an excellent music-brand art director, not a generic AI tech template. No excessive glow, purple gradients, particle explosions, extra floating objects, grids of cards, ornamental dashboards or visual clutter.\n\nLAYOUT AND EXACT SPANISH COPY: At top, small official app mark and the brand word 'melodia.' On the upper left / upper half, a large two-line headline, first line warm white and second line green:\n'Tu música.'\n'A tu manera.'\nBelow it in clearly smaller but easily readable text:\n'Descarga música gratis.'\n'Escúchala sin conexión.'\nLet the headphones occupy the center/lower part with clear separation from all typography, dynamic but balanced. At the bottom a restrained label:\n'Para Android · Código abierto'\nAnd an understated but clear call to action:\n'Descárgala en GitHub'\nAt the very bottom a legible small responsible-use line:\n'Contenido propio o autorizado.'\n\nThe brand and headline must be immediately readable at phone feed size. Spell every Spanish word exactly, including all accents. Include NO other words, made-up handles, emails, prices, testimonials or statistics. NO Google Play badge, Apple/iPhone device, Spotify/YouTube logo, fake Android app UI, fabricated app screenshot, or invented QR code. The app is free/open source and distributed on GitHub; do not claim unlimited content or rights to any music. This should be the finished Instagram announcement image, not a design board or presentation mockup."
+    },
+    {
+      "etapa": "aclaración de categoría",
+      "archivo_nativo": "fuentes/ajuste-codex.png",
+      "imagen_de_entrada": "fuentes/base-codex.png",
+      "proveedor_confirmado": "openai-codex",
+      "modelo_devuelto": "gpt-image-2-medium",
+      "calidad_devuelta": "medium",
+      "tamano_solicitado": "1024x1536",
+      "tamano_real": "1122x1402",
+      "request_id": "afa1b123-73f9-482f-9de2-282a7115a5a9",
+      "sha256": "9637762cb7def5b430eca535e6a54f4182598188d6c1a6aacc0529d8696a5cdc",
+      "prompt": "Make ONE strictly localized typography correction to this finished Instagram launch poster. Preserve the exact 4:5 vertical composition, logo, headline, typography hierarchy, black and green palette, headphones, emerald ribbon, lighting, call-to-action button, all spacing and every other word. Do not redesign anything. In the small information line immediately above the green 'Descárgala en GitHub' call-to-action, replace 'Para Android · Código abierto' with the exact text 'App de música para Android · Código abierto'. This line must be clearly readable, fit within the existing safe left and right margins on a single line, and make it explicit that Melodia is an APP rather than a headphones product. Preserve ALL other Spanish text exactly, including 'Tu música.', 'A tu manera.', 'Descarga música gratis.', 'Escúchala sin conexión.', and 'Contenido propio o autorizado.'. No new elements, no phone UI, no badges. Output a clean finished vertical 4:5 poster, not an explanation."
+    }
+  ],
+  "exportacion": {
+    "archivo": "presentacion-melodia-1080x1350.png",
+    "ancho": 1080,
+    "alto": 1350,
+    "aspecto": "4:5",
+    "modo": "RGB",
+    "perfil_color": "sRGB incrustado",
+    "metodo": "Pillow ImageOps.fit con LANCZOS; aspecto nativo prácticamente 4:5, sin cortar texto ni producto",
+    "bytes": 1180067,
+    "sha256": "d7c7e69dfaeb9c816200d48d9f76a6ec0200e6c5f15c457388d6208f5ba6e36a"
+  },
+  "revision_visual": {
+    "titulo_aprobado_conservado": true,
+    "descarga_gratuita_como_beneficio_secundario": true,
+    "categoria_app_android_explicita": true,
+    "texto_y_tildes_revisados": true,
+    "sin_capturas_android_inventadas": true,
+    "sin_correo_ni_insignia_google_play": true,
+    "uso_responsable_visible": true
+  }
+}
