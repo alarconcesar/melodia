@@ -332,7 +332,73 @@ fun TrackRow(
             heart.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = 500f))
         }
     }
-    Box(Modifier.fillMaxWidth()) {
+    Box(
+        Modifier.fillMaxWidth()
+            // El detector vive en el contenedor inmóvil. Medido dentro de la fila
+            // que se traslada, cada evento restaba el offset anterior a la
+            // distancia del dedo y la fila retrocedía: el parpadeo del swipe.
+            .then(
+                if (safeGestures || selecting) Modifier else Modifier.pointerInput(Unit) {
+                    // Dirección bloqueada al primer movimiento: si el gesto es
+                    // vertical se abandona y la lista scrollea. Con `draggable`
+                    // un scroll diagonal abría la franja sin querer.
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        // Un toque nuevo manda: si la fila venía regresando, el
+                        // retorno se congela aquí y el arrastre continúa desde
+                        // donde está, sin pelear ni saltar a cero.
+                        try { releaseJob?.cancel() } catch (_: Exception) {}
+                        releaseJob = null
+                        val base = dragX
+                        val startX = down.position.x
+                        val startY = down.position.y
+                        var locked = 0 // 0 = indeciso, 1 = horizontal, -1 = vertical
+                        while (true) {
+                            val ev = awaitPointerEvent()
+                            val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!ch.pressed) break
+                            val dx = ch.position.x - startX
+                            val dy = ch.position.y - startY
+                            if (locked == 0) {
+                                val slop = viewConfiguration.touchSlop
+                                when {
+                                    kotlin.math.abs(dx) > slop &&
+                                        kotlin.math.abs(dx) > kotlin.math.abs(dy) -> locked = 1
+                                    kotlin.math.abs(dy) > slop -> { locked = -1; break }
+                                }
+                            }
+                            if (locked == 1) {
+                                ch.consume()
+                                // Directo al estado, sin corrutina por evento:
+                                // N snapTo en vuelo se pisaban y parpadearon.
+                                dragX = (base + dx).coerceIn(-maxSwipe, maxSwipe)
+                            }
+                        }
+                        if (locked == 1) {
+                            val v = dragX
+                            if (v >= threshold && onQueue != null) onQueue()
+                            else if (v <= -threshold) onFav()
+                            // Un solo regreso: si un evento viejo llega tarde,
+                            // ya no hay snapTo que lo traiga de vuelta.
+                            releaseJob = scope.launch {
+                                val a = Animatable(v)
+                                try {
+                                    a.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) { dragX = value }
+                                } catch (_: Exception) {}
+                            }
+                        } else if (base != 0f) {
+                            // El toque no fue un deslizamiento: termina de volver.
+                            releaseJob = scope.launch {
+                                val a = Animatable(base)
+                                try {
+                                    a.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) { dragX = value }
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                }
+            )
+    ) {
         // Franja de acción: solo existe mientras hay deslizamiento. Sin esto cada
         // fila visible arrastraba dos capas (Canvas + caja con alpha) al hacer scroll.
         val swiping = !safeGestures && dragX != 0f
@@ -370,58 +436,10 @@ fun TrackRow(
         }
         Row(
             modifier = Modifier.fillMaxWidth()
-                .graphicsLayer { scaleX = rowScale; scaleY = rowScale }
-                .background(selBg)
+                // Desplaza el nodo completo (incluida su semántica) para que lo
+                // que se ve y lo que se mide sean lo mismo. El detector está en
+                // el Box exterior y no se mueve.
                 .offset { IntOffset(dragX.roundToInt(), 0) }
-                .then(
-                    if (safeGestures || selecting) Modifier else Modifier.pointerInput(Unit) {
-                        // Dirección bloqueada al primer movimiento: si el gesto es
-                        // vertical se abandona y la lista scrollea. Con `draggable`
-                        // un scroll diagonal abría la franja sin querer.
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            val startX = down.position.x
-                            val startY = down.position.y
-                            var locked = 0 // 0 = indeciso, 1 = horizontal, -1 = vertical
-                            while (true) {
-                                val ev = awaitPointerEvent()
-                                val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!ch.pressed) break
-                                val dx = ch.position.x - startX
-                                val dy = ch.position.y - startY
-                                if (locked == 0) {
-                                    val slop = viewConfiguration.touchSlop
-                                    when {
-                                        kotlin.math.abs(dx) > slop &&
-                                            kotlin.math.abs(dx) > kotlin.math.abs(dy) -> locked = 1
-                                        kotlin.math.abs(dy) > slop -> { locked = -1; break }
-                                    }
-                                }
-                                if (locked == 1) {
-                                    ch.consume()
-                                    // Directo al estado, sin corrutina por evento:
-                                    // N snapTo en vuelo se pisaban y parpadeaba.
-                                    try { releaseJob?.cancel() } catch (_: Exception) {}
-                                    releaseJob = null
-                                    dragX = dx.coerceIn(-maxSwipe, maxSwipe)
-                                }
-                            }
-                            if (locked == 1) {
-                                val v = dragX
-                                if (v >= threshold && onQueue != null) onQueue()
-                                else if (v <= -threshold) onFav()
-                                // Un solo regreso: si un evento viejo llega tarde,
-                                // ya no hay snapTo que lo traiga de vuelta.
-                                releaseJob = scope.launch {
-                                    val a = Animatable(v)
-                                    try {
-                                        a.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) { dragX = value }
-                                    } catch (_: Exception) {}
-                                }
-                            }
-                        }
-                    }
-                )
                 .semantics { this.selected = selected }
                 .combinedClickable(
                     interactionSource = pressSource,
@@ -434,6 +452,8 @@ fun TrackRow(
                     onClick = { if (selecting) onSelectToggle() else onTap() },
                     onLongClick = { if (selecting) onLongPress() else selection.start(s.id) }
                 )
+                .graphicsLayer { scaleX = rowScale; scaleY = rowScale }
+                .background(selBg)
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
