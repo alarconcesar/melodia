@@ -1,13 +1,13 @@
 # Melodia — contexto inicial de marketing
 
-Revisión: 2026-11-05 · Rama revisada: `marketing-landing-20261105` · Android 7.33 / código 100.
+Revisión: 2026-11-06 · Rama revisada: `marketing-landing-20261105` · Android 7.33 / código 100.
 Documento operativo inicial, no plan anual ni auditoría legal. Permite construir la landing ahora; las decisiones abiertas no bloquean el diseño.
 
 ## Producto y oferta
 
 Melodia es un reproductor para Android que organiza y reproduce los archivos de audio del teléfono. Incluye listas, favoritos, cola, letras y ajustes de sonido; también ofrece búsqueda, reproducción y descarga de contenido de terceros, con límites de disponibilidad y autorización.
 
-- **Canal definitivo elegido por César:** código abierto en el repositorio de GitHub `alarconcesar/melodia`, landing en GitHub Pages y APK en GitHub Releases. **No se publicará en Google Play.** La vista previa del VPS continúa como entorno de revisión hasta completar esa migración. Elegir una licencia compatible con las dependencias y auditar archivos e historial antes de hacer público el repositorio.
+- **Canal definitivo elegido por César:** código abierto en el repositorio de GitHub `alarconcesar/melodia`, landing en GitHub Pages y APK en GitHub Releases. **No se publicará en Google Play.** El repositorio ya es público con licencia GPLv3; la web oficial es https://alarconcesar.github.io/melodia/ y el APK firmado se distribuye en Releases. El VPS queda como preview.
 - **Artefacto revisado:** `app/build/outputs/apk/release/app-release.apk`. `aapt2 dump badging` devolvió `com.melodia.app`, 7.33 / 100, minSdk 24, targetSdk 36; `apksigner verify --print-certs` terminó con código 0. No se compiló ni se probó en un teléfono en esta revisión.
 - Funciona sin cuenta de Melodia y sin anuncios. No convertir esto en una garantía de precio futuro, acceso ilimitado o ausencia de conexiones externas.
 - No incluye derechos sobre música, letras o carátulas; tampoco promete un catálogo propio.
@@ -25,7 +25,7 @@ Melodia es un reproductor para Android que organiza y reproduce los archivos de 
 ## Posicionamiento, promesa y beneficios
 
 **Categoría:** reproductor de música para Android, centrado en la biblioteca personal.
-**Promesa:** tu biblioteca, tus listas y tu sonido en un reproductor sin anuncios ni cuenta de Melodia.
+**Promesa prioritaria por pedido de César:** descarga música gratis y escúchala sin conexión; la gratuidad corresponde a la función de Melodia, no a derechos sobre cualquier canción. Usar contenido propio o autorizado. Biblioteca, listas y sonido respaldan esa promesa.
 **Diferencia a demostrar, no superioridad a proclamar:** control de la colección local + organización + ajustes de sonido en una experiencia visual coherente.
 
 | Beneficio para quien escucha | Copy utilizable | Límite |
@@ -41,14 +41,13 @@ Melodia es un reproductor para Android que organiza y reproduce los archivos de 
 
 Español latino, cercano y directo. Hablar de canciones, listas, carpetas y sonido. Evitar jerga, superlativos, «revolucionario», «mejor que» y promesas de rendimiento sin mediciones.
 
-- **Titular, con salto:** «Tu música. / A tu manera.»
-- **Subtexto:** «Tu biblioteca, tus listas y tu sonido. Un reproductor para Android que pone la música primero.»
+- **Titular y subtexto vigentes:** fuente única en `web/index.html` (`#hero-title` y `.hero-description`). La descarga gratuita se comunica desde la primera pantalla; no relegarla a FAQ ni confundirla con que solo el APK sea gratis.
 - **Único CTA de conversión:** «Descargar para Android». Puede repetirse, con el mismo destino.
 - **Microcopy junto al CTA:** «Beta pública PREVIEW · APK firmado · Android 7.0 o posterior».
 - **Respaldo breve:** «Sin anuncios. Sin cuenta de Melodia.»
 - No añadir correo, formulario de captación, lista de espera ni insignia de Google Play.
 
-## Seis FAQ listas para adaptar a la landing
+## Respuestas de apoyo (la FAQ publicada tiene su fuente en `web/index.html`)
 
 ### 1. ¿Qué necesito para instalar Melodia?
 

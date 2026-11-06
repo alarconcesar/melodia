@@ -27,4 +27,5 @@ keystore.properties
 /web/qa/*.png
 /web/qa/*.jpg
 /web/qa/*.webm
+/web/qa/runtime/
 /web/**/__pycache__/

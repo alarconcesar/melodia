@@ -62,7 +62,7 @@ if ('IntersectionObserver' in window) {
       });
     });
   }, { rootMargin: '-15% 0px -55% 0px' });
-  ['inicio', 'a-tu-manera', 'tu-sonido', 'preguntas', 'descargar'].forEach((id) => {
+  ['inicio', 'descargas-gratis', 'a-tu-manera', 'tu-sonido', 'preguntas', 'descargar'].forEach((id) => {
     const target = document.getElementById(id);
     if (target) navObserver.observe(target);
   });

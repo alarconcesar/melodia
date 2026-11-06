@@ -8,8 +8,8 @@ import sys
 from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
-OUT=ROOT/'qa'
-OUT.mkdir(exist_ok=True)
+OUT=Path(os.environ.get('MELODIA_QA_OUTPUT',str(ROOT/'qa')))
+OUT.mkdir(parents=True, exist_ok=True)
 URL=os.environ.get('MELODIA_QA_URL','http://127.0.0.1:8942/melodia/')
 CHROME=sorted(Path.home().glob('.cache/ms-playwright/chromium_headless_shell-*/chrome-linux/headless_shell'))[-1]
 RESULT={'url':URL,'viewports':[],'checks':[],'failures':[]}
@@ -37,7 +37,7 @@ with sync_playwright() as pw:
         response=page.goto(URL,wait_until='networkidle')
         page.evaluate('document.fonts.ready')
         page.wait_for_timeout(1300)
-        metrics=page.evaluate("""()=>{const h=document.querySelector('h1'),cta=document.querySelector('.hero-cta'),stage=document.querySelector('.hero-visual');return {width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth-innerWidth,fontReady:document.fonts.check('600 48px "Manrope Variable"','Tu música. A tu manera.'),fonts:[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family),heroTitle:{size:getComputedStyle(h).fontSize,height:h.getBoundingClientRect().height},ctaBottom:cta.getBoundingClientRect().bottom,visualTop:stage.getBoundingClientRect().top,pageHeight:document.documentElement.scrollHeight};}""")
+        metrics=page.evaluate("""()=>{const h=document.querySelector('h1'),cta=document.querySelector('.hero-cta'),stage=document.querySelector('.hero-visual');return {width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth-innerWidth,fontReady:document.fonts.check('600 48px "Manrope Variable"','Descarga música gratis.'),fonts:[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family),heroTitle:{size:getComputedStyle(h).fontSize,height:h.getBoundingClientRect().height},ctaBottom:cta.getBoundingClientRect().bottom,visualTop:stage.getBoundingClientRect().top,pageHeight:document.documentElement.scrollHeight};}""")
         record(f'{width}:http',response is not None and response.status==200)
         record(f'{width}:viewport-real',metrics['width']==width,metrics['width'])
         record(f'{width}:overflow',metrics['overflow']==0,metrics['overflow'])
@@ -108,11 +108,11 @@ with sync_playwright() as pw:
             # El nombre lo decide el servidor cuando el APK es cross-origin (Releases).
             record('download:name',item.suggested_filename.endswith('.apk'),item.suggested_filename)
         context.close()
-    # Movimiento reducido, sin JavaScript y tamaño de texto aumentado.
-    for mode in ['reduced','no-js','large-text']:
+    # Movimiento reducido, sin JavaScript y raíz en 20px (solo rem; no equivale a zoom de textos en px).
+    for mode in ['reduced','no-js','root-font-20']:
         context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,reduced_motion='reduce' if mode=='reduced' else 'no-preference',java_script_enabled=mode!='no-js')
         page=context.new_page();page.goto(URL,wait_until='networkidle')
-        if mode=='large-text': page.add_style_tag(content='html{font-size:20px}')
+        if mode=='root-font-20': page.add_style_tag(content='html{font-size:20px}')
         page.wait_for_timeout(1300)
         record(f'{mode}:overflow',page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
         record(f'{mode}:headline-visible',page.locator('h1').evaluate('(e)=>Number(getComputedStyle(e).opacity)>0.99'))

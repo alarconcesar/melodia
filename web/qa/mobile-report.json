@@ -1,0 +1,2037 @@
+{
+  "url": "http://127.0.0.1:8951/melodia/",
+  "at": "2026-11-06T16:16:01.821275+00:00",
+  "viewports": [
+    {
+      "width": 320,
+      "clientWidth": 320,
+      "height": 568,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "34px",
+      "ctaBottom": 404,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 360,
+      "clientWidth": 360,
+      "height": 640,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "36px",
+      "ctaBottom": 408,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 375,
+      "clientWidth": 375,
+      "height": 667,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "37.5px",
+      "ctaBottom": 411,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 390,
+      "clientWidth": 390,
+      "height": 844,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "39px",
+      "ctaBottom": 414,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 414,
+      "clientWidth": 414,
+      "height": 896,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2.00030193236715,
+      "headingSize": "41.4px",
+      "ctaBottom": 394.8125,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 430,
+      "clientWidth": 430,
+      "height": 932,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "43px",
+      "ctaBottom": 398,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 480,
+      "clientWidth": 480,
+      "height": 800,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "60px",
+      "ctaBottom": 448,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 600,
+      "clientWidth": 600,
+      "height": 960,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "60px",
+      "ctaBottom": 448,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 667,
+      "clientWidth": 667,
+      "height": 375,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "60px",
+      "ctaBottom": 448,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 844,
+      "clientWidth": 844,
+      "height": 390,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2.000093250833772,
+      "headingSize": "45.576px",
+      "ctaBottom": 526.171875,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 768,
+      "clientWidth": 768,
+      "height": 1024,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 1.9998432677469136,
+      "headingSize": "41.472px",
+      "ctaBottom": 511.671875,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 1024,
+      "clientWidth": 1024,
+      "height": 768,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "60px",
+      "ctaBottom": 546.59375,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 1440,
+      "clientWidth": 1440,
+      "height": 900,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "72px",
+      "ctaBottom": 560.34375,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    },
+    {
+      "width": 1920,
+      "clientWidth": 1920,
+      "height": 1080,
+      "overflow": 0,
+      "heading": "Descarga música\ngratis.",
+      "headingLines": 2,
+      "headingSize": "82px",
+      "ctaBottom": 596.34375,
+      "manrope": true,
+      "loaded": [
+        "Manrope Variable"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "name": "320x568:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 320,
+        "clientWidth": 320,
+        "height": 568,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "34px",
+        "ctaBottom": 404,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "320x568:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "320x568:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:cta-above-fold",
+      "passed": true,
+      "detail": 404
+    },
+    {
+      "name": "320x568:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "320x568:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "320x568:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:menu-fits-height",
+      "passed": true,
+      "detail": {
+        "top": 0,
+        "bottom": 568,
+        "client": 568,
+        "scroll": 604
+      }
+    },
+    {
+      "name": "320x568:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:menu-focus",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:menu-navigates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:section-not-under-header",
+      "passed": true,
+      "detail": 95.59375
+    },
+    {
+      "name": "320x568:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "360x640:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 360,
+        "clientWidth": 360,
+        "height": 640,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "36px",
+        "ctaBottom": 408,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "360x640:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "360x640:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:cta-above-fold",
+      "passed": true,
+      "detail": 408
+    },
+    {
+      "name": "360x640:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "360x640:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "360x640:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:menu-fits-height",
+      "passed": true,
+      "detail": {
+        "top": 0,
+        "bottom": 640,
+        "client": 640,
+        "scroll": 640
+      }
+    },
+    {
+      "name": "360x640:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:menu-focus",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:menu-navigates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:section-not-under-header",
+      "passed": true,
+      "detail": 95.59375
+    },
+    {
+      "name": "360x640:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "375x667:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 375,
+        "clientWidth": 375,
+        "height": 667,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "37.5px",
+        "ctaBottom": 411,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "375x667:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "375x667:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:cta-above-fold",
+      "passed": true,
+      "detail": 411
+    },
+    {
+      "name": "375x667:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "375x667:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "375x667:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:menu-fits-height",
+      "passed": true,
+      "detail": {
+        "top": 0,
+        "bottom": 667,
+        "client": 667,
+        "scroll": 667
+      }
+    },
+    {
+      "name": "375x667:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:menu-focus",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:menu-navigates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:section-not-under-header",
+      "passed": true,
+      "detail": 95.59375
+    },
+    {
+      "name": "375x667:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "390x844:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 390,
+        "clientWidth": 390,
+        "height": 844,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "39px",
+        "ctaBottom": 414,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "390x844:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "390x844:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:cta-above-fold",
+      "passed": true,
+      "detail": 414
+    },
+    {
+      "name": "390x844:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "390x844:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "390x844:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:menu-fits-height",
+      "passed": true,
+      "detail": {
+        "top": 0,
+        "bottom": 844,
+        "client": 844,
+        "scroll": 844
+      }
+    },
+    {
+      "name": "390x844:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:menu-focus",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:menu-navigates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:section-not-under-header",
+      "passed": true,
+      "detail": 95.796875
+    },
+    {
+      "name": "touch:audio-plays",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "touch:repeat",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "touch:shuffle",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "touch:apk-sha256",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "touch:apk-size",
+      "passed": true,
+      "detail": 2913451
+    },
+    {
+      "name": "mobile:resize-closes-menu",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "mobile:resize-unlocks-scroll",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "414x896:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 414,
+        "clientWidth": 414,
+        "height": 896,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2.00030193236715,
+        "headingSize": "41.4px",
+        "ctaBottom": 394.8125,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "414x896:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:two-line-headline",
+      "passed": true,
+      "detail": 2.00030193236715
+    },
+    {
+      "name": "414x896:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:cta-above-fold",
+      "passed": true,
+      "detail": 394.8125
+    },
+    {
+      "name": "414x896:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "414x896:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "414x896:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:menu-fits-height",
+      "passed": true,
+      "detail": {
+        "top": 0,
+        "bottom": 896,
+        "client": 896,
+        "scroll": 896
+      }
+    },
+    {
+      "name": "414x896:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:menu-focus",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:menu-navigates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:section-not-under-header",
+      "passed": true,
+      "detail": 95.609375
+    },
+    {
+      "name": "414x896:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "430x932:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 430,
+        "clientWidth": 430,
+        "height": 932,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "43px",
+        "ctaBottom": 398,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "430x932:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "430x932:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:cta-above-fold",
+      "passed": true,
+      "detail": 398
+    },
+    {
+      "name": "430x932:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "430x932:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "430x932:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:menu-fits-height",
+      "passed": true,
+      "detail": {
+        "top": 0,
+        "bottom": 932,
+        "client": 932,
+        "scroll": 932
+      }
+    },
+    {
+      "name": "430x932:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:menu-focus",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:menu-navigates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:section-not-under-header",
+      "passed": true,
+      "detail": 95.796875
+    },
+    {
+      "name": "430x932:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "480x800:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 480,
+        "clientWidth": 480,
+        "height": 800,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "60px",
+        "ctaBottom": 448,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "480x800:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "480x800:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:cta-above-fold",
+      "passed": true,
+      "detail": 448
+    },
+    {
+      "name": "480x800:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "480x800:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "480x800:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:menu-fits-height",
+      "passed": true,
+      "detail": {
+        "top": 0,
+        "bottom": 800,
+        "client": 800,
+        "scroll": 800
+      }
+    },
+    {
+      "name": "480x800:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:menu-focus",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:menu-navigates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:section-not-under-header",
+      "passed": true,
+      "detail": 95.796875
+    },
+    {
+      "name": "480x800:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "600x960:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 600,
+        "clientWidth": 600,
+        "height": 960,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "60px",
+        "ctaBottom": 448,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "600x960:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "600x960:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:cta-above-fold",
+      "passed": true,
+      "detail": 448
+    },
+    {
+      "name": "600x960:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "600x960:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "600x960:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:menu-fits-height",
+      "passed": true,
+      "detail": {
+        "top": 0,
+        "bottom": 960,
+        "client": 960,
+        "scroll": 960
+      }
+    },
+    {
+      "name": "600x960:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:menu-focus",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:menu-navigates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:section-not-under-header",
+      "passed": true,
+      "detail": 95.796875
+    },
+    {
+      "name": "600x960:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "667x375:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 667,
+        "clientWidth": 667,
+        "height": 375,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "60px",
+        "ctaBottom": 448,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "667x375:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "667x375:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "667x375:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "667x375:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:menu-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:menu-fits-height",
+      "passed": true,
+      "detail": {
+        "top": 0,
+        "bottom": 375,
+        "client": 375,
+        "scroll": 375
+      }
+    },
+    {
+      "name": "667x375:menu-escape",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:menu-focus",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:menu-navigates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:section-not-under-header",
+      "passed": true,
+      "detail": 95.796875
+    },
+    {
+      "name": "667x375:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "844x390:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 844,
+        "clientWidth": 844,
+        "height": 390,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2.000093250833772,
+        "headingSize": "45.576px",
+        "ctaBottom": 526.171875,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "844x390:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:two-line-headline",
+      "passed": true,
+      "detail": 2.000093250833772
+    },
+    {
+      "name": "844x390:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "844x390:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "844x390:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "768x1024:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 768,
+        "clientWidth": 768,
+        "height": 1024,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 1.9998432677469136,
+        "headingSize": "41.472px",
+        "ctaBottom": 511.671875,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "768x1024:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:two-line-headline",
+      "passed": true,
+      "detail": 1.9998432677469136
+    },
+    {
+      "name": "768x1024:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "768x1024:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "768x1024:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1024x768:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 1024,
+        "clientWidth": 1024,
+        "height": 768,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "60px",
+        "ctaBottom": 546.59375,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "1024x768:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "1024x768:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1024x768:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1024x768:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1440x900:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 1440,
+        "clientWidth": 1440,
+        "height": 900,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "72px",
+        "ctaBottom": 560.34375,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "1440x900:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "1440x900:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1440x900:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1440x900:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:no-js-errors",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1920x1080:http",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:real-viewport",
+      "passed": true,
+      "detail": {
+        "width": 1920,
+        "clientWidth": 1920,
+        "height": 1080,
+        "overflow": 0,
+        "heading": "Descarga música\ngratis.",
+        "headingLines": 2,
+        "headingSize": "82px",
+        "ctaBottom": 596.34375,
+        "manrope": true,
+        "loaded": [
+          "Manrope Variable"
+        ]
+      }
+    },
+    {
+      "name": "1920x1080:free-download-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:two-line-headline",
+      "passed": true,
+      "detail": 2
+    },
+    {
+      "name": "1920x1080:font-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:overflow",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:text-not-clipped",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1920x1080:touch-targets-44px",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "1920x1080:three-download-steps",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:images-loaded",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:faq-1-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:faq-2-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:faq-3-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:faq-4-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:faq-5-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:faq-6-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:faq-7-open",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:no-js-errors",
+      "passed": true,
+      "detail": []
+    }
+  ],
+  "failures": []
+}

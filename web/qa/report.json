@@ -1,5 +1,5 @@
 {
-  "url": "https://alarconcesar.github.io/melodia/",
+  "url": "http://127.0.0.1:8951/melodia/",
   "viewports": [
     {
       "width": 320,
@@ -10,12 +10,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "48px",
-        "height": 96
+        "size": "34px",
+        "height": 68
       },
-      "ctaBottom": 432,
-      "visualTop": 456,
-      "pageHeight": 7391,
+      "ctaBottom": 404,
+      "visualTop": 483.59375,
+      "pageHeight": 8228,
       "errors": [],
       "badAssets": []
     },
@@ -28,12 +28,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "48px",
-        "height": 96
+        "size": "36px",
+        "height": 72
       },
-      "ctaBottom": 432,
-      "visualTop": 456,
-      "pageHeight": 7323,
+      "ctaBottom": 408,
+      "visualTop": 487.59375,
+      "pageHeight": 8188,
       "errors": [],
       "badAssets": []
     },
@@ -46,12 +46,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "48px",
-        "height": 96
+        "size": "39px",
+        "height": 78
       },
-      "ctaBottom": 432,
-      "visualTop": 456,
-      "pageHeight": 7201,
+      "ctaBottom": 414,
+      "visualTop": 472.796875,
+      "pageHeight": 8007,
       "errors": [],
       "badAssets": []
     },
@@ -64,12 +64,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "48px",
-        "height": 96
+        "size": "43px",
+        "height": 86
       },
-      "ctaBottom": 408,
-      "visualTop": 432,
-      "pageHeight": 7113,
+      "ctaBottom": 398,
+      "visualTop": 456.796875,
+      "pageHeight": 7850,
       "errors": [],
       "badAssets": []
     },
@@ -82,12 +82,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "48px",
-        "height": 96
+        "size": "41.472px",
+        "height": 82.9375
       },
-      "ctaBottom": 546,
+      "ctaBottom": 511.671875,
       "visualTop": 96,
-      "pageHeight": 5787,
+      "pageHeight": 6323,
       "errors": [],
       "badAssets": []
     },
@@ -103,9 +103,9 @@
         "size": "60px",
         "height": 120
       },
-      "ctaBottom": 578,
+      "ctaBottom": 546.59375,
       "visualTop": 96,
-      "pageHeight": 5875,
+      "pageHeight": 6405,
       "errors": [],
       "badAssets": []
     },
@@ -121,9 +121,9 @@
         "size": "72px",
         "height": 144
       },
-      "ctaBottom": 591.75,
+      "ctaBottom": 560.34375,
       "visualTop": 97.75,
-      "pageHeight": 6010,
+      "pageHeight": 6540,
       "errors": [],
       "badAssets": []
     },
@@ -136,12 +136,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "96px",
-        "height": 192
+        "size": "82px",
+        "height": 164
       },
-      "ctaBottom": 641.75,
+      "ctaBottom": 596.34375,
       "visualTop": 123.75,
-      "pageHeight": 6090,
+      "pageHeight": 6620,
       "errors": [],
       "badAssets": []
     }
@@ -172,7 +172,7 @@
     {
       "name": "320:hero-cta-in-fold",
       "passed": true,
-      "detail": 432
+      "detail": 404
     },
     {
       "name": "320:images",
@@ -252,7 +252,7 @@
     {
       "name": "360:hero-cta-in-fold",
       "passed": true,
-      "detail": 432
+      "detail": 408
     },
     {
       "name": "360:images",
@@ -332,7 +332,7 @@
     {
       "name": "390:hero-cta-in-fold",
       "passed": true,
-      "detail": 432
+      "detail": 414
     },
     {
       "name": "390:images",
@@ -437,7 +437,7 @@
     {
       "name": "430:hero-cta-in-fold",
       "passed": true,
-      "detail": 408
+      "detail": 398
     },
     {
       "name": "430:images",
@@ -517,7 +517,7 @@
     {
       "name": "768:hero-cta-in-fold",
       "passed": true,
-      "detail": 546
+      "detail": 511.671875
     },
     {
       "name": "768:images",
@@ -597,7 +597,7 @@
     {
       "name": "1024:hero-cta-in-fold",
       "passed": true,
-      "detail": 578
+      "detail": 546.59375
     },
     {
       "name": "1024:images",
@@ -677,7 +677,7 @@
     {
       "name": "1440:hero-cta-in-fold",
       "passed": true,
-      "detail": 591.75
+      "detail": 560.34375
     },
     {
       "name": "1440:images",
@@ -737,8 +737,8 @@
       "passed": true,
       "detail": {
         "paused": false,
-        "time": 0.740292,
-        "duration": 32,
+        "time": 0.821132,
+        "duration": 17.846333,
         "error": null
       }
     },
@@ -833,7 +833,7 @@
     {
       "name": "1920:hero-cta-in-fold",
       "passed": true,
-      "detail": 641.75
+      "detail": 596.34375
     },
     {
       "name": "1920:images",
@@ -929,17 +929,17 @@
       "detail": null
     },
     {
-      "name": "large-text:overflow",
+      "name": "root-font-20:overflow",
       "passed": true,
       "detail": null
     },
     {
-      "name": "large-text:headline-visible",
+      "name": "root-font-20:headline-visible",
       "passed": true,
       "detail": null
     },
     {
-      "name": "large-text:download-link",
+      "name": "root-font-20:download-link",
       "passed": true,
       "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.33/melodia-7.33.apk"
     }
