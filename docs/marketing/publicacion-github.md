@@ -1,5 +1,7 @@
 # Publicación de Melodia en GitHub (open source + Pages + Releases)
 
+**Estado: ejecutado el 6-nov-2026.** Repositorio público en <https://github.com/alarconcesar/melodia>, sitio en <https://alarconcesar.github.io/melodia/> y descarga en <https://github.com/alarconcesar/melodia/releases/tag/v7.33> (marcado como prerelease). Licencia GPLv3. Verificado por HTTPS: página, política, condiciones, robots, sitemap, tarjeta social y APK con SHA-256 idéntico al firmado. QA de 101 comprobaciones sin fallos en ocho anchos, servicio y descarga incluidos.
+
 Decisión de César (6-nov-2026): el código será abierto en `alarconcesar/melodia`, la landing vivirá en GitHub Pages y el APK se descargará desde GitHub Releases. **No se publica en Google Play.** Este documento es el plan de ejecución; nada de esto está ejecutado todavía salvo donde se indica «verificado».
 
 ## Sí se puede, con dos condiciones
@@ -40,13 +42,15 @@ Play Console, cuenta de desarrollador, Seguridad de los datos, cuestionario IARC
 - Licencias y condiciones de los servicios de terceros, y el aviso de uso responsable dentro de la app.
 - Decisión sobre el nombre del repo, la descripción y si el proyecto se presenta como beta.
 
-## Orden de ejecución propuesto
+## Orden ejecutado
 
-1. Elegir licencia y confirmar la visibilidad pública.
-2. Corregir README y añadir `LICENSE`, `CONTRIBUTING` mínimo y plantilla de issues.
-3. Adaptar la landing a Pages (política en el build, enlaces de descarga, metadatos).
-4. Probar el build de Pages en local y con QA real.
-5. Subir el historial completo, verificar que el remoto coincide con el local.
-6. Activar Pages y comprobar la URL pública con QA sobre HTTPS.
-7. Crear el release `v7.33` con el APK y verificar la descarga desde la landing publicada.
-8. Recién entonces anunciar el enlace.
+1. Licencia GPLv3 en `LICENSE`, detectada por GitHub como `gpl-3.0`.
+2. README corregido y publicado; descripción y temas del repositorio actualizados.
+3. Landing adaptada: política dentro del build, descarga a Releases y metadatos por modo (`.env` para el preview, `.env.pages` para Pages).
+4. Build de Pages probado en local simulando la ruta `/melodia/`.
+5. Historial completo subido: `main` en `b1050c3`, remoto verificado con `git ls-remote`.
+6. Pages activado con `build_type=workflow`; el workflow construyó y desplegó sin errores.
+7. Release `v7.33` publicado como prerelease con `melodia-7.33.apk` y `version.json`.
+8. QA de 101 comprobaciones sobre la URL pública, sin fallos.
+
+Pendiente después de esta entrega: pruebas en teléfono real, canal de soporte (Issues), y revisar el uso de contenido de terceros antes de difundir el proyecto.

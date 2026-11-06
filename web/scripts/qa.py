@@ -105,7 +105,8 @@ with sync_playwright() as pw:
             manifest=page.request.get(URL+'descargas/version.json').json()
             record('download:sha256',hashlib.sha256(data).hexdigest()==manifest['sha256'])
             record('download:size',len(data)==manifest['bytes'],len(data))
-            record('download:name',item.suggested_filename=='Melodia-7.33.apk',item.suggested_filename)
+            # El nombre lo decide el servidor cuando el APK es cross-origin (Releases).
+            record('download:name',item.suggested_filename.endswith('.apk'),item.suggested_filename)
         context.close()
     # Movimiento reducido, sin JavaScript y tamaño de texto aumentado.
     for mode in ['reduced','no-js','large-text']:
@@ -115,7 +116,8 @@ with sync_playwright() as pw:
         page.wait_for_timeout(1300)
         record(f'{mode}:overflow',page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
         record(f'{mode}:headline-visible',page.locator('h1').evaluate('(e)=>Number(getComputedStyle(e).opacity)>0.99'))
-        record(f'{mode}:download-link',page.locator('.download-link').get_attribute('href')=='/melodia/descargas/melodia-7.33.apk')
+        href=page.locator('.download-link').get_attribute('href') or ''
+        record(f'{mode}:download-link',href.endswith('melodia-7.33.apk'),href)
         if mode=='reduced': record('reduced:frame-transform',page.locator('.demo-frame').evaluate('(e)=>getComputedStyle(e).transform')=='none')
         if mode=='no-js':record('no-js:demo-honest',page.locator('.no-js-demo').is_visible())
         context.close()

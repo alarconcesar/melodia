@@ -1,5 +1,5 @@
 {
-  "url": "http://127.0.0.1:8951/melodia/",
+  "url": "https://alarconcesar.github.io/melodia/",
   "viewports": [
     {
       "width": 320,
@@ -737,8 +737,8 @@
       "passed": true,
       "detail": {
         "paused": false,
-        "time": 0.817221,
-        "duration": 17.846333,
+        "time": 0.826942,
+        "duration": 32,
         "error": null
       }
     },
@@ -806,7 +806,7 @@
     {
       "name": "download:name",
       "passed": true,
-      "detail": "Melodia-7.33.apk"
+      "detail": "melodia-7.33.apk"
     },
     {
       "name": "1920:http",
@@ -901,7 +901,7 @@
     {
       "name": "reduced:download-link",
       "passed": true,
-      "detail": null
+      "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.33/melodia-7.33.apk"
     },
     {
       "name": "reduced:frame-transform",
@@ -921,7 +921,7 @@
     {
       "name": "no-js:download-link",
       "passed": true,
-      "detail": null
+      "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.33/melodia-7.33.apk"
     },
     {
       "name": "no-js:demo-honest",
@@ -941,7 +941,7 @@
     {
       "name": "large-text:download-link",
       "passed": true,
-      "detail": null
+      "detail": "https://github.com/alarconcesar/melodia/releases/download/v7.33/melodia-7.33.apk"
     }
   ],
   "failures": []
