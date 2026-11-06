@@ -2,7 +2,10 @@ package com.melodia.app
 
 import android.app.Application
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -121,5 +124,31 @@ class TrackRowSwipeTest {
         assertEquals(initial, rowLeft(), .1f)
         assertEquals(0, queued)
         assertEquals(0, favorites)
+    }
+
+    @Test fun dentroDeUnaListaElScrollVerticalNoDisparaAcciones() {
+        rule.setContent {
+            MelodiaTheme {
+                CompositionLocalProvider(LocalSelection provides SelectionState()) {
+                    LazyColumn(
+                        Modifier.width(320.dp).height(200.dp).testTag("list")
+                    ) {
+                        items(8) { i ->
+                            TrackRow(
+                                song.copy(id = 900L + i, title = "Tema $i"), false, false,
+                                { taps++ }, { favorites++ }, { options++ }, { queued++ }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag("list").performTouchInput { swipeUp(durationMillis = 220) }
+        rule.waitForIdle()
+        assertEquals(0, queued)
+        assertEquals(0, favorites)
+        assertEquals(0, taps)
+        assertEquals(0, options)
     }
 }

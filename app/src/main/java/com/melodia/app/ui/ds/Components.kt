@@ -353,10 +353,16 @@ fun TrackRow(
                         val startX = down.position.x
                         val startY = down.position.y
                         var locked = 0 // 0 = indeciso, 1 = horizontal, -1 = vertical
+                        var cancelled = false
                         while (true) {
                             val ev = awaitPointerEvent()
                             val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!ch.pressed) break
+                            if (!ch.pressed) {
+                                // Un cancel llega como levantamiento ya consumido por
+                                // otro detector: no es una decisión del usuario.
+                                cancelled = ch.isConsumed
+                                break
+                            }
                             val dx = ch.position.x - startX
                             val dy = ch.position.y - startY
                             if (locked == 0) {
@@ -374,7 +380,7 @@ fun TrackRow(
                                 dragX = (base + dx).coerceIn(-maxSwipe, maxSwipe)
                             }
                         }
-                        if (locked == 1) {
+                        if (locked == 1 && !cancelled) {
                             val v = dragX
                             if (v >= threshold && onQueue != null) onQueue()
                             else if (v <= -threshold) onFav()
@@ -386,10 +392,10 @@ fun TrackRow(
                                     a.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) { dragX = value }
                                 } catch (_: Exception) {}
                             }
-                        } else if (base != 0f) {
+                        } else if (base != 0f || dragX != base) {
                             // El toque no fue un deslizamiento: termina de volver.
                             releaseJob = scope.launch {
-                                val a = Animatable(base)
+                                val a = Animatable(dragX)
                                 try {
                                     a.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) { dragX = value }
                                 } catch (_: Exception) {}
