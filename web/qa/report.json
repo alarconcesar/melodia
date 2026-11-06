@@ -1,5 +1,5 @@
 {
-  "url": "https://vnic-cesar.tailb6ee43.ts.net/melodia/",
+  "url": "http://127.0.0.1:8951/melodia/",
   "viewports": [
     {
       "width": 320,
@@ -737,8 +737,8 @@
       "passed": true,
       "detail": {
         "paused": false,
-        "time": 0.270862,
-        "duration": 32,
+        "time": 0.817221,
+        "duration": 17.846333,
         "error": null
       }
     },

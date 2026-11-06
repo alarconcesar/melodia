@@ -1,102 +1,93 @@
-# 🎵 Melodia — Reproductor local premium para Android
+# Melodia
 
-Reproductor de música local con diseño minimalista moderno (**Melodia DS**),
-construido 100% con Kotlin + Jetpack Compose + Media3. Sin tracking, sin anuncios,
-sin Hilt: arranque estable con DI manual.
+Reproductor de música para Android con biblioteca local, listas, ecualizador y
+funciones en línea. Construido con Kotlin, Jetpack Compose y Media3, con
+inyección de dependencias manual.
 
-![minSdk 26](https://img.shields.io/badge/minSdk-26-green)
-![targetSdk 34](https://img.shields.io/badge/targetSdk-34-green)
-![Kotlin 1.9.22](https://img.shields.io/badge/Kotlin-1.9.22-blue)
-![Compose BOM 2024.01.00](https://img.shields.io/badge/Compose_BOM-2024.01.00-blue)
+**Estado: beta.** No está publicado en Google Play. La distribución es directa,
+como APK firmado en [Releases](https://github.com/alarconcesar/melodia/releases)
+y el sitio del proyecto es <https://alarconcesar.github.io/melodia/>.
 
-## ✨ Funciones
+- minSdk 24 (Android 7.0) · targetSdk 36
+- Kotlin 1.9.22 · Compose BOM 2024.01.00 · Media3 1.2.1
+- AGP 8.10.1 · Gradle 8.11.1 · JDK 17
+
+## Funciones
 
 | Área | Detalle |
-|---|---|
-| 🎵 Biblioteca | Canciones desde MediaStore, buscar global, ordenar (título/artista/recientes/duración) |
-| 🧺 Cola | Ver, reordenar (↑/↓), quitar, vaciar dejando el tema actual y guardarla como playlist |
-| 📁 Explorar | Carpetas reales del dispositivo, álbumes, artistas |
-| 📃 Playlists | Crear / renombrar / eliminar, añadir temas (tap largo), detalle con play |
-| ❤️ Favoritos | Corazón único por fila, tab dedicada |
-| 🎚️ Ecualizador | 5 bandas + Bass Boost + presets del sistema, en vivo y persistido |
-| ⏱️ Sleep timer | 5–60 min con chip visible |
-| 📄 Ficha del tema | Long-press: duración, álbum, carpeta, fecha y **ruta completa** + acciones |
-| ↩️ Back por capas | Player → detalle → filtro → salir |
-| 🌗 Tema | Claro / oscuro / sistema, dark-first verdoso |
-| ⚙️ Ajustes | Pantalla propia: apariencia (tema + acento), reproducción, biblioteca, datos |
-| 👉 Gestos | Deslizar una fila: derecha = encolar, izquierda = favorito |
-| ▶️ Player | Play/pause/next/prev, shuffle, repeat (off/all/one), seek con preview, MediaSession |
-| 🎧 Estabilidad | Foco de audio (pausa en llamadas), wake lock para streams, botón de auriculares, re-resolución automática si YouTube vence la URL |
-| ⏯️ Continuidad | La cola, el tema y la posición sobreviven al cierre; al reabrir queda en pausa, lista para seguir |
-| 🖼️ Carátulas | MediaStore y portada incrustada del archivo (offline); iTunes solo si no hay nada local |
-| 💿 Álbumes | Reproducción en orden de disco y pista (`ALBUM_ARTIST` para compilados) |
-| 🌐 Online | Buscar en YouTube, escuchar, descargar (alta/estándar) e importar playlists; descargas y ajustes en el menú ⋮ |
+| --- | --- |
+| Biblioteca | Archivos de audio del dispositivo vía MediaStore; búsqueda, orden y filtros |
+| Explorar | Carpetas, álbumes (nombre + artista) y artistas |
+| Listas y favoritos | Crear, renombrar, ordenar y guardar la cola como lista |
+| Reproductor | Play/pausa, anterior/siguiente, aleatorio, repetición, búsqueda en la pista, MediaSession |
+| Cola | Reordenar, quitar y vaciar conservando el tema actual; se restaura al reabrir |
+| Sonido | Ecualizador de cinco bandas y refuerzo de graves, según el dispositivo; velocidad y tono |
+| Letras | Desde LRCLIB cuando existen, con sincronización si el texto trae tiempos |
+| Carátulas | MediaStore o portada incrustada primero; iTunes solo como respaldo |
+| En línea | Búsqueda en YouTube, reproducción y descargas gestionadas por cola |
+| Sistema | Servicio en primer plano, controles en notificación y pantalla bloqueada, widget y temporizador |
 
-## 🧱 Stack (versiones fijadas y probadas)
-
-- Gradle 8.5 · AGP 8.2.2 · Kotlin 1.9.22 · Compose compiler 1.5.8
-- Compose BOM 2024.01.00 · Material 3
-- Media3 ExoPlayer + Session 1.2.1 · Room 2.6.1 (KSP) · Coil 2.5.0 · Haze 0.3.1 (blur)
-- DI manual (`AppContainer`) — decisión consciente: Hilt + Room + KSP daban
-  pantallas negras en arranque (ver `docs/ARCHITECTURE.md`).
-
-## 📁 Estructura
-
-```
-app/src/main/
-├── AndroidManifest.xml
-├── java/com/melodia/app/
-│   ├── MelodiaApp.kt            # Application + canal de notificación
-│   ├── MainActivity.kt          # Permisos, VM retenida, setContent
-│   ├── AppContainer.kt          # DI manual
-│   ├── MainViewModel.kt         # Estado UI + sincronía con ExoPlayer
-│   ├── data/
-│   │   ├── MusicRepository.kt   # MediaStore (normaliza <unknown>)
-│   │   ├── PlaylistRepository.kt
-│   │   ├── LibraryHelpers.kt    # carpetas / álbumes / artistas
-│   │   ├── model/Song.kt
-│   │   └── local/               # Room: 1 DAO por archivo
-│   │       ├── MelodiaDatabase.kt
-│   │       ├── PlaylistEntity.kt / PlaylistSongEntity.kt / FavoriteEntity.kt
-│   │       └── PlaylistDao.kt / PlaylistSongDao.kt / FavoriteDao.kt
-│   ├── player/
-│   │   ├── MusicPlayer.kt       # ExoPlayer + MediaSession (try/catch)
-│   │   ├── EqualizerManager.kt  # AudioEffect: EQ + BassBoost
-│   │   └── SleepTimer.kt
-│   └── ui/
-│       ├── theme/Theme.kt       # Melodia DS: tokens
-│       ├── ds/Components.kt     # TrackRow, Hero, QuickCard, PillNav, MiniPlayer…
-│       └── screens/MelodiaScreen.kt
-├── res/values/ (themes AppCompat — obligatorio, ver docs)
-docs/
-├── DESIGN_SYSTEM.md
-└── ARCHITECTURE.md
-```
-
-## 🚀 Compilar
+## Requisitos para compilar
 
 ```bash
-export ANDROID_HOME=$HOME/Android   # SDK con platforms;android-34 + build-tools;34.0.0
+export ANDROID_HOME=$HOME/Android        # platforms;android-36 + build-tools;35.0.0
+git clone https://github.com/alarconcesar/melodia.git
 cd melodia
-./gradlew assembleDebug
-# APK → app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleDebug                  # APK de depuración
+./gradlew testDebugUnitTest              # pruebas JVM (Robolectric)
+./gradlew assembleRelease                # requiere keystore.properties
 ```
 
-> ⚠️ El tema **debe** heredar de `Theme.AppCompat.*` y existir la dependencia
-> `androidx.appcompat:appcompat` o la app abre en negro (Compose + Material3
-> lo requieren). No usar `android:Theme.*`.
+`keystore.properties` no está en el repositorio y contiene la ruta y las claves
+de firma. Sin ese archivo, `assembleRelease` produce un APK sin firmar; usa
+`assembleDebug` o `assemblePerf` para probar.
 
-## 🗺️ Roadmap
+> El tema debe heredar de `Theme.AppCompat.*` y la dependencia
+> `androidx.appcompat:appcompat` debe estar presente, o la app abre en negro.
 
-Hecho:
-- [x] Servicio foreground + notificación persistente (MediaSession)
-- [x] Cola visible: reordenar, quitar, vaciar y guardar como playlist
-- [x] Carátulas reales (MediaStore), widget y letras (incl. LRC)
-- [x] Velocidad/pitch, estadísticas, respaldo JSON
-- [x] Foco de audio, wake lock, botón de auriculares y re-resolución de URL vencida (4.5)
-- [x] Cola persistente, reanudación del sistema, álbumes en orden y carátulas offline (4.6)
+## Estructura
 
-Ideas siguientes (sin compromiso):
-- [ ] Android Auto (Car App Library)
-- [ ] Descargas en segundo plano con `DownloadService` de Media3
-- [ ] Biblioteca incremental (caché Room + ContentObserver)
+```text
+app/src/main/java/com/melodia/app/
+├── AppContainer.kt          # inyección manual
+├── MainViewModel.kt         # estado de la interfaz y sincronía con ExoPlayer
+├── data/                    # MediaStore, Room, descargas, letras, carátulas
+├── player/                  # ExoPlayer, ecualizador, cola persistente
+├── ui/                      # tema, componentes y pantallas Compose
+└── widget/                  # widget y política de acciones
+web/                         # sitio del proyecto (Vite, estático)
+docs/                        # sistema de diseño, arquitectura y notas
+```
+
+Más detalle en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) y
+[`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md).
+
+## Privacidad
+
+Melodia no tiene cuentas ni servidores propios, pero **sí se conecta a servicios
+externos**: YouTube, LRCLIB e iTunes, en algunos casos de forma automática. La
+política completa está en
+<https://alarconcesar.github.io/melodia/privacidad/> y el texto fuente en
+[`docs/store/PRIVACY.md`](docs/store/PRIVACY.md).
+
+## Uso responsable del contenido
+
+Usa únicamente audio propio o para el que tengas permisos, licencias o
+autorizaciones. Las funciones de búsqueda y descarga no conceden derechos sobre
+el contenido ni autorizan a eludir restricciones de terceros. Melodia no es una
+aplicación oficial de YouTube, LRCLIB ni Apple.
+
+## Contribuir
+
+Antes de abrir un cambio, revisa los problemas abiertos y describe el caso que
+quieres resolver. Para reportar un fallo, indica versión de Android, modelo de
+teléfono, versión de Melodia y los pasos para reproducirlo. No adjuntes audios,
+rutas personales ni datos de tu biblioteca.
+
+## Licencia
+
+GNU General Public License, versión 3. Ver [`LICENSE`](LICENSE).
+
+Melodia incluye [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor),
+distribuido bajo GPLv3. Al redistribuir la app debes cumplir la licencia y ofrecer
+el código fuente correspondiente.

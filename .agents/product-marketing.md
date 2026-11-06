@@ -7,7 +7,7 @@ Documento operativo inicial, no plan anual ni auditoría legal. Permite construi
 
 Melodia es un reproductor para Android que organiza y reproduce los archivos de audio del teléfono. Incluye listas, favoritos, cola, letras y ajustes de sonido; también ofrece búsqueda, reproducción y descarga de contenido de terceros, con límites de disponibilidad y autorización.
 
-- **Distribución elegida para la landing:** beta pública **PREVIEW**, mediante APK `release` firmado actual. No anunciar lanzamiento ni disponibilidad en Google Play.
+- **Canal definitivo elegido por César:** código abierto en el repositorio de GitHub `alarconcesar/melodia`, landing en GitHub Pages y APK en GitHub Releases. **No se publicará en Google Play.** La vista previa del VPS continúa como entorno de revisión hasta completar esa migración. Elegir una licencia compatible con las dependencias y auditar archivos e historial antes de hacer público el repositorio.
 - **Artefacto revisado:** `app/build/outputs/apk/release/app-release.apk`. `aapt2 dump badging` devolvió `com.melodia.app`, 7.33 / 100, minSdk 24, targetSdk 36; `apksigner verify --print-certs` terminó con código 0. No se compiló ni se probó en un teléfono en esta revisión.
 - Funciona sin cuenta de Melodia y sin anuncios. No convertir esto en una garantía de precio futuro, acceso ilimitado o ausencia de conexiones externas.
 - No incluye derechos sobre música, letras o carátulas; tampoco promete un catálogo propio.

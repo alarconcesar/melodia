@@ -23,6 +23,7 @@ keystore.properties
 /web/node_modules/
 /web/dist/
 /web/public/descargas/*.apk
+/web/public/privacidad/
 /web/qa/*.png
 /web/qa/*.jpg
 /web/qa/*.webm

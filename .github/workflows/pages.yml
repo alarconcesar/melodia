@@ -1,0 +1,60 @@
+name: Sitio del proyecto
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'docs/store/PRIVACY.md', 'docs/store/icon-512.png', 'tools/store_site.py', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generar política de privacidad
+        run: python3 tools/store_site.py --output web/public/privacidad
+      - name: Instalar dependencias
+        working-directory: web
+        run: npm ci
+      - name: Construir el sitio
+        working-directory: web
+        run: npm run build:pages
+      - name: Comprobar el artefacto
+        working-directory: web
+        run: |
+          test -f dist/index.html
+          test -f dist/privacidad/index.html
+          test -f dist/404.html
+          test -f dist/sitemap.xml
+          ! grep -q "vnic-cesar" dist/index.html
+          grep -q "alarconcesar.github.io/melodia" dist/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

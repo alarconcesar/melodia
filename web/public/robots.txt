@@ -1,5 +1,4 @@
 User-agent: *
-Disallow: /melodia/
+Allow: /melodia/
 
-# Vista previa: no indexar el hostname de infraestructura.
-# Cambiar esta política y el canonical al aprobar el dominio de lanzamiento.
+Sitemap: https://alarconcesar.github.io/melodia/sitemap.xml

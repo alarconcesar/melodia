@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 8942 --strictPort",
     "build": "vite build",
+    "build:pages": "vite build --mode pages",
+    "prebuild": "python3 ../tools/store_site.py --output public/privacidad && python3 scripts/prepare-site.py",
+    "prebuild:pages": "python3 ../tools/store_site.py --output public/privacidad && SITE_ORIGIN=https://alarconcesar.github.io python3 scripts/prepare-site.py",
     "preview": "vite preview --host 127.0.0.1 --port 8942 --strictPort",
     "qa": "python3 scripts/qa.py",
     "prepare:release": "python3 scripts/prepare-release.py"
