@@ -10,7 +10,7 @@ Convertir tráfico orgánico de TikTok y Reels en descarga del APK de la beta p�
 
 ## Hero vigente
 
-El copy exacto vive en `web/index.html` (`#hero-title` y `.hero-description`). La primera pantalla debe destacar **descarga de música gratuita** y escucha sin conexión, no solo la biblioteca local ni que el APK sea gratis. Mantener el diseño negro/verde aprobado y aclarar uso de contenido propio o autorizado.
+El copy exacto vive en `web/index.html` (`#hero-title` y `.hero-description`). Conservar el H1 de marca aprobado; destacar **descarga de música gratuita** y escucha sin conexión en el subtítulo, sin reemplazar el título. Mantener el diseño negro/verde aprobado y aclarar uso de contenido propio o autorizado.
 
 **CTA:** Descargar para Android
 
@@ -31,7 +31,7 @@ Editorial negro y verde **#2EE56B**; Manrope autoalojada. Tipografía protagonis
 
 ## Recorrido y copy de secciones
 
-1. **Hero + demo:** descarga musical gratuita como promesa principal, categoría Android y CTA visibles; la prueba interactiva se reconoce como web. Tras los hechos, una sección explica búsqueda → descarga → escucha sin conexión.
+1. **Hero + demo:** H1 de marca conservado, descarga musical gratuita en el subtítulo, categoría Android y CTA visibles; la prueba interactiva se reconoce como web. Tras los hechos, una sección explica búsqueda → descarga → escucha sin conexión.
 2. **«Tu biblioteca vuelve a sonar.»** — «Explora canciones, carpetas, álbumes y artistas. Escucha tus archivos, también sin conexión.»
 3. **«Decide qué sigue.»** — «Marca favoritos, prepara la cola y guarda tus listas.» La cola descrita es local, no una mezcla universal con streams.
 4. **«Encuentra tu sonido.»** — «Ajusta el ecualizador de cinco bandas y el refuerzo de graves, según tu dispositivo.» Apoyo: «Letras de LRCLIB, sincronizadas cuando están disponibles.»
@@ -39,7 +39,7 @@ Editorial negro y verde **#2EE56B**; Manrope autoalojada. Tipografía protagonis
 6. **FAQ:** la versión publicada vive en `web/index.html`; responder primero a la descarga musical gratuita y después a compatibilidad, conexión, anuncios/cuenta, instalación, letras y fuentes externas.
 7. **Cierre:** «Tu próxima canción la eliges tú.» + el mismo CTA. Nota: «Las funciones en línea dependen de servicios externos. Usa solo contenido propio o autorizado y respeta sus condiciones.» Enlace de privacidad solo a una URL real verificada, nunca un correo inventado.
 
-La descarga gratuita sí es promesa principal por pedido de César. No presentarla como acceso autorizado a cualquier catálogo ni como forma de eludir pagos. La importación de listas encola descargas, no sincroniza cuentas ni migra Spotify. Disponibilidad, derechos y máximo de 100 temas por colección deben explicarse donde corresponda, no como «música ilimitada».
+La descarga gratuita se destaca en el subtítulo y la sección dedicada; no reemplaza el H1 de marca aprobado por César. No presentarla como acceso autorizado a cualquier catálogo ni como forma de eludir pagos. La importación de listas encola descargas, no sincroniza cuentas ni migra Spotify. Disponibilidad, derechos y máximo de 100 temas por colección deben explicarse donde corresponda, no como «música ilimitada».
 
 ## Entrada orgánica y medición inicial
 

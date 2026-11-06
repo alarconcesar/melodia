@@ -8,7 +8,7 @@ Fuente: `/home/ubuntu/projects/melodia/web`. No modifica ni recompila la app And
 
 ## Dirección y mensaje
 
-La prioridad de César es destacar **la descarga gratuita de música y la escucha sin conexión**, no solamente que el APK sea gratis. El copy vigente tiene una sola fuente: `index.html`. Usar contenido propio o cuya descarga esté autorizada; no prometer catálogos, permisos sobre música ajena, disponibilidad universal ni elusión de pagos.
+La prioridad de César es destacar **la descarga gratuita de música y la escucha sin conexión**, no solamente que el APK sea gratis. El H1 de marca aprobado se conserva: destacar un beneficio no autoriza a reemplazarlo. La descarga gratuita vive en el subtítulo y la sección dedicada. El copy vigente tiene una sola fuente: `index.html`. Usar contenido propio o cuya descarga esté autorizada; no prometer catálogos, permisos sobre música ajena, disponibilidad universal ni elusión de pagos.
 
 Se conserva el diseño aprobado: negro, verde `#2EE56B`, Manrope autoalojada, composición editorial asimétrica y animaciones accesibles. No hay anuncios, píxeles, métricas de adopción, testimonios, correo ni perfiles sociales inventados.
 

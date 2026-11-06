@@ -25,7 +25,7 @@ Melodia es un reproductor para Android que organiza y reproduce los archivos de 
 ## Posicionamiento, promesa y beneficios
 
 **Categoría:** reproductor de música para Android, centrado en la biblioteca personal.
-**Promesa prioritaria por pedido de César:** descarga música gratis y escúchala sin conexión; la gratuidad corresponde a la función de Melodia, no a derechos sobre cualquier canción. Usar contenido propio o autorizado. Biblioteca, listas y sonido respaldan esa promesa.
+**Jerarquía aprobada por César:** conservar el H1 de marca; destacar la descarga gratuita y la escucha sin conexión en el subtítulo y la sección dedicada, no sustituir el título. La gratuidad corresponde a la función de Melodia, no a derechos sobre cualquier canción. Usar contenido propio o autorizado.
 **Diferencia a demostrar, no superioridad a proclamar:** control de la colección local + organización + ajustes de sonido en una experiencia visual coherente.
 
 | Beneficio para quien escucha | Copy utilizable | Límite |

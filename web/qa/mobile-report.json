@@ -1,16 +1,17 @@
 {
   "url": "http://127.0.0.1:8951/melodia/",
-  "at": "2026-11-06T16:16:01.821275+00:00",
+  "at": "2026-11-06T16:37:57.075042+00:00",
   "viewports": [
     {
       "width": 320,
       "clientWidth": 320,
       "height": 568,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
-      "headingSize": "34px",
-      "ctaBottom": 404,
+      "headingSize": "48px",
+      "ctaBottom": 432,
       "manrope": true,
       "loaded": [
         "Manrope Variable"
@@ -21,10 +22,11 @@
       "clientWidth": 360,
       "height": 640,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
-      "headingSize": "36px",
-      "ctaBottom": 408,
+      "headingSize": "48px",
+      "ctaBottom": 432,
       "manrope": true,
       "loaded": [
         "Manrope Variable"
@@ -35,10 +37,11 @@
       "clientWidth": 375,
       "height": 667,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
-      "headingSize": "37.5px",
-      "ctaBottom": 411,
+      "headingSize": "48px",
+      "ctaBottom": 432,
       "manrope": true,
       "loaded": [
         "Manrope Variable"
@@ -49,10 +52,11 @@
       "clientWidth": 390,
       "height": 844,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
-      "headingSize": "39px",
-      "ctaBottom": 414,
+      "headingSize": "48px",
+      "ctaBottom": 432,
       "manrope": true,
       "loaded": [
         "Manrope Variable"
@@ -63,10 +67,11 @@
       "clientWidth": 414,
       "height": 896,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
-      "headingLines": 2.00030193236715,
-      "headingSize": "41.4px",
-      "ctaBottom": 394.8125,
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
+      "headingLines": 2,
+      "headingSize": "48px",
+      "ctaBottom": 408,
       "manrope": true,
       "loaded": [
         "Manrope Variable"
@@ -77,10 +82,11 @@
       "clientWidth": 430,
       "height": 932,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
-      "headingSize": "43px",
-      "ctaBottom": 398,
+      "headingSize": "48px",
+      "ctaBottom": 408,
       "manrope": true,
       "loaded": [
         "Manrope Variable"
@@ -91,7 +97,8 @@
       "clientWidth": 480,
       "height": 800,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
       "headingSize": "60px",
       "ctaBottom": 448,
@@ -105,7 +112,8 @@
       "clientWidth": 600,
       "height": 960,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
       "headingSize": "60px",
       "ctaBottom": 448,
@@ -119,7 +127,8 @@
       "clientWidth": 667,
       "height": 375,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
       "headingSize": "60px",
       "ctaBottom": 448,
@@ -133,10 +142,11 @@
       "clientWidth": 844,
       "height": 390,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
-      "headingLines": 2.000093250833772,
-      "headingSize": "45.576px",
-      "ctaBottom": 526.171875,
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
+      "headingLines": 2,
+      "headingSize": "48px",
+      "ctaBottom": 528.59375,
       "manrope": true,
       "loaded": [
         "Manrope Variable"
@@ -147,10 +157,11 @@
       "clientWidth": 768,
       "height": 1024,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
-      "headingLines": 1.9998432677469136,
-      "headingSize": "41.472px",
-      "ctaBottom": 511.671875,
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
+      "headingLines": 2,
+      "headingSize": "48px",
+      "ctaBottom": 518.203125,
       "manrope": true,
       "loaded": [
         "Manrope Variable"
@@ -161,7 +172,8 @@
       "clientWidth": 1024,
       "height": 768,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
       "headingSize": "60px",
       "ctaBottom": 546.59375,
@@ -175,7 +187,8 @@
       "clientWidth": 1440,
       "height": 900,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
       "headingSize": "72px",
       "ctaBottom": 560.34375,
@@ -189,10 +202,11 @@
       "clientWidth": 1920,
       "height": 1080,
       "overflow": 0,
-      "heading": "Descarga música\ngratis.",
+      "heading": "Tu música.\nA tu manera.",
+      "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
       "headingLines": 2,
-      "headingSize": "82px",
-      "ctaBottom": 596.34375,
+      "headingSize": "96px",
+      "ctaBottom": 610.34375,
       "manrope": true,
       "loaded": [
         "Manrope Variable"
@@ -213,10 +227,11 @@
         "clientWidth": 320,
         "height": 568,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
-        "headingSize": "34px",
-        "ctaBottom": 404,
+        "headingSize": "48px",
+        "ctaBottom": 432,
         "manrope": true,
         "loaded": [
           "Manrope Variable"
@@ -224,7 +239,12 @@
       }
     },
     {
-      "name": "320x568:free-download-headline",
+      "name": "320x568:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "320x568:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -241,7 +261,7 @@
     {
       "name": "320x568:cta-above-fold",
       "passed": true,
-      "detail": 404
+      "detail": 432
     },
     {
       "name": "320x568:overflow",
@@ -356,10 +376,11 @@
         "clientWidth": 360,
         "height": 640,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
-        "headingSize": "36px",
-        "ctaBottom": 408,
+        "headingSize": "48px",
+        "ctaBottom": 432,
         "manrope": true,
         "loaded": [
           "Manrope Variable"
@@ -367,7 +388,12 @@
       }
     },
     {
-      "name": "360x640:free-download-headline",
+      "name": "360x640:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "360x640:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -384,7 +410,7 @@
     {
       "name": "360x640:cta-above-fold",
       "passed": true,
-      "detail": 408
+      "detail": 432
     },
     {
       "name": "360x640:overflow",
@@ -499,10 +525,11 @@
         "clientWidth": 375,
         "height": 667,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
-        "headingSize": "37.5px",
-        "ctaBottom": 411,
+        "headingSize": "48px",
+        "ctaBottom": 432,
         "manrope": true,
         "loaded": [
           "Manrope Variable"
@@ -510,7 +537,12 @@
       }
     },
     {
-      "name": "375x667:free-download-headline",
+      "name": "375x667:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "375x667:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -527,7 +559,7 @@
     {
       "name": "375x667:cta-above-fold",
       "passed": true,
-      "detail": 411
+      "detail": 432
     },
     {
       "name": "375x667:overflow",
@@ -642,10 +674,11 @@
         "clientWidth": 390,
         "height": 844,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
-        "headingSize": "39px",
-        "ctaBottom": 414,
+        "headingSize": "48px",
+        "ctaBottom": 432,
         "manrope": true,
         "loaded": [
           "Manrope Variable"
@@ -653,7 +686,12 @@
       }
     },
     {
-      "name": "390x844:free-download-headline",
+      "name": "390x844:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "390x844:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -670,7 +708,7 @@
     {
       "name": "390x844:cta-above-fold",
       "passed": true,
-      "detail": 414
+      "detail": 432
     },
     {
       "name": "390x844:overflow",
@@ -820,10 +858,11 @@
         "clientWidth": 414,
         "height": 896,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
-        "headingLines": 2.00030193236715,
-        "headingSize": "41.4px",
-        "ctaBottom": 394.8125,
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
+        "headingLines": 2,
+        "headingSize": "48px",
+        "ctaBottom": 408,
         "manrope": true,
         "loaded": [
           "Manrope Variable"
@@ -831,14 +870,19 @@
       }
     },
     {
-      "name": "414x896:free-download-headline",
+      "name": "414x896:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "414x896:free-download-subtitle",
       "passed": true,
       "detail": null
     },
     {
       "name": "414x896:two-line-headline",
       "passed": true,
-      "detail": 2.00030193236715
+      "detail": 2
     },
     {
       "name": "414x896:font-loaded",
@@ -848,7 +892,7 @@
     {
       "name": "414x896:cta-above-fold",
       "passed": true,
-      "detail": 394.8125
+      "detail": 408
     },
     {
       "name": "414x896:overflow",
@@ -943,7 +987,7 @@
     {
       "name": "414x896:section-not-under-header",
       "passed": true,
-      "detail": 95.609375
+      "detail": 95.796875
     },
     {
       "name": "414x896:no-js-errors",
@@ -963,10 +1007,11 @@
         "clientWidth": 430,
         "height": 932,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
-        "headingSize": "43px",
-        "ctaBottom": 398,
+        "headingSize": "48px",
+        "ctaBottom": 408,
         "manrope": true,
         "loaded": [
           "Manrope Variable"
@@ -974,7 +1019,12 @@
       }
     },
     {
-      "name": "430x932:free-download-headline",
+      "name": "430x932:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "430x932:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -991,7 +1041,7 @@
     {
       "name": "430x932:cta-above-fold",
       "passed": true,
-      "detail": 398
+      "detail": 408
     },
     {
       "name": "430x932:overflow",
@@ -1106,7 +1156,8 @@
         "clientWidth": 480,
         "height": 800,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
         "headingSize": "60px",
         "ctaBottom": 448,
@@ -1117,7 +1168,12 @@
       }
     },
     {
-      "name": "480x800:free-download-headline",
+      "name": "480x800:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "480x800:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -1249,7 +1305,8 @@
         "clientWidth": 600,
         "height": 960,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
         "headingSize": "60px",
         "ctaBottom": 448,
@@ -1260,7 +1317,12 @@
       }
     },
     {
-      "name": "600x960:free-download-headline",
+      "name": "600x960:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "600x960:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -1392,7 +1454,8 @@
         "clientWidth": 667,
         "height": 375,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
         "headingSize": "60px",
         "ctaBottom": 448,
@@ -1403,7 +1466,12 @@
       }
     },
     {
-      "name": "667x375:free-download-headline",
+      "name": "667x375:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "667x375:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -1530,10 +1598,11 @@
         "clientWidth": 844,
         "height": 390,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
-        "headingLines": 2.000093250833772,
-        "headingSize": "45.576px",
-        "ctaBottom": 526.171875,
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
+        "headingLines": 2,
+        "headingSize": "48px",
+        "ctaBottom": 528.59375,
         "manrope": true,
         "loaded": [
           "Manrope Variable"
@@ -1541,14 +1610,19 @@
       }
     },
     {
-      "name": "844x390:free-download-headline",
+      "name": "844x390:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "844x390:free-download-subtitle",
       "passed": true,
       "detail": null
     },
     {
       "name": "844x390:two-line-headline",
       "passed": true,
-      "detail": 2.000093250833772
+      "detail": 2
     },
     {
       "name": "844x390:font-loaded",
@@ -1633,10 +1707,11 @@
         "clientWidth": 768,
         "height": 1024,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
-        "headingLines": 1.9998432677469136,
-        "headingSize": "41.472px",
-        "ctaBottom": 511.671875,
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
+        "headingLines": 2,
+        "headingSize": "48px",
+        "ctaBottom": 518.203125,
         "manrope": true,
         "loaded": [
           "Manrope Variable"
@@ -1644,14 +1719,19 @@
       }
     },
     {
-      "name": "768x1024:free-download-headline",
+      "name": "768x1024:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "768x1024:free-download-subtitle",
       "passed": true,
       "detail": null
     },
     {
       "name": "768x1024:two-line-headline",
       "passed": true,
-      "detail": 1.9998432677469136
+      "detail": 2
     },
     {
       "name": "768x1024:font-loaded",
@@ -1736,7 +1816,8 @@
         "clientWidth": 1024,
         "height": 768,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
         "headingSize": "60px",
         "ctaBottom": 546.59375,
@@ -1747,7 +1828,12 @@
       }
     },
     {
-      "name": "1024x768:free-download-headline",
+      "name": "1024x768:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1024x768:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -1839,7 +1925,8 @@
         "clientWidth": 1440,
         "height": 900,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
         "headingSize": "72px",
         "ctaBottom": 560.34375,
@@ -1850,7 +1937,12 @@
       }
     },
     {
-      "name": "1440x900:free-download-headline",
+      "name": "1440x900:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1440x900:free-download-subtitle",
       "passed": true,
       "detail": null
     },
@@ -1942,10 +2034,11 @@
         "clientWidth": 1920,
         "height": 1080,
         "overflow": 0,
-        "heading": "Descarga música\ngratis.",
+        "heading": "Tu música.\nA tu manera.",
+        "description": "Busca música, descárgala gratis y escúchala sin conexión. Sin anuncios y sin crear una cuenta.",
         "headingLines": 2,
-        "headingSize": "82px",
-        "ctaBottom": 596.34375,
+        "headingSize": "96px",
+        "ctaBottom": 610.34375,
         "manrope": true,
         "loaded": [
           "Manrope Variable"
@@ -1953,7 +2046,12 @@
       }
     },
     {
-      "name": "1920x1080:free-download-headline",
+      "name": "1920x1080:brand-headline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1920x1080:free-download-subtitle",
       "passed": true,
       "detail": null
     },

@@ -54,14 +54,15 @@ try:
                     const h=document.querySelector('h1'), cta=document.querySelector('.hero-cta');
                     const style=getComputedStyle(h), r=h.getBoundingClientRect();
                     return {width:innerWidth,clientWidth:document.documentElement.clientWidth,height:innerHeight,overflow:document.documentElement.scrollWidth-innerWidth,
-                      heading:h.innerText,headingLines:r.height/parseFloat(style.lineHeight),
+                      heading:h.innerText,description:document.querySelector('.hero-description').innerText,headingLines:r.height/parseFloat(style.lineHeight),
                       headingSize:style.fontSize,ctaBottom:cta.getBoundingClientRect().bottom,
-                      manrope:document.fonts.check('600 48px "Manrope Variable"','Descarga música gratis.'),
+                      manrope:document.fonts.check('600 48px "Manrope Variable"','Tu música. A tu manera.'),
                       loaded:[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family)};
                 }''')
                 record(f'{key}:http', response is not None and response.status == 200)
                 record(f'{key}:real-viewport', m['width'] == width and m['clientWidth'] == width and m['height'] == height, m)
-                record(f'{key}:free-download-headline', 'Descarga música' in m['heading'] and 'gratis.' in m['heading'])
+                record(f'{key}:brand-headline', ' '.join(m['heading'].split()) == 'Tu música. A tu manera.')
+                record(f'{key}:free-download-subtitle', 'descárgala gratis' in m['description'] and 'sin conexión' in m['description'])
                 record(f'{key}:two-line-headline', m['headingLines'] <= 2.1, m['headingLines'])
                 record(f'{key}:font-loaded', m['manrope'] and any('Manrope' in f for f in m['loaded']))
                 if width < 768 and height > width:

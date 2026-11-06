@@ -87,7 +87,6 @@ p { text-wrap: pretty; }
 .signal-dot { display: inline-block; height: 8px; width: 8px; background: var(--accent); border-radius: 9999px; }
 .hero h1 { font-size: 72px; line-height: 1; letter-spacing: -.065em; font-weight: 600; max-width: 680px; background: linear-gradient(100deg,#fff 5%,#9b9b9b 100%); color: transparent; background-clip: text; -webkit-background-clip: text; }
 .hero h1 span { white-space: nowrap; }
-.hero h1 .hero-free { color: var(--accent); }
 .hero-description { font-size: 18px; line-height: 28px; color: #b9bcb5; max-width: 400px; margin-block: 24px 32px; }
 .hero-cta { min-height: 56px; }
 .hero-terms { max-width: 370px; margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.6; animation-delay: 280ms; }
@@ -309,7 +308,7 @@ p { text-wrap: pretty; }
   .site-footer > nav a:hover { color: var(--accent); }
 }
 @media (min-width: 1536px) {
-  .hero h1 { font-size: 82px; }
+  .hero h1 { font-size: 96px; }
   .hero { grid-template-columns: 1.15fr 1fr; min-height: 900px; }
   .hero-visual { padding-inline: 40px; }
   .hero-bottom { margin-top: 0; }
@@ -333,7 +332,7 @@ p { text-wrap: pretty; }
   .nav-island { gap: 24px; padding-left: 16px; }
   .desktop-links { gap: 16px; }
   .desktop-links a { font-size: 12px; line-height: 16px; }
-  .hero h1 { font-size: clamp(40px, 5.4vw, 48px); }
+  .hero h1 { font-size: 48px; }
   .hero-visual { min-height: 560px; }
   .demo-frame { width: 288px; padding-inline: 16px; }
   .demo-track h2 { font-size: 18px; line-height: 28px; }
@@ -454,7 +453,7 @@ p { text-wrap: pretty; }
 }
 @media (max-width: 479px) {
   .hero { padding-top: 96px; }
-  .hero h1 { font-size: clamp(34px, 10vw, 44px); line-height: 1; letter-spacing: -.055em; }
+  .hero h1 { font-size: 48px; line-height: 1; }
   .hero-copy { padding-block: 24px; }
   .offline-panel { padding: 28px 22px; gap: 32px; }
   .offline-copy h2 { font-size: 30px; }
@@ -496,7 +495,7 @@ p { text-wrap: pretty; }
   .record-wrap { left: auto; right: 0; width: 224px; top: 112px; }
   .floating-note { display: none; }
   .demo-bottom { font-size: 12px; line-height: 16px; gap: 4px; }
-  .hero h1 { font-size: 34px; }
+  .hero h1 { font-size: 48px; }
   .word-reveal { font-size: 30px; line-height: 36px; }
   .sound-grid article { padding: 24px 16px; }
   .sound-grid h3 { font-size: 24px; line-height: 32px; }

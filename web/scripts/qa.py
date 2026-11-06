@@ -37,7 +37,7 @@ with sync_playwright() as pw:
         response=page.goto(URL,wait_until='networkidle')
         page.evaluate('document.fonts.ready')
         page.wait_for_timeout(1300)
-        metrics=page.evaluate("""()=>{const h=document.querySelector('h1'),cta=document.querySelector('.hero-cta'),stage=document.querySelector('.hero-visual');return {width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth-innerWidth,fontReady:document.fonts.check('600 48px "Manrope Variable"','Descarga música gratis.'),fonts:[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family),heroTitle:{size:getComputedStyle(h).fontSize,height:h.getBoundingClientRect().height},ctaBottom:cta.getBoundingClientRect().bottom,visualTop:stage.getBoundingClientRect().top,pageHeight:document.documentElement.scrollHeight};}""")
+        metrics=page.evaluate("""()=>{const h=document.querySelector('h1'),cta=document.querySelector('.hero-cta'),stage=document.querySelector('.hero-visual');return {width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth-innerWidth,fontReady:document.fonts.check('600 48px "Manrope Variable"','Tu música. A tu manera.'),fonts:[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family),heroTitle:{size:getComputedStyle(h).fontSize,height:h.getBoundingClientRect().height},ctaBottom:cta.getBoundingClientRect().bottom,visualTop:stage.getBoundingClientRect().top,pageHeight:document.documentElement.scrollHeight};}""")
         record(f'{width}:http',response is not None and response.status==200)
         record(f'{width}:viewport-real',metrics['width']==width,metrics['width'])
         record(f'{width}:overflow',metrics['overflow']==0,metrics['overflow'])

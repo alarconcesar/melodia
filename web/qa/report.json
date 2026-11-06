@@ -10,12 +10,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "34px",
-        "height": 68
+        "size": "48px",
+        "height": 96
       },
-      "ctaBottom": 404,
-      "visualTop": 483.59375,
-      "pageHeight": 8228,
+      "ctaBottom": 432,
+      "visualTop": 511.59375,
+      "pageHeight": 8256,
       "errors": [],
       "badAssets": []
     },
@@ -28,12 +28,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "36px",
-        "height": 72
+        "size": "48px",
+        "height": 96
       },
-      "ctaBottom": 408,
-      "visualTop": 487.59375,
-      "pageHeight": 8188,
+      "ctaBottom": 432,
+      "visualTop": 511.59375,
+      "pageHeight": 8212,
       "errors": [],
       "badAssets": []
     },
@@ -46,12 +46,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "39px",
-        "height": 78
+        "size": "48px",
+        "height": 96
       },
-      "ctaBottom": 414,
-      "visualTop": 472.796875,
-      "pageHeight": 8007,
+      "ctaBottom": 432,
+      "visualTop": 490.796875,
+      "pageHeight": 8025,
       "errors": [],
       "badAssets": []
     },
@@ -64,12 +64,12 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "43px",
-        "height": 86
+        "size": "48px",
+        "height": 96
       },
-      "ctaBottom": 398,
-      "visualTop": 456.796875,
-      "pageHeight": 7850,
+      "ctaBottom": 408,
+      "visualTop": 466.796875,
+      "pageHeight": 7860,
       "errors": [],
       "badAssets": []
     },
@@ -82,10 +82,10 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "41.472px",
-        "height": 82.9375
+        "size": "48px",
+        "height": 96
       },
-      "ctaBottom": 511.671875,
+      "ctaBottom": 518.203125,
       "visualTop": 96,
       "pageHeight": 6323,
       "errors": [],
@@ -136,10 +136,10 @@
         "Manrope Variable"
       ],
       "heroTitle": {
-        "size": "82px",
-        "height": 164
+        "size": "96px",
+        "height": 192
       },
-      "ctaBottom": 596.34375,
+      "ctaBottom": 610.34375,
       "visualTop": 123.75,
       "pageHeight": 6620,
       "errors": [],
@@ -172,7 +172,7 @@
     {
       "name": "320:hero-cta-in-fold",
       "passed": true,
-      "detail": 404
+      "detail": 432
     },
     {
       "name": "320:images",
@@ -252,7 +252,7 @@
     {
       "name": "360:hero-cta-in-fold",
       "passed": true,
-      "detail": 408
+      "detail": 432
     },
     {
       "name": "360:images",
@@ -332,7 +332,7 @@
     {
       "name": "390:hero-cta-in-fold",
       "passed": true,
-      "detail": 414
+      "detail": 432
     },
     {
       "name": "390:images",
@@ -437,7 +437,7 @@
     {
       "name": "430:hero-cta-in-fold",
       "passed": true,
-      "detail": 398
+      "detail": 408
     },
     {
       "name": "430:images",
@@ -517,7 +517,7 @@
     {
       "name": "768:hero-cta-in-fold",
       "passed": true,
-      "detail": 511.671875
+      "detail": 518.203125
     },
     {
       "name": "768:images",
@@ -737,7 +737,7 @@
       "passed": true,
       "detail": {
         "paused": false,
-        "time": 0.821132,
+        "time": 0.800719,
         "duration": 17.846333,
         "error": null
       }
@@ -833,7 +833,7 @@
     {
       "name": "1920:hero-cta-in-fold",
       "passed": true,
-      "detail": 596.34375
+      "detail": 610.34375
     },
     {
       "name": "1920:images",
